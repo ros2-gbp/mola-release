@@ -1,139 +1,58 @@
-[![CircleCI](https://img.shields.io/circleci/build/gh/MOLAorg/mp2p_icp/master.svg)](https://circleci.com/gh/MOLAorg/mp2p_icp) [![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.mola-slam.org/latest/module-mp2p-icp.html)
+[![CI Check clang-format](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml)
+[![CI ROS](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml)
+[![CircleCI](https://img.shields.io/circleci/build/gh/MOLAorg/mola/develop.svg)](https://circleci.com/gh/MOLAorg/mola)
+[![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.mola-slam.org/latest/)
+
+| Distro | Build dev | Build release | Stable sync |
+| --- | --- | --- | --- |
+| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/) |  TBD | [![Version](https://img.shields.io/ros/v/iron/mola)](https://index.ros.org/search/?term=mola) |
+| ROS 2 Iron (u22.04) | [![Build Status](https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/) |  TBD | [![Version](https://img.shields.io/ros/v/iron/mola)](https://index.ros.org/search/?term=mola) |
+| ROS 2 Rolling (u22.04) | [![Build Status](https://build.ros2.org/job/Rdev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mola__ubuntu_jammy_amd64/) |  TBD | [![Version](https://img.shields.io/ros/v/rolling/mola)](https://index.ros.org/search/?term=mola) |
 
 
-| Distro | Build dev | Build releases | Stable version |
-| ---    | ---       | ---            | ---         |
-| ROS 1 Noetic (u20.04) | [![Build Status](https://build.ros.org/job/Ndev__mp2p_icp__ubuntu_focal_amd64/badge/icon)](https://build.ros.org/job/Ndev__mp2p_icp__ubuntu_focal_amd64/) | [![Build Status](https://build.ros.org/job/Nbin_uF64__mp2p_icp__ubuntu_focal_amd64__binary/badge/icon)](https://build.ros.org/job/Nbin_uF64__mp2p_icp__ubuntu_focal_amd64__binary/) | [![Version](https://img.shields.io/ros/v/noetic/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/humble/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Iron (u22.04) | [![Build Status](https://build.ros2.org/job/Idev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Idev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/iron/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Rolling (u22.04) | [![Build Status](https://build.ros2.org/job/Rdev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Rbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/rolling/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
+# mola
+A Modular Optimization framework for Localization and mApping (MOLA).
 
+This repository holds the MOLA git [superproject](https://en.wikibooks.org/wiki/Git/Submodules_and_Superprojects).
+Refer to the [official documentation](https://docs.mola-slam.org/latest/) for
+build instructions, [demos](https://docs.mola-slam.org/latest/demos.html), API reference, etc.
 
-# `mp2p_icp`
-A repertory of multi primitive-to-primitive (MP2P) ICP algorithms in C++. 
-
-License: New BSD 3-Clause
-
-Docs:
-- [Main library documentation](https://docs.mola-slam.org/latest/module-mp2p-icp.html)
-- [C++ API reference](https://docs.mola-slam.org/latest/group_mp2p_icp_grp.html)
-
-The OLAE-ICP method is described in [this technical report](https://arxiv.org/abs/1906.10783):
-
-```
-Jose-Luis Blanco-Claraco. "OLAE-ICP: Robust and fast alignment of geometric
-features with the optimal linear attitude estimator", Arxiv 2019.
-```
-
-![mp2p_pairings](docs/mp2p_pairings.png)
-
-## Introduction
-
-This library provides:
- * [`mp2p_icp::metricmap_t`](https://docs.mola-slam.org/latest/class_mp2p_icp_metric_map_t.html#doxid-classmp2p-icp-1-1metric-map-t): A generic
-   data type to store raw or processed point clouds, e.g. segmented, discrete
-   extracted features. Note that filtering point clouds is intentionally left
-   outside of the scope of this library.
-   See [MOLA](https://github.com/MOLAorg/mola) for possible implementations.
- * [`mp2p_icp::ICP_Base`](https://docs.mola-slam.org/latest/): A uniform API
-   for matching those generic point clouds.
- * Implementations/wrappers of different ICP algorithms under such uniform API.
- * The library exposes both, complete iterative ICP algorithms, and the
- underlying optimal transformation estimators which are run at each ICP iteration.
-
-## Implemented Optimal Transformation methods
- * `optimal_tf_olae()`: A novel algorithm that can recover the optimal attitude from a set
-    of point-to-point, line-to-line, and plane-to-plane pairings.
- * `optimal_tf_horn()`: Classic Horn's closed-form optimal quaternion solution.
-    Relies on the implementation in [`<mrpt/tfest/se3.h>`](http://mrpt.ual.es/reference/devel/group__mrpt__tfest__grp.html).
- * `optimal_gauss_newton()`: Simple non-linear optimizer to find the SE(3)
-    optimal transformation for these pairings: point-to-point, point-to-plane.
-
-## Implemented ICP methods
-
- * `ICP_OLAE`: ICP for point clouds, planes, and lines. Uses `optimal_tf_olae()`.
- * `ICP_Horn_MultiCloud`: Align point clouds layers, using classic Horn's
-    closed-form optimal quaternion solution.
-
-## Status on ROS build farms
-
-| Distro | Build dev | Build releases | Stable version |
-| ---    | ---       | ---            | ---         |
-| ROS 1 Noetic (u20.04) | [![Build Status](https://build.ros.org/job/Ndev__mp2p_icp__ubuntu_focal_amd64/badge/icon)](https://build.ros.org/job/Ndev__mp2p_icp__ubuntu_focal_amd64/) | [![Build Status](https://build.ros.org/job/Nbin_uF64__mp2p_icp__ubuntu_focal_amd64__binary/badge/icon)](https://build.ros.org/job/Nbin_uF64__mp2p_icp__ubuntu_focal_amd64__binary/) | [![Version](https://img.shields.io/ros/v/noetic/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/humble/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Iron (u22.04) | [![Build Status](https://build.ros2.org/job/Idev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Idev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/iron/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
-| ROS 2 Rolling (u22.04) | [![Build Status](https://build.ros2.org/job/Rdev__mp2p_icp__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mp2p_icp__ubuntu_jammy_amd64/) | [![Build Status](https://build.ros2.org/job/Rbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uJ64__mp2p_icp__ubuntu_jammy_amd64__binary/) | [![Version](https://img.shields.io/ros/v/rolling/mp2p_icp)](https://index.ros.org/search/?term=mp2p_icp) |
+|             Demo                                                                                             |                                          Preview                                               |  
+|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+|  [3D LiDAR SLAM from KITTI dataset](https://docs.mola-slam.org/latest/demo-kitti-lidar-slam.html)            |  ![](https://github.com/MOLAorg/static-media/blob/master/kitti_lidar_slam.gif)                 |
+|  [Graph SLAM from G2O dataset](https://docs.mola-slam.org/latest/demo-pose-graph-g2o-file.html)              |  ![](https://github.com/MOLAorg/static-media/blob/master/mola-demo-g2o-garage.gif)             |
 
 ## Building
-
-### Requisites
- * A C++17 compiler. Tested with gcc-7, MSVC 2017.
- * Eigen3
- * CMake >= 3.4
- * MRPT >=2.4.0
-
-Install all the dependencies in Ubuntu with:
+Clone with:
 
 ```
-# MRPT >=2.4.0, for now from this PPA (or build from sources if preferred):
-sudo add-apt-repository ppa:joseluisblancoc/mrpt
-sudo apt update
-sudo apt install libmrpt-dev
-
-# Rest of dependencies:
-sudo apt install build-essential cmake libeigen3-dev
+git clone --recurse-submodules https://github.com/MOLAorg/mola.git
 ```
 
-### Build
+Follow [these instructions](https://docs.mola-slam.org/latest/building.html) (in RST format [here](docs/source/building.rst)).
 
-```
-cmake -H. -Bbuild
-cd build
-cmake --build .   # or make
-```
+## About the directory structure
+Directories layout is as follows:
+* `demos`: Example YAML files for `mola-launcher`
+* `docs`: Documentation and placeholder for Doxygen docs.
+* `externals`: All external depedencies
+* `modules`: All MOLA module projects.
 
-### Run the tests
+## Citation
 
-```
-make test
-```
+MOLA was presented in ([PDF](http://www.roboticsproceedings.org/rss15/p43.pdf)):
 
-### Run the demos
-
-```bash
-# 2D icp with point-to-point pairings only:
-build/bin/mp2p-icp-run \
-  --input-local demos/local_001.mm \
-  --input-global demos/global_001.mm \
-  -c demos/icp-settings-2d-lidar-example-point2point.yaml \
-  --generate-debug-log
-
-# Inspect the debug log:
-build/bin/mp2p-icp-log-viewer
+```bibtex
+@INPROCEEDINGS{Blanco-Claraco-RSS-19, 
+    AUTHOR    = {Jose Luis Blanco-Claraco}, 
+    TITLE     = {A Modular Optimization Framework for Localization and Mapping}, 
+    BOOKTITLE = {Proceedings of Robotics: Science and Systems}, 
+    YEAR      = {2019}, 
+    ADDRESS   = {FreiburgimBreisgau, Germany}, 
+    MONTH     = {June}, 
+    DOI       = {10.15607/RSS.2019.XV.043} 
+} 
 ```
 
-```bash
-# 2D icp with point-to-line pairings:
-build/bin/mp2p-icp-run \
-  --input-local demos/local_001.mm \
-  --input-global demos/global_001.mm \
-  -c demos/icp-settings-2d-lidar-example-point2line.yaml \
-  --generate-debug-log
-
-# Inspect the debug log:
-build/bin/mp2p-icp-log-viewer
-```
-
-
-```bash
-# 3D icp with external library wrapper
-build/bin/mp2p-icp-run \
-  --input-local demos/local_001.mm \
-  --input-global demos/global_001.mm \
-  -c demos/icp-settings-example-libpointmatcher.yaml \
-  --generate-debug-log
-
-# Inspect the debug log:
-build/bin/mp2p-icp-log-viewer
-```
-
+## License
+MOLA is released under the GNU GPL v3 license, except noted otherwise in each individual module. Other options available upon request.
