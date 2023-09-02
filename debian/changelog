@@ -1,0 +1,10 @@
+ros-humble-mola-input-kitti-dataset (0.2.1-1jammy) jammy; urgency=high
+
+  * Implement ground-truth interface for KITTI
+  * Update copyright date
+  * Update to new colcon ROS2 build system
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+
