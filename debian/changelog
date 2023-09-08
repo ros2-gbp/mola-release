@@ -1,0 +1,24 @@
+ros-humble-mola-test-datasets (0.2.2-1bullseye) bullseye; urgency=high
+
+  * Fix package name in docs
+  * Build as correct ament package. Add license file
+  * Add package.xml and reorganize data files
+  * fix cmake lib name
+  * add 2lidar+odo dataset
+  * add radish test datasets
+  * fix copyright
+  * import a tiny extract of Kitti00 (lidar) for unit tests
+  * add example 2D slam dataset
+  * add sample g2o dataset
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-humble-mola-test-datasets (0.2.1-1bullseye) bullseye; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 23 Jun 2019 22:00:00 -0000
+
+
