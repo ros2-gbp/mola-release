@@ -1,3 +1,39 @@
+## mola (humble) - 0.2.2-1
+
+The packages in the `mola` repository were released into the `humble` distro by running `/home/jlblanco/code/bloom-venv/bin/bloom-release -r humble mola -y` on `Fri, 08 Sep 2023 16:09:46 -0000`
+
+These packages were released:
+- `mola_common`
+- `mola_demos`
+- `mola_imu_preintegration`
+- `mola_input_euroc_dataset`
+- `mola_input_kitti_dataset`
+- `mola_input_rawlog`
+- `mola_input_ros2`
+- `mola_kernel`
+- `mola_launcher`
+- `mola_test_datasets`
+- `mola_viz`
+- `mola_yaml`
+- `mp2p_icp`
+
+Version of package(s) in repository `mola`:
+
+- upstream repository: https://github.com/MOLAorg/mola.git
+- release repository: https://github.com/ros2-gbp/mola-release.git
+- rosdistro version: `0.2.1-1`
+- old version: `0.2.1-1`
+- new version: `0.2.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.11.2`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.22.2`
+- rosdistro version: `0.9.0`
+- vcstools version: `0.1.42`
+
+
 ## mola (iron) - 0.2.2-1
 
 The packages in the `mola` repository were released into the `iron` distro by running `/home/jlblanco/code/bloom-venv/bin/bloom-release -r iron mola -y` on `Fri, 08 Sep 2023 16:01:36 -0000`
