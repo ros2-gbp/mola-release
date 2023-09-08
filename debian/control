@@ -1,0 +1,12 @@
+Source: ros-rolling-mola-test-datasets
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-rolling-ament-cmake, ros-rolling-ament-cmake-gtest, ros-rolling-ament-cmake-xmllint, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-ament-lint-common <!nocheck>, ros-rolling-ros-environment, ros-rolling-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-rolling-mola-test-datasets
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-ros-workspace
+Description: Small SLAM dataset extracts used for demos or unit tests in the rest of MOLA packages
