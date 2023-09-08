@@ -1,0 +1,16 @@
+ros-rolling-mola-demos (0.2.2-1jammy) jammy; urgency=high
+
+  * Progress with demo
+  * Import first demo files
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-rolling-mola-demos (0.2.1-1jammy) jammy; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+
