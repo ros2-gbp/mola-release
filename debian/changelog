@@ -1,0 +1,20 @@
+ros-humble-mola-kernel (0.2.2-1jammy) jammy; urgency=high
+
+  * Correct references to the license.
+  * viz interface: new service update_3d_object()
+  * Fix const-correctness of observations
+  * FIX missing dependency on mrpt::gui for public header
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-humble-mola-kernel (0.2.1-1jammy) jammy; urgency=high
+
+  * Add virtual interface for dataset groundtruth
+  * Update copyright date
+  * Update to new colcon ROS2 build system
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+
