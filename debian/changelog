@@ -1,0 +1,15 @@
+ros-iron-mola-input-rawlog (0.2.2-1bullseye) bullseye; urgency=high
+
+  * First complete public release
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-iron-mola-input-rawlog (0.2.1-1bullseye) bullseye; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 15 Feb 2019 23:00:00 -0000
+
+
