@@ -1,0 +1,20 @@
+ros-iron-mola-yaml (0.2.2-1bullseye) bullseye; urgency=high
+
+  * Fix package name in docs
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-iron-mola-yaml (0.2.1-1bullseye) bullseye; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+ros-iron-mola-yaml (0.2.0-1bullseye) bullseye; urgency=high
+
+  * First public release as ROS 2 package.
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 23 Aug 2023 22:00:00 -0000
+
+
