@@ -9,10 +9,13 @@ mola_add_library(
 	TARGET ${PROJECT_NAME}
 	SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
 	PUBLIC_LINK_LIBRARIES
+		mp2p_icp_map
 		mrpt::containers
 		mrpt::tfest
 		mrpt::maps
 		mrpt::gui
+	CMAKE_DEPENDENCIES
+		mp2p_icp_map
 )
 
 if (MP2PICP_BUILD_POINTMATCHER)
