@@ -19,11 +19,13 @@
 #include <mola_kernel/interfaces/RawDataSourceBase.h>
 
 // MRPT:
+#include <mrpt/obs/CObservationGPS.h>
 #include <mrpt/obs/CObservationImage.h>
 #include <mrpt/obs/CObservationPointCloud.h>
 
 // ROS & others
 #include <tf2_ros/buffer.h>
+#include <tf2_ros/static_transform_broadcaster.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 
@@ -103,6 +105,15 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         /// tf frame name with respect to sensor poses are measured:
         std::string base_link_frame = "base_link";
 
+        /// If not empty, the node will broadcast a static /tf from base_link to
+        /// base_footprint with the TF base_footprint_to_base_link_tf at start
+        /// up.
+        /// Normally: "base_footprint"
+        std::string base_footprint_frame;  // Disabled by default
+
+        /// YAML format: "[x y z yaw pitch roll]" (meters & degrees)
+        mrpt::math::TPose3D base_footprint_to_base_link_tf = {0, 0, 0, 0, 0, 0};
+
         /// tf frame name for odometry's frame of reference:
         std::string odom_frame = "odom";
 
@@ -120,6 +131,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
         double period_publish_new_localization = 0.2;  // [s]
         double period_publish_new_map          = 5.0;  // [s]
+        double period_publish_static_tfs       = 1.0;  // [s]
 
         double period_check_new_mola_subs = 1.0;  // [s]
 
@@ -134,7 +146,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     std::shared_ptr<tf2_ros::Buffer>            tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
-    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_bc_;
+    std::shared_ptr<tf2_ros::TransformBroadcaster>       tf_bc_;
+    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_bc_;
 
     rclcpp::Clock::SharedPtr ros_clock_;
     std::mutex               ros_clock_mtx_;
@@ -242,6 +255,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     void internalOn(const mrpt::obs::CObservation2DRangeScan& obs);
     void internalOn(const mrpt::obs::CObservationPointCloud& obs);
     void internalOn(const mrpt::obs::CObservationRobotPose& obs);
+    void internalOn(const mrpt::obs::CObservationGPS& obs);
 
     void internalOn(
         const mrpt::obs::CObservationPointCloud& obs, bool isSensorTopic,
@@ -249,6 +263,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
     void internalAnalyzeTopicsToSubscribe(
         const mrpt::containers::yaml& ds_subscribe);
+
+    void publishStaticTFs();
 };
 
 }  // namespace mola
