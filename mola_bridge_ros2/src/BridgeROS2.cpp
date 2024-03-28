@@ -103,6 +103,11 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
         // TF broadcaster:
         tf_bc_ = std::make_shared<tf2_ros::TransformBroadcaster>(rosNode_);
 
+        // It seems /tf does not find the connection between frames correctly if
+        // using tf_static (!)
+        tf_static_bc_ =
+            std::make_shared<tf2_ros::StaticTransformBroadcaster>(rosNode_);
+
         // Subscribe to topics as described by MOLA YAML parameters:
         auto ds_subscribe = cfg["subscribe"];
         if (!ds_subscribe.isSequence() || ds_subscribe.asSequence().empty())
@@ -119,15 +124,22 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
         auto timerLoc = rosNode_->create_wall_timer(
             std::chrono::microseconds(static_cast<unsigned int>(
                 1e6 * params_.period_publish_new_localization)),
-            std::bind(&BridgeROS2::timerPubLocalization, this));
+            [this]() { timerPubLocalization(); });
 
         auto timerMap = rosNode_->create_wall_timer(
             std::chrono::microseconds(static_cast<unsigned int>(
                 1e6 * params_.period_publish_new_map)),
-            std::bind(&BridgeROS2::timerPubMap, this));
+            [this]() { timerPubMap(); });
+
+        // Static tf:
+        auto timerStaticTFs = rosNode_->create_wall_timer(
+            std::chrono::microseconds(static_cast<unsigned int>(
+                1e6 * params_.period_publish_static_tfs)),
+            [this]() { publishStaticTFs(); });
 
         // Spin:
         rclcpp::spin(rosNode_);
+
         rclcpp::shutdown();
     }
     catch (const std::exception& e)
@@ -156,8 +168,19 @@ void BridgeROS2::initialize_rds(const Yaml& c)
     // params of the ROS2->MOLA part:
     YAML_LOAD_OPT(params_, base_link_frame, std::string);
     YAML_LOAD_OPT(params_, odom_frame, std::string);
+    YAML_LOAD_OPT(params_, base_footprint_frame, std::string);
+
     YAML_LOAD_OPT(params_, forward_ros_tf_as_mola_odometry_observations, bool);
     YAML_LOAD_OPT(params_, wait_for_tf_timeout_milliseconds, int);
+
+    if (cfg.has("base_footprint_to_base_link_tf"))
+    {
+        const auto s = cfg["base_footprint_to_base_link_tf"].as<std::string>();
+
+        // Format: "[x y z yaw pitch roll]" (meters & degrees)
+        params_.base_footprint_to_base_link_tf =
+            mrpt::math::TPose3D::FromString(s);
+    }
 
     // params of the MOLA-ROS2 part:
     YAML_LOAD_OPT(params_, base_link_frame, std::string);
@@ -251,12 +274,16 @@ void BridgeROS2::callbackOnPointCloud2(
             obs_pc->sensorPose, o.header.frame_id, params_.base_link_frame,
             o.header.stamp, params_.wait_for_tf_timeout_milliseconds,
             true /*print errors*/);
-        ASSERTMSG_(
-            ok,
-            mrpt::format(
-                "Timeout waiting for /tf transform '%s'->'%s' for timestamp=%f",
+
+        if (!ok)
+        {
+            MRPT_LOG_ERROR_FMT(
+                "Could not forward ROS2 observation to MOLA due to timeout "
+                "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
                 params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
-                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9));
+                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9);
+            return;
+        }
     }
 
     // send it out:
@@ -378,12 +405,16 @@ void BridgeROS2::callbackOnLaserScan(
             sensorPose, o.header.frame_id, params_.base_link_frame,
             o.header.stamp, params_.wait_for_tf_timeout_milliseconds,
             true /*print errors*/);
-        ASSERTMSG_(
-            ok,
-            mrpt::format(
-                "Timeout waiting for /tf transform '%s'->'%s' for timestamp=%f",
+
+        if (!ok)
+        {
+            MRPT_LOG_ERROR_FMT(
+                "Could not forward ROS2 observation to MOLA due to timeout "
+                "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
                 params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
-                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9));
+                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9);
+            return;
+        }
     }
 
     auto obs = mrpt::obs::CObservation2DRangeScan::Create();
@@ -418,12 +449,15 @@ void BridgeROS2::callbackOnImu(
             sensorPose, o.header.frame_id, params_.base_link_frame,
             o.header.stamp, params_.wait_for_tf_timeout_milliseconds,
             true /*print errors*/);
-        ASSERTMSG_(
-            ok,
-            mrpt::format(
-                "Timeout waiting for /tf transform '%s'->'%s' for timestamp=%f",
+        if (!ok)
+        {
+            MRPT_LOG_ERROR_FMT(
+                "Could not forward ROS2 observation to MOLA due to timeout "
+                "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
                 params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
-                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9));
+                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9);
+            return;
+        }
     }
 
     auto obs = mrpt::obs::CObservationIMU::Create();
@@ -459,12 +493,15 @@ void BridgeROS2::callbackOnNavSatFix(
             sensorPose, o.header.frame_id, params_.base_link_frame,
             o.header.stamp, params_.wait_for_tf_timeout_milliseconds,
             true /*print errors*/);
-        ASSERTMSG_(
-            ok,
-            mrpt::format(
-                "Timeout waiting for /tf transform '%s'->'%s' for timestamp=%f",
+        if (!ok)
+        {
+            MRPT_LOG_ERROR_FMT(
+                "Could not forward ROS2 observation to MOLA due to timeout "
+                "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
                 params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
-                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9));
+                o.header.stamp.sec + o.header.stamp.nanosec * 1e-9);
+            return;
+        }
     }
 
     auto obs = mrpt::obs::CObservationGPS::Create();
@@ -505,6 +542,10 @@ void BridgeROS2::onNewObservation(const CObservation::Ptr& o)
              oRP)
     {
         return internalOn(*oRP);
+    }
+    else if (auto oGPS = std::dynamic_pointer_cast<CObservationGPS>(o); oGPS)
+    {
+        return internalOn(*oGPS);
     }
     else
     {
@@ -782,6 +823,60 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationRobotPose& obs)
     }
 }
 
+void BridgeROS2::internalOn(const mrpt::obs::CObservationGPS& obs)
+{
+    auto lck = mrpt::lockHelper(rosPubsMtx_);
+
+    // Create the publisher the first time an observation arrives:
+    const bool is_1st_pub = rosPubs_.pub_sensors.find(obs.sensorLabel) ==
+                            rosPubs_.pub_sensors.end();
+    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
+
+    if (is_1st_pub)
+    {
+        // REP-2003: Sensor sources should use SystemDefaultsQoS
+        // See: https://ros.org/reps/rep-2003.html
+        pub = rosNode()->create_publisher<sensor_msgs::msg::NavSatFix>(
+            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
+    }
+    lck.unlock();
+
+    rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr pubGPS =
+        std::dynamic_pointer_cast<
+            rclcpp::Publisher<sensor_msgs::msg::NavSatFix>>(pub);
+    ASSERT_(pubGPS);
+
+    const std::string sSensorFrameId = obs.sensorLabel;
+
+    // Send TF:
+    mrpt::poses::CPose3D sensorPose;
+    obs.getSensorPose(sensorPose);
+
+    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
+
+    geometry_msgs::msg::TransformStamped tfStmp;
+    tfStmp.transform       = tf2::toMsg(transform);
+    tfStmp.child_frame_id  = sSensorFrameId;
+    tfStmp.header.frame_id = params_.base_link_frame;
+    tfStmp.header.stamp    = myNow(obs.timestamp);
+    tf_bc_->sendTransform(tfStmp);
+
+    // Send observation:
+    {
+        obs.load();
+
+        // Convert observation MRPT -> ROS
+        std_msgs::msg::Header header;
+        header.stamp    = myNow(obs.timestamp);
+        header.frame_id = sSensorFrameId;
+
+        sensor_msgs::msg::NavSatFix msg;
+        mrpt::ros2bridge::toROS(obs, header, msg);
+
+        pubGPS->publish(msg);
+    }
+}
+
 void BridgeROS2::doLookForNewMolaSubs()
 {
     using namespace std::string_literals;
@@ -1014,7 +1109,7 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(
         std::optional<mrpt::poses::CPose3D> fixedSensorPose;
         if (topic.has("fixed_sensor_pose") &&
             (!topic.has("use_fixed_sensor_pose") ||
-             !topic["use_fixed_sensor_pose"].as<bool>()))
+             topic["use_fixed_sensor_pose"].as<bool>()))
         {
             fixedSensorPose = mrpt::poses::CPose3D::FromString(
                 "["s + topic["fixed_sensor_pose"].as<std::string>() + "]"s);
@@ -1080,5 +1175,24 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(
                 "Unhandled type=`%s` for topic=`%s`", type.c_str(),
                 topic_name.c_str());
         }
+    }
+}
+
+void BridgeROS2::publishStaticTFs()
+{
+    if (!params_.base_footprint_frame.empty())
+    {
+        const tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(
+            params_.base_footprint_to_base_link_tf);
+
+        geometry_msgs::msg::TransformStamped tfStmp;
+
+        tfStmp.transform       = tf2::toMsg(transform);
+        tfStmp.child_frame_id  = params_.base_link_frame;
+        tfStmp.header.frame_id = params_.base_footprint_frame;
+        tfStmp.header.stamp    = myNow(mrpt::Clock::now());
+
+        tf_static_bc_->sendTransform(tfStmp);
+        // tf_bc_->sendTransform(tfStmp);
     }
 }
