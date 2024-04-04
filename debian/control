@@ -1,0 +1,12 @@
+Source: ros-rolling-mola
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <jlblanco@ual.es>
+Build-Depends: debhelper (>= 9.0.0), ros-rolling-ament-cmake, ros-rolling-ament-lint-auto, ros-rolling-ament-lint-common, ros-rolling-kitti-metrics-eval, ros-rolling-mola-bridge-ros2, ros-rolling-mola-demos, ros-rolling-mola-imu-preintegration, ros-rolling-mola-input-euroc-dataset, ros-rolling-mola-input-kitti-dataset, ros-rolling-mola-input-kitti360-dataset, ros-rolling-mola-input-mulran-dataset, ros-rolling-mola-input-paris-luco-dataset, ros-rolling-mola-input-rawlog, ros-rolling-mola-input-rosbag2, ros-rolling-mola-kernel, ros-rolling-mola-launcher, ros-rolling-mola-metric-maps, ros-rolling-mola-navstate-fuse, ros-rolling-mola-pose-list, ros-rolling-mola-relocalization, ros-rolling-mola-traj-tools, ros-rolling-mola-viz, ros-rolling-mola-yaml, ros-rolling-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-rolling-mola
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-ament-lint-auto, ros-rolling-ament-lint-common, ros-rolling-kitti-metrics-eval, ros-rolling-mola-bridge-ros2, ros-rolling-mola-demos, ros-rolling-mola-imu-preintegration, ros-rolling-mola-input-euroc-dataset, ros-rolling-mola-input-kitti-dataset, ros-rolling-mola-input-kitti360-dataset, ros-rolling-mola-input-mulran-dataset, ros-rolling-mola-input-paris-luco-dataset, ros-rolling-mola-input-rawlog, ros-rolling-mola-input-rosbag2, ros-rolling-mola-kernel, ros-rolling-mola-launcher, ros-rolling-mola-metric-maps, ros-rolling-mola-navstate-fuse, ros-rolling-mola-pose-list, ros-rolling-mola-relocalization, ros-rolling-mola-traj-tools, ros-rolling-mola-viz, ros-rolling-mola-yaml, ros-rolling-ros-workspace
+Description: Metapackage with all core open-sourced MOLA packages.
