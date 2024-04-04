@@ -1,0 +1,40 @@
+ros-rolling-mola-input-kitti360-dataset (1.0.2-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-rolling-mola-input-kitti360-dataset (1.0.1-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-input-kitti360-dataset (1.0.0-1bookworm) bookworm; urgency=high
+
+  * Refactor initialize()
+  * Kitti360: add point timestamps, add ground truth
+  * Add Kitti360 dataset source
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-input-kitti360-dataset (0.2.2-1bookworm) bookworm; urgency=high
+
+  * Correct references to license
+  * Fix published ground truth axis of reference
+  * Fix wrong ground truth matrix indexing.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-rolling-mola-input-kitti360-dataset (0.2.1-1bookworm) bookworm; urgency=high
+
+  * Implement ground-truth interface for KITTI
+  * Update copyright date
+  * Update to new colcon ROS2 build system
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+
