@@ -2,6 +2,11 @@
 Changelog for package mola_input_kitti_dataset
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.2 (2024-04-04)
+------------------
+* Add docs on expected KITTI dataset layout
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.1 (2024-03-28)
 ------------------
 
