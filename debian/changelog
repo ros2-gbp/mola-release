@@ -1,0 +1,37 @@
+ros-rolling-mola-launcher (1.0.2-1bookworm) bookworm; urgency=high
+
+  * BUGFIX: mola_launcher will not autoregister .so modules if installed via apt
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-rolling-mola-launcher (1.0.1-1bookworm) bookworm; urgency=high
+
+  * code clean up.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-launcher (1.0.0-1bookworm) bookworm; urgency=high
+
+  * ROS2 launch demos
+  * reorganize as monorepo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-launcher (0.2.2-1bookworm) bookworm; urgency=high
+
+  * First complete public release
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-rolling-mola-launcher (0.2.1-1bookworm) bookworm; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 16 Dec 2018 23:00:00 -0000
+
+
