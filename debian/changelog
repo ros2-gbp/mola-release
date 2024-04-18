@@ -1,0 +1,40 @@
+ros-jazzy-mola-input-kitti360-dataset (1.0.2-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-kitti360-dataset (1.0.1-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-kitti360-dataset (1.0.0-2noble) noble; urgency=high
+
+  * Refactor initialize()
+  * Kitti360: add point timestamps, add ground truth
+  * Add Kitti360 dataset source
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-kitti360-dataset (0.2.2-2noble) noble; urgency=high
+
+  * Correct references to license
+  * Fix published ground truth axis of reference
+  * Fix wrong ground truth matrix indexing.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+ros-jazzy-mola-input-kitti360-dataset (0.2.1-2noble) noble; urgency=high
+
+  * Implement ground-truth interface for KITTI
+  * Update copyright date
+  * Update to new colcon ROS2 build system
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 02 Sep 2023 00:00:00 -0000
+
+
