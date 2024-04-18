@@ -1,0 +1,38 @@
+ros-jazzy-mola-input-rosbag2 (1.0.2-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rosbag2 (1.0.1-2noble) noble; urgency=high
+
+  * BUGFIX: Inverted value of "use_fixed_sensor_pose" was used
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rosbag2 (1.0.0-2noble) noble; urgency=high
+
+  * tolerate missing tf data temporarily
+  * Merge ROS2 input and output in one module
+  * Add use_fixed_sensor_pose flag
+  * Fix ROS2 sensorPose from /tf data
+  * Fix jump forward in time in rosbags
+  * Implement UI Dataset in the rest of dataset sources
+  * New option to shutdown automatically mola-cli after dataset ends
+  * Automatic determination of storage id from file extension
+  * Show dataset replay progress percent
+  * Correct usage of mola:: namespace in cmake targets
+  * copyright update
+  * Hide ros2 dependencies from public .h
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rosbag2 (0.2.2-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
