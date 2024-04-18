@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <jlblanco@ual.es>
+Build-Depends: debhelper (>= 9.0.0), ros-jazzy-ament-cmake, ros-jazzy-ament-lint-auto, ros-jazzy-ament-lint-common, ros-jazzy-kitti-metrics-eval, ros-jazzy-mola-bridge-ros2, ros-jazzy-mola-demos, ros-jazzy-mola-imu-preintegration, ros-jazzy-mola-input-euroc-dataset, ros-jazzy-mola-input-kitti-dataset, ros-jazzy-mola-input-kitti360-dataset, ros-jazzy-mola-input-mulran-dataset, ros-jazzy-mola-input-paris-luco-dataset, ros-jazzy-mola-input-rawlog, ros-jazzy-mola-input-rosbag2, ros-jazzy-mola-kernel, ros-jazzy-mola-launcher, ros-jazzy-mola-metric-maps, ros-jazzy-mola-navstate-fuse, ros-jazzy-mola-pose-list, ros-jazzy-mola-relocalization, ros-jazzy-mola-traj-tools, ros-jazzy-mola-viz, ros-jazzy-mola-yaml, ros-jazzy-ros-workspace
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-ament-lint-auto, ros-jazzy-ament-lint-common, ros-jazzy-kitti-metrics-eval, ros-jazzy-mola-bridge-ros2, ros-jazzy-mola-demos, ros-jazzy-mola-imu-preintegration, ros-jazzy-mola-input-euroc-dataset, ros-jazzy-mola-input-kitti-dataset, ros-jazzy-mola-input-kitti360-dataset, ros-jazzy-mola-input-mulran-dataset, ros-jazzy-mola-input-paris-luco-dataset, ros-jazzy-mola-input-rawlog, ros-jazzy-mola-input-rosbag2, ros-jazzy-mola-kernel, ros-jazzy-mola-launcher, ros-jazzy-mola-metric-maps, ros-jazzy-mola-navstate-fuse, ros-jazzy-mola-pose-list, ros-jazzy-mola-relocalization, ros-jazzy-mola-traj-tools, ros-jazzy-mola-viz, ros-jazzy-mola-yaml, ros-jazzy-ros-workspace
+Description: Metapackage with all core open-sourced MOLA packages.
