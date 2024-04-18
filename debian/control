@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-launcher
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-jazzy-ament-cmake, ros-jazzy-ament-cmake-gtest, ros-jazzy-ament-cmake-xmllint, ros-jazzy-ament-lint-auto <!nocheck>, ros-jazzy-ament-lint-common <!nocheck>, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-ros-environment, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-launcher
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-ros-workspace
+Description: Launcher app for MOLA systems
