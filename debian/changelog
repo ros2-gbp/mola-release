@@ -1,0 +1,41 @@
+ros-jazzy-mola-input-rawlog (1.0.2-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rawlog (1.0.1-2noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rawlog (1.0.0-2noble) noble; urgency=high
+
+  * Refactor initialize()
+  * Implement UI Dataset in the rest of dataset sources
+  * New option to shutdown automatically mola-cli after dataset ends
+  * Fix boundless memory usage growth in rawlog inputs
+  * Show dataset replay progress percent
+  * Correct usage of mola:: namespace in cmake targets
+  * copyright update
+  * reorganize as monorepo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-rawlog (0.2.2-2noble) noble; urgency=high
+
+  * First complete public release
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+ros-jazzy-mola-input-rawlog (0.2.1-2noble) noble; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 16 Feb 2019 00:00:00 -0000
+
+
