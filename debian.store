@@ -1,1 +1,1 @@
-{"base": "54f04509", "parent": "debian/rolling/mola_bridge_ros2", "previous": "99106c81", "trim": "", "trimbase": ""}
+{"base": "c8d691af", "parent": "debian/jazzy/mola_bridge_ros2", "previous": "b4722674", "trim": "", "trimbase": ""}
