@@ -1,0 +1,28 @@
+ros-jazzy-kitti-metrics-eval (1.0.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-kitti-metrics-eval (1.0.1-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-kitti-metrics-eval (1.0.0-2bookworm) bookworm; urgency=high
+
+  * Add option to use several groundtruth/result file pairs
+  * copyright update
+  * kitti eval cli moves to its own package
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-kitti-metrics-eval (0.2.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
