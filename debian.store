@@ -1,1 +1,1 @@
-{"base": "c067c28e", "parent": "debian/rolling/mola_kernel", "previous": "21fafd74", "trim": "", "trimbase": ""}
+{"base": "1200db7a", "parent": "debian/jazzy/mola_kernel", "previous": "89bb758d", "trim": "", "trimbase": ""}
