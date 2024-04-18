@@ -1,0 +1,27 @@
+ros-jazzy-mola (1.0.2-2bookworm) bookworm; urgency=high
+
+  * Add new mola_relocalization as dependency of the metapackage mola
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola (1.0.1-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola (1.0.0-2bookworm) bookworm; urgency=high
+
+  * add metapackage mola
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola (0.2.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
