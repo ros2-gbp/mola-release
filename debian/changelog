@@ -1,0 +1,44 @@
+ros-jazzy-mola-viz (1.0.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-viz (1.0.1-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-viz (1.0.0-2bookworm) bookworm; urgency=high
+
+  * ROS2 launch demos
+  * use new mrpt GPS covariance field
+  * visualize sensor pose
+  * mola_kernel: new UI interface for datasets
+  * mola-viz: show image channel of RGBD observations
+  * Fix sensorPose on lidar preview
+  * Viz: show GPS data
+  * mola_viz: add custom icon
+  * viz: more options to visualize RGBD camera observations
+  * viz API: add enqueue_custom_nanogui_code()
+  * viz console: add fading effect
+  * mola_viz: show console messages
+  * Correct usage of mola:: namespace in cmake targets
+  * copyright update
+  * mola_viz: support visualizing velodyne observations
+  * Add look_at() viz interface
+  * Fewer mutex locking()
+  * reorganize as monorepo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-viz (0.2.2-2bookworm) bookworm; urgency=high
+
+  * Initial public release.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
