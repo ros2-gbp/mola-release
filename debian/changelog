@@ -1,0 +1,37 @@
+ros-jazzy-mola-input-euroc-dataset (1.0.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-euroc-dataset (1.0.1-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-euroc-dataset (1.0.0-2bookworm) bookworm; urgency=high
+
+  * New option to shutdown automatically mola-cli after dataset ends
+  * Show dataset replay progress percent
+  * Correct usage of mola:: namespace in cmake targets
+  * copyright update
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-input-euroc-dataset (0.2.2-2bookworm) bookworm; urgency=high
+
+  * Correct references to license
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+ros-jazzy-mola-input-euroc-dataset (0.2.1-2bookworm) bookworm; urgency=high
+
+  * Update to new colcon ROS2 build system
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 02 Sep 2023 00:00:00 -0000
+
+
