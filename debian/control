@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-bridge-ros2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), ament-cmake, ament-cmake-copyright, ament-cmake-copyright <!nocheck>, ament-cmake-cppcheck, ament-cmake-cppcheck <!nocheck>, ament-cmake-cpplint, ament-cmake-cpplint <!nocheck>, ament-cmake-flake8, ament-cmake-flake8 <!nocheck>, ament-cmake-googletest, ament-cmake-lint-cmake, ament-cmake-lint-cmake <!nocheck>, ament-cmake-pep257, ament-cmake-pep257 <!nocheck>, ament-cmake-uncrustify, ament-cmake-uncrustify <!nocheck>, ament-cmake-xmllint, ament-cmake-xmllint <!nocheck>, ament-lint, ament-lint <!nocheck>, cmake, libgeometry-msgs-dev, libnav-msgs-dev, libsensor-msgs-dev, libtf2-dev, libtf2-geometry-msgs-dev, python3-geometry-msgs, python3-nav-msgs, python3-sensor-msgs, python3-tf2, python3-tf2-geometry-msgs, ros-environment, ros-geometry-msgs, ros-jazzy-mola-common, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-rclcpp, ros-nav-msgs, ros-sensor-msgs, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-bridge-ros2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ament-cmake-copyright, ament-cmake-cppcheck, ament-cmake-cpplint, ament-cmake-flake8, ament-cmake-lint-cmake, ament-cmake-pep257, ament-cmake-uncrustify, ament-cmake-xmllint, ament-lint, libgeometry-msgs-dev, libnav-msgs-dev, libsensor-msgs-dev, libtf2-dev, libtf2-geometry-msgs-dev, python3-geometry-msgs, python3-nav-msgs, python3-sensor-msgs, python3-tf2, python3-tf2-geometry-msgs, ros-geometry-msgs, ros-jazzy-mola-common, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-rclcpp, ros-nav-msgs, ros-sensor-msgs, ros-jazzy-ros-workspace
+Description: Bidirectional bridge ROS2-MOLA

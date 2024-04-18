@@ -1,0 +1,32 @@
+ros-jazzy-mola-bridge-ros2 (1.0.2-2bookworm) bookworm; urgency=high
+
+  * update docs
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-bridge-ros2 (1.0.1-2bookworm) bookworm; urgency=high
+
+  * BridgeROS2: do not quit on temporary /tf timeout
+  * mola_bridge_ros2: option to publish /tf_static for base_footprint
+  * mola_bridge_ros2: implement missing MOLA->ROS2 conversion for GNNS observations
+  * BUGFIX: Inverted value of "use_fixed_sensor_pose" was used
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-bridge-ros2 (1.0.0-2bookworm) bookworm; urgency=high
+
+  * Comply with ROS2 REP-2003
+  * Merge ROS2 input and output in one module
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-bridge-ros2 (0.2.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
