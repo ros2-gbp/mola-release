@@ -1,0 +1,43 @@
+ros-jazzy-mola-demos (1.0.2-2bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 04 Apr 2024 00:00:00 -0000
+
+ros-jazzy-mola-demos (1.0.1-2bookworm) bookworm; urgency=high
+
+  * Clean up yaml files.
+  * PF localization demo for Mulran dataset
+  * renamed ros launch files for clear autocompletion with ros2 launch
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 28 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-demos (1.0.0-2bookworm) bookworm; urgency=high
+
+  * Add use_fixed_sensor_pose flag
+  * Publish ground truth to ROS2 too
+  * ROS 2 launch demos
+  * mola-cli now does not need the -c cli flag
+  * More generic demo launch
+  * reorganize as monorepo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 19 Mar 2024 00:00:00 -0000
+
+ros-jazzy-mola-demos (0.2.2-2bookworm) bookworm; urgency=high
+
+  * Progress with demo
+  * Import first demo files
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+ros-jazzy-mola-demos (0.2.1-2bookworm) bookworm; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 08 Sep 2023 00:00:00 -0000
+
+
