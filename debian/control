@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-bridge-ros2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-jazzy-ament-cmake, ros-jazzy-ament-cmake-gmock, ros-jazzy-ament-cmake-gtest, ros-jazzy-ament-cmake-xmllint, ros-jazzy-ament-lint-auto, ros-jazzy-ament-lint-auto <!nocheck>, ros-jazzy-ament-lint-common, ros-jazzy-ament-lint-common <!nocheck>, ros-jazzy-geometry-msgs, ros-jazzy-mola-common, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-nav-msgs, ros-jazzy-rclcpp, ros-jazzy-ros-environment, ros-jazzy-sensor-msgs, ros-jazzy-tf2, ros-jazzy-tf2-geometry-msgs, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-bridge-ros2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-ament-lint-auto, ros-jazzy-ament-lint-common, ros-jazzy-geometry-msgs, ros-jazzy-mola-common, ros-jazzy-mola-kernel, ros-jazzy-mrpt2, ros-jazzy-nav-msgs, ros-jazzy-rclcpp, ros-jazzy-sensor-msgs, ros-jazzy-tf2, ros-jazzy-tf2-geometry-msgs, ros-jazzy-ros-workspace
+Description: Bidirectional bridge ROS2-MOLA
