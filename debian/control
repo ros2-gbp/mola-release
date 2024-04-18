@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-imu-preintegration
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-jazzy-mola-common, ros-jazzy-mrpt2, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-imu-preintegration
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-mola-common, ros-jazzy-mrpt2, ros-jazzy-ros-workspace
+Description: Integrator of IMU angular velocity readings
