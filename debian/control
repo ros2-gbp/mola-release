@@ -1,0 +1,12 @@
+Source: ros-humble-mola-relocalization
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-humble-mola-common, ros-humble-mola-pose-list, ros-humble-mola-test-datasets, ros-humble-mp2p-icp, ros-humble-mrpt2, ros-humble-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_relocalization
+Standards-Version: 3.9.2
+
+Package: ros-humble-mola-relocalization
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-humble-mola-common, ros-humble-mola-pose-list, ros-humble-mola-test-datasets, ros-humble-mp2p-icp, ros-humble-mrpt2, ros-humble-ros-workspace
+Description: C++ library with algorithms for relocalization, global localization, or pose estimation given a large initial uncertainty

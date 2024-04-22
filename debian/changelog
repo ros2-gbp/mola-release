@@ -1,0 +1,42 @@
+ros-humble-mola-relocalization (1.0.3-1jammy) jammy; urgency=high
+
+  * RelocalizationICP_SE2: work in multiple threads and provides a feedback functor
+  * Add new ICP-based relocalization method
+  * Fix package.xml website URL
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 21 Apr 2024 22:00:00 -0000
+
+ros-humble-mola-relocalization (1.0.2-1jammy) jammy; urgency=high
+
+  * Implement SE(2) relocalization grid method
+  * New package mola_relocalization
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-humble-mola-relocalization (1.0.1-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-humble-mola-relocalization (1.0.0-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-humble-mola-relocalization (0.2.2-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-humble-mola-relocalization (0.2.1-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+
