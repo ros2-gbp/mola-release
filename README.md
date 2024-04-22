@@ -1,71 +1,128 @@
-[![CI Check clang-format](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml)
-[![CI ROS](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml)
-[![CircleCI](https://img.shields.io/circleci/build/gh/MOLAorg/mola/develop.svg)](https://circleci.com/gh/MOLAorg/mola)
-[![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.mola-slam.org/latest/)
+# mola_input_kitti_dataset
+CLI tool to evaluate the KITTI odometry benchmark metrics to arbitrary trajectory files,
+in both, `kitti` and `tum` formats. Better used together with [evo](https://github.com/MichaelGrupp/evo).
 
-| Distro | Build dev | Release |
-| --- | --- | --- |
-| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/) | [![Version](https://img.shields.io/ros/v/humble/mola)](https://index.ros.org/search/?term=mola) |
-| ROS 2 Iron (u22.04) | [![Build Status](https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/) | [![Version](https://img.shields.io/ros/v/iron/mola)](https://index.ros.org/search/?term=mola) |
-| ROS 2 Rolling (u24.04) | [![Build Status](https://build.ros2.org/job/Rdev__mola__ubuntu_noble_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mola__ubuntu_noble_amd64/) | [![Version](https://img.shields.io/ros/v/rolling/mola)](https://index.ros.org/search/?term=mola) |
+<!-- toc -->
 
-# mola
-A Modular Optimization framework for Localization and mApping (MOLA).
-This repository contains the base open-sourced packages for the MOLA project. Other packages exist under the [MOLAorg](https://github.com/MOLAorg/) organization.
+- [Build and install](#build-and-install)
+- [Documentation](#documentation)
+- [Examples of usage](#examples-of-usage)
+  * [Evaluate the KITTI metrics on a solution by your SLAM method](#evaluate-the-kitti-metrics-on-a-solution-by-your-slam-method)
+  * [Evaluate the KITTI metrics on another dataset](#evaluate-the-kitti-metrics-on-another-dataset)
+  * [Transform a KITTI solution file in TUM format to KITTI](#transform-a-kitti-solution-file-in-tum-format-to-kitti)
+- [License](#license)
 
-Refer to the [official documentation](https://docs.mola-slam.org/latest/) for build instructions, demos, API reference, etc.
+<!-- tocstop -->
 
-![kitti_demo_06](https://github.com/MOLAorg/mola/assets/5497818/76cf07e2-ab20-41a3-abc6-df5c5ba74b97)
+## Build and install
+Refer to the [root MOLA repository](https://github.com/MOLAorg/mola) for compilation instructions.
+
+To install from the ROS repositories:
+
+    sudo apt install ros-${ROS_DISTRO}-mola-metrics-eval
+
+This program is largely based on the public Kitti dataset evaluation C++ code.
+Rewritten to use Eigen instead of GNU GPL'd code, and to add additional features.
+Original source code notice:
+
+    ###########################################################################
+    #   THE KITTI VISION BENCHMARK SUITE: VISUAL ODOMETRY / SLAM BENCHMARK    #
+    #              Andreas Geiger    Philip Lenz    Raquel Urtasun            #
+    #                    Karlsruhe Institute of Technology                    #
+    #                Toyota Technological Institute at Chicago                #
+    #                             www.cvlibs.net                              #
+    ###########################################################################
+
+## Documentation
+
+Basically, this CLI program can be used for evaluating the [KITTI metrics](https://www.cvlibs.net/datasets/kitti/) in two ways:
+- To **estimated trajectories of the KITTI odometry sequences**, stored in the [TUM format](https://github.com/MichaelGrupp/evo/wiki/Formats#tum---tum-rgb-d-dataset-trajectory-format) (unlike the original KITTI dev kit, which uses the [kitti format](https://github.com/MichaelGrupp/evo/wiki/Formats#kitti---kitti-dataset-pose-format)). In this case, the program reads the **ground truth sequences** and the **calibration files** from a user's local copy of the KITTI dataset. Calibration data is used to first transform the user's input trajectory to the `cam0` frame, in which the KITTI ground truth paths are given.
+- To **any other pair of trajectory files** for other datasets, i.e. a ground truth and an estimated trajectory file.
+
+```bash
+USAGE: 
+
+   kitti-metrics-eval  [--no-figures] [--gt-tum-path <trajectory_gt.txt>]
+                       [-s <01>] ...  [--save-as-kitti <result.kitti>] -r
+                       <result.txt> [-k <>] [--] [--version] [-h]
 
 
-## Individual package build status
+Where: 
 
+   --no-figures
+     Skip generating the error figures
 
-| Package | ROS 2 Humble <br/> BinBuild |  ROS 2 Iron <br/> BinBuild |  ROS 2 Rolling <br/> BinBuild |
-| --- | --- | --- | --- |
-| kitti_metrics_eval | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__kitti_metrics_eval__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__kitti_metrics_eval__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__kitti_metrics_eval__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__kitti_metrics_eval__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__kitti_metrics_eval__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__kitti_metrics_eval__ubuntu_noble_amd64__binary/) |
-| mola | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola__ubuntu_noble_amd64__binary/) |
-| mola_bridge_ros2 | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_bridge_ros2__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_bridge_ros2__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_bridge_ros2__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_bridge_ros2__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_bridge_ros2__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_bridge_ros2__ubuntu_noble_amd64__binary/) |
-| mola_demos | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_demos__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_demos__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_demos__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_demos__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_demos__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_demos__ubuntu_noble_amd64__binary/) |
-| mola_imu_preintegration | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_imu_preintegration__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_imu_preintegration__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_imu_preintegration__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_imu_preintegration__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_imu_preintegration__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_imu_preintegration__ubuntu_noble_amd64__binary/) |
-| mola_input_euroc_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/) |
-| mola_input_kitti360_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/) |
-| mola_input_kitti_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/) |
-| mola_input_mulran_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/) |
-| mola_input_paris_luco_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/) |
-| mola_input_rawlog | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/) |
-| mola_input_rosbag2 | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_rosbag2__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_rosbag2__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_input_rosbag2__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_input_rosbag2__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_rosbag2__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_rosbag2__ubuntu_noble_amd64__binary/) |
-| mola_kernel | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_kernel__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_kernel__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_kernel__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_kernel__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_kernel__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_kernel__ubuntu_noble_amd64__binary/) |
-| mola_launcher | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_launcher__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_launcher__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_launcher__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_launcher__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_launcher__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_launcher__ubuntu_noble_amd64__binary/) |
-| mola_metric_maps | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_metric_maps__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_metric_maps__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_metric_maps__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_metric_maps__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_metric_maps__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_metric_maps__ubuntu_noble_amd64__binary/) |
-| mola_navstate_fuse | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_navstate_fuse__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_navstate_fuse__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_navstate_fuse__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_navstate_fuse__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_navstate_fuse__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_navstate_fuse__ubuntu_noble_amd64__binary/) |
-| mola_pose_list | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_pose_list__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_pose_list__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_pose_list__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_pose_list__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_pose_list__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_pose_list__ubuntu_noble_amd64__binary/) |
-| mola_relocalization | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_relocalization__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_relocalization__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_relocalization__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_relocalization__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_relocalization__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_relocalization__ubuntu_noble_amd64__binary/) |
-| mola_traj_tools | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_traj_tools__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_traj_tools__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_traj_tools__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_traj_tools__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_traj_tools__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_traj_tools__ubuntu_noble_amd64__binary/) |
-| mola_viz | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_viz__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_viz__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_viz__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_viz__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_viz__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_viz__ubuntu_noble_amd64__binary/) |
-| mola_yaml | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_yaml__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_yaml__ubuntu_jammy_amd64__binary/) | [![Build Status](https://build.ros2.org/job/Ibin_uJ64__mola_yaml__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Ibin_uJ64__mola_yaml__ubuntu_jammy_amd64__binary/)| [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_yaml__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_yaml__ubuntu_noble_amd64__binary/) |
+   --gt-tum-path <trajectory_gt.txt>
+     If provided, the --sequence flag will be ignored and this particular
+     file in TUM format will be read and used as ground truth to compare
+     against the resulting odometry path.
 
+   -s <01>,  --sequence <01>  (accepted multiple times)
+     The sequence number of the path(s) file(s) to evaluate, used to find
+     out GT and calibration files for the Kitti dataset.
 
-## Citations
+   --save-as-kitti <result.kitti>
+     If given, will transform the input path from the LIDAR frame to the
+     cam0 frame and save the path to a TXT file in the format expected by
+     KITTI dev kit.
 
-The latest publications on MOLA are: 
+   -r <result.txt>,  --result-tum-path <result.txt>
+     (required)  File to evaluate, in TUM format
 
-    mola_lidar_odometry: (TBD 2024-Q2!!)
+   -k <>,  --kitti-basedir <>
+     Path to the kitti datasets. Overrides to the default, which is reading
+     the env var `KITTI_BASE_DIR`.
 
-MOLA was initially presented in 2019 in ([PDF](http://www.roboticsproceedings.org/rss15/p43.pdf)):
+   --,  --ignore_rest
+     Ignores the rest of the labeled arguments following this flag.
 
-```bibtex
-@INPROCEEDINGS{Blanco-Claraco-RSS-19, 
-    AUTHOR    = {Jose Luis Blanco-Claraco}, 
-    TITLE     = {A Modular Optimization Framework for Localization and Mapping}, 
-    BOOKTITLE = {Proceedings of Robotics: Science and Systems}, 
-    YEAR      = {2019}, 
-    ADDRESS   = {FreiburgimBreisgau, Germany}, 
-    MONTH     = {June}, 
-    DOI       = {10.15607/RSS.2019.XV.043} 
-} 
+   --version
+     Displays version information and exits.
+
+   -h,  --help
+     Displays usage information and exits.
+```
+
+## Examples of usage
+
+### Evaluate the KITTI metrics on a solution by your SLAM method
+
+Evaluate on all KITTI test sequences 00-10.
+
+```bash
+kitti-metrics-eval \
+    -r results/estim_%02i.txt \
+    -s 00 -s 01 -s 02 -s 03 -s 04 -s 05 -s 06 -s 07 -s 08 -s 09 -s 10 \
+    --kitti-basedir /path/to/your/local/kitti_dataset
+```
+
+Expected tree layout under the `kitti_dataset` directory:
+
+```
+/path/to/your/local/kitti_dataset
+├── poses
+└── sequences
+```
+
+### Evaluate the KITTI metrics on another dataset
+
+Evaluate on another arbitrary dataset, with ground truth trajectory
+given in the TUM format:
+
+```bash
+kitti-metrics-eval \
+    -r results/my_solution.txt \
+    --gt-tum-path /path/to/ground_truth.txt
+```
+
+### Transform a KITTI solution file in TUM format to KITTI
+
+```bash
+kitti-metrics-eval \
+    -r results/estim_%02i.txt \
+    -s 00 \
+    --save-as-kitti results/00.txt
 ```
 
 ## License
-MOLA is released under the GNU GPL v3 license, except noted otherwise in each individual module. Other options available upon request.
-Some modules are released under BSD-3. See the [official documentation](https://docs.mola-slam.org/latest/).
+This package is released under the BSD-3-clause license.
