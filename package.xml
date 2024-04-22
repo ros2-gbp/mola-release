@@ -5,13 +5,13 @@
 -->
 <package format="3">
   <name>mola_metric_maps</name>
-  <version>1.0.2</version>
+  <version>1.0.3</version>
   <description>Advanced metric map classes, using the generic `mrpt::maps::CMetricMap` interface, for use in other MOLA odometry and SLAM modules.</description>
 
   <author     email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</author>
   <maintainer email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</maintainer>
 
-  <url type="website">https://github.com/MOLAorg/</url>
+  <url type="website">https://github.com/MOLAorg/mola/tree/develop/mola_metric_maps</url>
 
   <license file="LICENSE">GPLv3</license>
 
