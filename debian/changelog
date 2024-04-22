@@ -1,0 +1,47 @@
+ros-humble-mola-imu-preintegration (1.0.3-1jammy) jammy; urgency=high
+
+  * Update docs
+  * Fix package.xml website URL
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 21 Apr 2024 22:00:00 -0000
+
+ros-humble-mola-imu-preintegration (1.0.2-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-humble-mola-imu-preintegration (1.0.1-1jammy) jammy; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-humble-mola-imu-preintegration (1.0.0-1jammy) jammy; urgency=high
+
+  * API changes for new package mola_navstate_fuse
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-humble-mola-imu-preintegration (0.2.2-1jammy) jammy; urgency=high
+
+  * Update copyright year
+  * Correct references to license
+  * Ported to ROS2 colcon build system
+  * Delete WIP files.
+  * first unit tests
+  * progress, unit tests
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-humble-mola-imu-preintegration (0.2.1-1jammy) jammy; urgency=high
+
+  * Initial commit
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 17 Sep 2021 22:00:00 -0000
+
+
