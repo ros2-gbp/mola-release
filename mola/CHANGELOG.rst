@@ -2,6 +2,9 @@
 Changelog for package mola
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.3 (2024-04-22)
+------------------
+
 1.0.2 (2024-04-04)
 ------------------
 * Add new mola_relocalization as dependency of the metapackage mola
