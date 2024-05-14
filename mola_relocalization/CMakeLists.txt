@@ -8,7 +8,7 @@
 # ------------------------------------------------------------------------------
 
 # Minimum CMake vesion: limited by CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.5)
 
 # Tell CMake we'll use C++ for use in its tests/flags
 project(mola_relocalization LANGUAGES CXX)
@@ -19,6 +19,7 @@ find_package(mola_common REQUIRED)
 # find CMake dependencies:
 find_package(mrpt-obs REQUIRED)
 find_package(mrpt-maps REQUIRED)
+find_package(mrpt-slam REQUIRED)
 find_package(mp2p_icp REQUIRED)
 find_package(mola_pose_list REQUIRED)
 
@@ -26,15 +27,17 @@ find_package(mola_test_datasets) # optional
 
 # -----------------------
 # define lib:
-file(GLOB_RECURSE LIB_SRCS src/*.cpp src/*.h)
-file(GLOB_RECURSE LIB_PUBLIC_HDRS include/*.h)
-
 mola_add_library(
 	TARGET ${PROJECT_NAME}
-	SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
+	SOURCES 
+		src/find_best_poses_se2.cpp
+		src/RelocalizationICP_SE2.cpp
+		src/RelocalizationLikelihood_SE2.cpp
+		include/mola_relocalization/relocalization.h
 	PUBLIC_LINK_LIBRARIES
 		mrpt::obs
 		mrpt::maps
+		mrpt::slam
 		mola::mp2p_icp
 		mola::mola_pose_list
 #	PRIVATE_LINK_LIBRARIES

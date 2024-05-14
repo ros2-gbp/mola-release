@@ -13,3 +13,4 @@ mola_add_test(
 )
 target_compile_definitions(test-relocalization-se2-kitti PRIVATE TEST_DATASETS_ROOT=\"${TEST_DATASETS_ROOT}\")
 endif()
+
