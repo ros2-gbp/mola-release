@@ -8,7 +8,7 @@
 # ------------------------------------------------------------------------------
 
 # Minimum CMake vesion: limited by CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.5)
 
 # Tell CMake we'll use C++ for use in its tests/flags
 project(mola_traj_tools LANGUAGES CXX)
@@ -42,3 +42,11 @@ mola_add_executable(
 	LINK_LIBRARIES
 		mrpt::poses
 )
+
+# Install "executables" too:
+install(PROGRAMS
+    python/ncd-csv2tum
+  DESTINATION
+    bin
+)
+
