@@ -3,6 +3,11 @@ Changelog for package mola_bridge_ros2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+1.0.4 (2024-05-14)
+------------------
+* bump cmake_minimum_required to 3.5
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.3 (2024-04-22)
 ------------------
 * BridgeROS2: more robust /tf find_transform by using tf2::BufferCore
