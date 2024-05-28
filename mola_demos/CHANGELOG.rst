@@ -2,6 +2,21 @@
 Changelog for package mola_demos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.5 (2024-05-28)
+------------------
+
+1.0.4 (2024-05-14)
+------------------
+* bump cmake_minimum_required to 3.5
+* Contributors: Jose Luis Blanco-Claraco
+
+1.0.3 (2024-04-22)
+------------------
+* ROS2 demo yaml files: fix missing entry and unify notation with mola_lidar_odometry
+* FIXBUG: inverse sensor poses in rosbag2 reader.
+  Also: unify notation in C++ calls to lookupTransform()
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.2 (2024-04-04)
 ------------------
 
