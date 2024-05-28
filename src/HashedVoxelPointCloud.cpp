@@ -67,8 +67,8 @@ void HashedVoxelPointCloud::TMapDefinition::loadFromConfigFile_map_specific(
     const std::string sSectCreation = sectionPrefix + "_creationOpts"s;
     MRPT_LOAD_CONFIG_VAR(voxel_size, float, s, sSectCreation);
 
-    ASSERT_(s.sectionExists(sectionPrefix + "_insertionOpts"s));
-    insertionOpts.loadFromConfigFile(s, sectionPrefix + "_insertionOpts"s);
+    ASSERT_(s.sectionExists(sectionPrefix + "_insertOpts"s));
+    insertionOpts.loadFromConfigFile(s, sectionPrefix + "_insertOpts"s);
 
     if (s.sectionExists(sectionPrefix + "_likelihoodOpts"s))
         likelihoodOpts.loadFromConfigFile(
@@ -113,7 +113,7 @@ IMPLEMENTS_SERIALIZABLE(HashedVoxelPointCloud, CMetricMap, mola)
 
 uint8_t HashedVoxelPointCloud::serializeGetVersion() const { return 0; }
 void    HashedVoxelPointCloud::serializeTo(
-    mrpt::serialization::CArchive& out) const
+       mrpt::serialization::CArchive& out) const
 {
     // params:
     out << voxel_size_;
@@ -217,9 +217,8 @@ void HashedVoxelPointCloud::getVisualizationInto(
         // Single color:
         auto obj = mrpt::opengl::CPointCloud::Create();
 
-        const auto lambdaVisitPoints = [&obj](const mrpt::math::TPoint3Df& pt) {
-            obj->insertPoint(pt);
-        };
+        const auto lambdaVisitPoints = [&obj](const mrpt::math::TPoint3Df& pt)
+        { obj->insertPoint(pt); };
         this->visitAllPoints(lambdaVisitPoints);
 
         obj->setColor(renderOptions.color);
@@ -248,12 +247,13 @@ void HashedVoxelPointCloud::getVisualizationInto(
         size_t nPoints = 0;
 
         const auto lambdaVisitPoints =
-            [&obj, &hists, &nPoints](const mrpt::math::TPoint3Df& pt) {
-                // x y z R G B [A]
-                obj->insertPoint({pt.x, pt.y, pt.z, 0, 0, 0});
-                for (int i = 0; i < 3; i++) hists[i].add(pt[i]);
-                nPoints++;
-            };
+            [&obj, &hists, &nPoints](const mrpt::math::TPoint3Df& pt)
+        {
+            // x y z R G B [A]
+            obj->insertPoint({pt.x, pt.y, pt.z, 0, 0, 0});
+            for (int i = 0; i < 3; i++) hists[i].add(pt[i]);
+            nPoints++;
+        };
 
         this->visitAllPoints(lambdaVisitPoints);
 
@@ -301,33 +301,33 @@ bool HashedVoxelPointCloud::internal_insertObservation(
     {
         robotPose2D = mrpt::poses::CPose2D(*robotPose);
         robotPose3D = (*robotPose);
-
-        if (insertionOptions.remove_voxels_farther_than > 0)
-        {
-            const int distInGrid = static_cast<int>(std::ceil(
-                insertionOptions.remove_voxels_farther_than * voxel_size_inv_));
-
-            const auto idxCurObs =
-                coordToGlobalIdx(robotPose3D.translation().cast<float>());
-
-            for (auto it = voxels_.begin(); it != voxels_.end();)
-            {
-                // manhattan distance:
-                const int dist = mrpt::max3(
-                    std::abs(it->first.cx - idxCurObs.cx),
-                    std::abs(it->first.cy - idxCurObs.cy),
-                    std::abs(it->first.cz - idxCurObs.cz));
-
-                if (dist > distInGrid)
-                    it = voxels_.erase(it);
-                else
-                    ++it;
-            }
-        }
     }
     else
     {
         // Default values are (0,0,0)
+    }
+
+    if (insertionOptions.remove_voxels_farther_than > 0)
+    {
+        const int distInGrid = static_cast<int>(std::ceil(
+            insertionOptions.remove_voxels_farther_than * voxel_size_inv_));
+
+        const auto idxCurObs =
+            coordToGlobalIdx(robotPose3D.translation().cast<float>());
+
+        for (auto it = voxels_.begin(); it != voxels_.end();)
+        {
+            // manhattan distance:
+            const int dist = mrpt::max3(
+                std::abs(it->first.cx - idxCurObs.cx),
+                std::abs(it->first.cy - idxCurObs.cy),
+                std::abs(it->first.cz - idxCurObs.cz));
+
+            if (dist > distInGrid)
+                it = voxels_.erase(it);
+            else
+                ++it;
+        }
     }
 
     if (IS_CLASS(obs, CObservation2DRangeScan))
@@ -575,9 +575,8 @@ bool HashedVoxelPointCloud::saveToTextFile(const std::string& file) const
     FILE* f = mrpt::system::os::fopen(file.c_str(), "wt");
     if (!f) return false;
 
-    const auto lambdaVisitPoints = [f](const mrpt::math::TPoint3Df& pt) {
-        mrpt::system::os::fprintf(f, "%f %f %f\n", pt.x, pt.y, pt.z);
-    };
+    const auto lambdaVisitPoints = [f](const mrpt::math::TPoint3Df& pt)
+    { mrpt::system::os::fprintf(f, "%f %f %f\n", pt.x, pt.y, pt.z); };
 
     this->visitAllPoints(lambdaVisitPoints);
 
@@ -719,7 +718,8 @@ void HashedVoxelPointCloud::nn_multiple_search_impl(
 
     auto lambdaProcessCandidate = [&](const float                  sqrDist,
                                       const mrpt::math::TPoint3Df& pt,
-                                      const global_plain_index_t&  id) {
+                                      const global_plain_index_t&  id)
+    {
         // bubble sort (yes, really!)
         // found its position in the list:
         size_t i = 0;
@@ -740,7 +740,8 @@ void HashedVoxelPointCloud::nn_multiple_search_impl(
         if (foundMatches < MAX_KNN) foundMatches++;
     };
 
-    auto lambdaCheckCell = [&](const global_index3d_t& p) {
+    auto lambdaCheckCell = [&](const global_index3d_t& p)
+    {
         if (auto* v = voxelByGlobalIdxs(p); v && !v->points().empty())
         {
             const auto& pts = v->points();
@@ -801,7 +802,8 @@ void HashedVoxelPointCloud::nn_radius_search(
 
     auto lambdaProcessCandidate = [&](const float                  sqrDist,
                                       const mrpt::math::TPoint3Df& pt,
-                                      const global_plain_index_t&  id) {
+                                      const global_plain_index_t&  id)
+    {
         // bubble sort (yes, really!)
         // found its position in the list:
         size_t i = 0;
@@ -822,7 +824,8 @@ void HashedVoxelPointCloud::nn_radius_search(
         if (foundMatches < HARD_MAX_MATCHES) foundMatches++;
     };
 
-    auto lambdaCheckCell = [&](const global_index3d_t& p) {
+    auto lambdaCheckCell = [&](const global_index3d_t& p)
+    {
         if (auto* v = voxelByGlobalIdxs(p); v && !v->points().empty())
         {
             const auto& pts = v->points();
@@ -885,14 +888,15 @@ mrpt::math::TBoundingBoxf HashedVoxelPointCloud::boundingBox() const
                 mrpt::math::TBoundingBoxf::PlusMinusInfinity();
 
             auto lambdaForEachVoxel =
-                [this](const global_index3d_t& idxs, const VoxelData&) {
-                    const mrpt::math::TPoint3Df voxelCorner =
-                        globalIdxToCoord(idxs);
+                [this](const global_index3d_t& idxs, const VoxelData&)
+            {
+                const mrpt::math::TPoint3Df voxelCorner =
+                    globalIdxToCoord(idxs);
 
-                    cached_.boundingBox_->updateWithPoint(voxelCorner);
-                    cached_.boundingBox_->updateWithPoint(
-                        voxelCorner + voxelDiagonal_);
-                };
+                cached_.boundingBox_->updateWithPoint(voxelCorner);
+                cached_.boundingBox_->updateWithPoint(
+                    voxelCorner + voxelDiagonal_);
+            };
 
             this->visitAllVoxels(lambdaForEachVoxel);
         }
@@ -1088,9 +1092,8 @@ const mrpt::maps::CSimplePointsMap*
 
     cachedPoints_->clear();
 
-    this->visitAllPoints([this](const mrpt::math::TPoint3Df& p) {
-        cachedPoints_->insertPointFast(p.x, p.y, p.z);
-    });
+    this->visitAllPoints([this](const mrpt::math::TPoint3Df& p)
+                         { cachedPoints_->insertPointFast(p.x, p.y, p.z); });
 
     return cachedPoints_.get();
 }
