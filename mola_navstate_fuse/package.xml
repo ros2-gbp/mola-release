@@ -5,7 +5,7 @@
 -->
 <package format="3">
   <name>mola_navstate_fuse</name>
-  <version>1.0.5</version>
+  <version>1.0.6</version>
   <description>SE(3) pose and twist path data fusion estimator</description>
 
   <author     email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</author>
@@ -16,6 +16,7 @@
   <license file="LICENSE">GPLv3</license>
 
   <depend>mola_common</depend>
+  <depend>mola_kernel</depend>
   <depend>mola_imu_preintegration</depend>
   <depend>mrpt2</depend>
 
