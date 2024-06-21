@@ -18,12 +18,33 @@
  * MOLA. If not, see <https://www.gnu.org/licenses/>.
  * ------------------------------------------------------------------------- */
 /**
- * @file   NavState.cpp
+ * @file   NavStateFilter.cpp
  * @brief  State vector for SE(3) pose + velocity
  * @author Jose Luis Blanco Claraco
  * @date   Jan 22, 2024
  */
 
-#include <mola_navstate_fuse/NavState.h>
+#include <mola_kernel/interfaces/NavStateFilter.h>
+
+#include <Eigen/Dense>
+#include <sstream>
 
 using namespace mola;
+
+NavStateFilter::NavStateFilter()
+{
+    this->mrpt::system::COutputLogger::setLoggerName("NavStateFilter");
+}
+
+NavStateFilter::~NavStateFilter() = default;
+
+std::string NavState::asString() const
+{
+    std::ostringstream ss;
+    ss << "pose  : " << pose;
+    ss << "twist : " << twist.asString() << "\n";
+    ss << "twist inv_cov diagonal: "
+       << twist_inv_cov.asEigen().diagonal().transpose() << "\n";
+
+    return ss.str();
+}

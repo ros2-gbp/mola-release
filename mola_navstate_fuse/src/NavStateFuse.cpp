@@ -24,6 +24,7 @@
  * @date   Jan 22, 2024
  */
 
+#include <mola_imu_preintegration/RotationIntegrator.h>
 #include <mola_navstate_fuse/NavStateFuse.h>
 #include <mrpt/poses/Lie/SO.h>
 
@@ -43,11 +44,11 @@ void NavStateFuse::reset()
     state_ = State();
 }
 
-void NavStateFuse::fuse_odometry(const mrpt::obs::CObservationOdometry& odom)
+void NavStateFuse::fuse_odometry(
+    const mrpt::obs::CObservationOdometry& odom,
+    [[maybe_unused]] const std::string&    odomName)
 {
-    // TODO(jlbc): proper time-based data fusion.
-
-    // temporarily, this will work well only for simple datasets:
+    // this will work well only for simple datasets with one odometry:
     if (state_.last_odom_obs && state_.last_pose)
     {
         const auto poseIncr = odom.odometry - state_.last_odom_obs->odometry;
@@ -55,8 +56,9 @@ void NavStateFuse::fuse_odometry(const mrpt::obs::CObservationOdometry& odom)
         state_.last_pose->mean =
             state_.last_pose->mean + mrpt::poses::CPose3D(poseIncr);
 
-        // and discard velocity-based model:
-        state_.last_twist = mrpt::math::TTwist3D(0, 0, 0, 0, 0, 0);
+        // We can skip velocity-based model, but retain the twist:
+        // state_.last_twist: do not modify
+        state_.pose_already_updated_with_odom = true;
     }
     // copy:
     state_.last_odom_obs = odom;
@@ -70,7 +72,8 @@ void NavStateFuse::fuse_imu(const mrpt::obs::CObservationIMU& imu)
 
 void NavStateFuse::fuse_pose(
     const mrpt::Clock::time_point&         timestamp,
-    const mrpt::poses::CPose3DPDFGaussian& pose)
+    const mrpt::poses::CPose3DPDFGaussian& pose,
+    [[maybe_unused]] const std::string&    frame_id)
 {
     mrpt::poses::CPose3D incrPose;
 
@@ -100,31 +103,25 @@ void NavStateFuse::fuse_pose(
         tw.wy = logRot[1] / dt;
         tw.wz = logRot[2] / dt;
     }
-    else
-    {
-        state_.last_twist.reset();
-    }
+    else { state_.last_twist.reset(); }
 
     // save for next iter:
-    state_.last_pose         = pose;
-    state_.last_pose_obs_tim = timestamp;
+    state_.last_pose                      = pose;
+    state_.last_pose_obs_tim              = timestamp;
+    state_.pose_already_updated_with_odom = false;
 }
 
 void NavStateFuse::fuse_twist(
-    const mrpt::Clock::time_point& timestamp, const mrpt::math::TTwist3D& twist)
-{
-    (void)timestamp;
-
-    state_.last_twist = twist;
-}
-
-void NavStateFuse::force_last_twist(const mrpt::math::TTwist3D& twist)
+    [[maybe_unused]] const mrpt::Clock::time_point&     timestamp,
+    const mrpt::math::TTwist3D&                         twist,
+    [[maybe_unused]] const mrpt::math::CMatrixDouble66& twistCov)
 {
     state_.last_twist = twist;
 }
 
 std::optional<NavState> NavStateFuse::estimated_navstate(
-    const mrpt::Clock::time_point& timestamp) const
+    const mrpt::Clock::time_point&      timestamp,
+    [[maybe_unused]] const std::string& frame_id)
 {
     if (!state_.last_pose_obs_tim) return {};  // None
 
@@ -137,19 +134,31 @@ std::optional<NavState> NavStateFuse::estimated_navstate(
 
     NavState ret;
 
-    const auto& tw = state_.last_twist.value();
+    mrpt::poses::CPose3D poseExtrapolation;
 
-    // For the velocity model, we don't have any known "bias":
-    const mola::RotationIntegrationParams rotParams = {};
+    if (state_.pose_already_updated_with_odom)
+    {
+        // We have already updated the pose via wheels odometry, don't
+        // extrapolate:
+        poseExtrapolation = mrpt::poses::CPose3D::Identity();
+    }
+    else
+    {  // normal case: use twist to extrapolate:
 
-    const auto rot33 =
-        mola::incremental_rotation({tw.wx, tw.wy, tw.wz}, rotParams, dt);
+        const auto& tw = state_.last_twist.value();
+
+        // For the velocity model, we don't have any known "bias":
+        const mola::RotationIntegrationParams rotParams = {};
+
+        const auto rot33 =
+            mola::incremental_rotation({tw.wx, tw.wy, tw.wz}, rotParams, dt);
+
+        poseExtrapolation = mrpt::poses::CPose3D::FromRotationAndTranslation(
+            rot33, mrpt::math::TVector3D(tw.vx, tw.vy, tw.vz) * dt);
+    }
 
     // pose mean:
-    ret.pose.mean =
-        (state_.last_pose->mean +
-         mrpt::poses::CPose3D::FromRotationAndTranslation(
-             rot33, mrpt::math::TVector3D(tw.vx, tw.vy, tw.vz) * dt));
+    ret.pose.mean = state_.last_pose->mean + poseExtrapolation;
 
     // pose cov:
     auto cov = state_.last_pose->cov;
