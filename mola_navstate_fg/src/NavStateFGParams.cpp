@@ -18,32 +18,41 @@
  * MOLA. If not, see <https://www.gnu.org/licenses/>.
  * ------------------------------------------------------------------------- */
 /**
- * @file   NavState.h
- * @brief  State vector for SE(3) pose + velocity
+ * @file   NavStateFGParams.cpp
+ * @brief  Parameters for NavStateFuse
  * @author Jose Luis Blanco Claraco
  * @date   Jan 22, 2024
  */
-#pragma once
 
-#include <mrpt/math/TTwist3D.h>
-#include <mrpt/poses/CPose3DPDFGaussianInf.h>
+#include <mola_navstate_fg/NavStateFGParams.h>
 
-namespace mola
+using namespace mola;
+
+void NavStateFGParams::loadFrom(const mrpt::containers::yaml& cfg)
 {
-struct NavState
-{
-    NavState()  = default;
-    ~NavState() = default;
+    MCP_LOAD_REQ(cfg, max_time_to_use_velocity_model);
 
-    /** SE(3) pose estimation, including information matrix
-     *  (in the "odom" frame) */
-    mrpt::poses::CPose3DPDFGaussianInf pose;
+    MCP_LOAD_REQ(cfg, sliding_window_length);
 
-    /** Linear and angular velocity estimation (in the "odom" frame) */
-    mrpt::math::TTwist3D twist;
+    MCP_LOAD_OPT(cfg, sigma_random_walk_acceleration_linear);
+    MCP_LOAD_OPT(cfg, sigma_random_walk_acceleration_angular);
 
-    /** Inverse covariance matrix (information) of twist */
-    mrpt::math::CMatrixDouble66 twist_inv_cov;
-};
+    MCP_LOAD_OPT(cfg, time_between_frames_to_warning);
 
-}  // namespace mola
+    MCP_LOAD_OPT(cfg, initial_twist_sigma_lin);
+    MCP_LOAD_OPT(cfg, initial_twist_sigma_ang);
+
+    MCP_LOAD_OPT(cfg, max_rmse);
+    MCP_LOAD_OPT(cfg, robust_param);
+
+    if (cfg.has("initial_twist"))
+    {
+        ASSERT_(
+            cfg["initial_twist"].isSequence() &&
+            cfg["initial_twist"].asSequence().size() == 6);
+
+        auto&      tw  = initial_twist;
+        const auto seq = cfg["initial_twist"].asSequenceRange();
+        for (size_t i = 0; i < 6; i++) tw[i] = seq.at(i).as<double>();
+    }
+}

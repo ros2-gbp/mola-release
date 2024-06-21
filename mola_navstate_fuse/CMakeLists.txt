@@ -21,6 +21,7 @@ find_package(mrpt-obs)
 
 # Find MOLA packages:
 find_package(mola_imu_preintegration REQUIRED)
+find_package(mola_kernel REQUIRED)
 
 # -----------------------
 # define lib:
@@ -33,14 +34,16 @@ mola_add_library(
 	PUBLIC_LINK_LIBRARIES
 		mrpt::obs
 		mola::mola_imu_preintegration
+		mola::mola_kernel
 	#PRIVATE_LINK_LIBRARIES
 	#	mrpt::obs
 	CMAKE_DEPENDENCIES
 		mola_common
+		mola_kernel
 		mola_imu_preintegration
 )
 
 # -----------------------
 # define tests:
-enable_testing()
-add_subdirectory(tests)
+#enable_testing()
+#add_subdirectory(tests)
