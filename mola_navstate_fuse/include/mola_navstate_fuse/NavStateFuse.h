@@ -25,8 +25,7 @@
  */
 #pragma once
 
-#include <mola_imu_preintegration/RotationIntegrator.h>
-#include <mola_navstate_fuse/NavState.h>
+#include <mola_kernel/interfaces/NavStateFilter.h>
 #include <mola_navstate_fuse/NavStateFuseParams.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/core/optional_ref.h>
@@ -51,10 +50,14 @@ namespace mola
  *
  * Old observations are automatically removed.
  *
+ * \note This implementation of mola::NavStateFilter ignores the passed
+ *       "frame_id"
+ *
  * \sa IMUIntegrator
  * \ingroup mola_imu_preintegration_grp
  */
-class NavStateFuse
+class NavStateFuse : public mola::NavStateFilter
+
 {
    public:
     NavStateFuse()  = default;
@@ -69,28 +72,37 @@ class NavStateFuse
      * @brief Initializes the object and reads all parameters from a YAML node.
      * @param cfg a YAML node with a dictionary of parameters to load from.
      */
-    void initialize(const mrpt::containers::yaml& cfg);
+    void initialize(const mrpt::containers::yaml& cfg) override;
 
     /** Resets the estimator state to an initial state.
      *  \sa currentIntegrationState
      */
-    void reset();
+    void reset() override;
 
-    /** Integrates new odometry observations into the estimator */
-    void fuse_odometry(const mrpt::obs::CObservationOdometry& odom);
-
-    /** Integrates new IMU observations into the estimator */
-    void fuse_imu(const mrpt::obs::CObservationIMU& imu);
-
-    /** Integrates new SE(3) pose estimation into the estimator */
+    /** Integrates new SE(3) pose estimation of the vehicle wrt frame_id
+     */
     void fuse_pose(
         const mrpt::Clock::time_point&         timestamp,
-        const mrpt::poses::CPose3DPDFGaussian& pose);
+        const mrpt::poses::CPose3DPDFGaussian& pose,
+        const std::string&                     frame_id) override;
+
+    /** Integrates new wheels-based odometry observations into the estimator.
+     *  This is a convenience method that internally ends up calling
+     *  fuse_pose(), but computing the uncertainty of odometry increments
+     *  according to a given motion model.
+     */
+    void fuse_odometry(
+        const mrpt::obs::CObservationOdometry& odom,
+        const std::string& odomName = "odom_wheels") override;
+
+    /** Integrates new IMU observations into the estimator */
+    void fuse_imu(const mrpt::obs::CObservationIMU& imu) override;
 
     /** Integrates new twist estimation (in the odom frame) */
     void fuse_twist(
-        const mrpt::Clock::time_point& timestamp,
-        const mrpt::math::TTwist3D&    twist);
+        const mrpt::Clock::time_point&     timestamp,
+        const mrpt::math::TTwist3D&        twist,
+        const mrpt::math::CMatrixDouble66& twistCov) override;
 
     /** Computes the estimated vehicle state at a given timestep using the
      * observations in the time window. A std::nullopt is returned if there is
@@ -98,14 +110,13 @@ class NavStateFuse
      * validity time window (e.g. too far in the future to be trustful).
      */
     std::optional<NavState> estimated_navstate(
-        const mrpt::Clock::time_point& timestamp) const;
+        const mrpt::Clock::time_point& timestamp,
+        const std::string&             frame_id) override;
 
     std::optional<mrpt::math::TTwist3D> get_last_twist() const
     {
         return state_.last_twist;
     }
-
-    void force_last_twist(const mrpt::math::TTwist3D& twist);
 
     /** @} */
 
@@ -115,12 +126,12 @@ class NavStateFuse
         State()  = default;
         ~State() = default;
 
+        std::optional<mrpt::obs::CObservationOdometry> last_odom_obs;
         std::optional<mrpt::Clock::time_point>         last_pose_obs_tim;
         std::optional<mrpt::poses::CPose3DPDFGaussian> last_pose;
         std::optional<mrpt::math::TTwist3D>            last_twist;
-        std::optional<mrpt::obs::CObservationOdometry> last_odom_obs;
+        bool pose_already_updated_with_odom = false;
     };
-    // const State& current_state() const { return state_; }
 
     State state_;
 };
