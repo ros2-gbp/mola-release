@@ -28,6 +28,7 @@
 
 #include <mrpt/containers/yaml.h>
 #include <mrpt/math/TPoint3D.h>
+#include <mrpt/math/TTwist3D.h>
 
 namespace mola
 {
@@ -47,6 +48,8 @@ class NavStateFuseParams
     /** Valid estimations will be extrapolated only up to this time since the
      * last incorporated observation. */
     double max_time_to_use_velocity_model = 2.0;  // [s]
+
+    mrpt::math::TTwist3D initial_twist;
 
     double sigma_random_walk_acceleration_linear  = 1.0;  // [m/s²]
     double sigma_random_walk_acceleration_angular = 1.0;  // [rad/s²]
