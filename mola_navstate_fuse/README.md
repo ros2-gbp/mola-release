@@ -1,11 +1,11 @@
 # mola_navstate_fuse
-SE(3) pose and twist path data fusion estimator.
+Simple kinematic state vector extrapolation algorithm to fuse odometry sources.
 
 This repository provides:
 * `NavStateFuse`: C++ class to integrate odometry, IMU, and pose/twist estimations.
 
-Note: At present this package just extrapolates the latest pose/twist estimations, taking into account
-random-walk uncertainty. TODO: Proper integration of IMU and odometry.
+See package [documentation](https://docs.mola-slam.org/latest/modules.html).
+
 
 ## Build and install
 Refer to the [root MOLA repository](https://github.com/MOLAorg/mola).
