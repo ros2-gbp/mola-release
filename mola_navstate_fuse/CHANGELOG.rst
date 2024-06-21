@@ -1,6 +1,12 @@
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Changelog for package mola_imu_preintegration
+Changelog for package mola_navstate_fuse
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1.0.6 (2024-06-21)
+------------------
+* Create new NavStateFilter interface and separate the simple fuser and the factor-graph approach in two packages
+* Twist in local frame
+* Contributors: Jose Luis Blanco-Claraco
 
 1.0.5 (2024-05-28)
 ------------------
