@@ -3,6 +3,11 @@ Changelog for package mola_bridge_ros2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+1.0.7 (2024-07-24)
+------------------
+* Fix GNSS typo
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.6 (2024-06-21)
 ------------------
 
@@ -31,7 +36,7 @@ Changelog for package mola_bridge_ros2
 ------------------
 * BridgeROS2: do not quit on temporary /tf timeout
 * mola_bridge_ros2: option to publish /tf_static for base_footprint
-* mola_bridge_ros2: implement missing MOLA->ROS2 conversion for GNNS observations
+* mola_bridge_ros2: implement missing MOLA->ROS2 conversion for GNSS observations
 * BUGFIX: Inverted value of "use_fixed_sensor_pose" was used
 * Contributors: Jose Luis Blanco-Claraco
 
