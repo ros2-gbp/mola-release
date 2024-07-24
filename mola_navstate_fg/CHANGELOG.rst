@@ -2,6 +2,11 @@
 Changelog for package mola_navstate_fg
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.7 (2024-07-24)
+------------------
+* Fix GNSS typo
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.6 (2024-06-21)
 ------------------
 * Create new NavStateFilter interface and separate the simple fuser and the factor-graph approach in two packages
