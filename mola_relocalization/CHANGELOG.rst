@@ -3,6 +3,12 @@ Changelog for package mola_relocalization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+1.0.8 (2024-07-29)
+------------------
+* BUGFIX: Add missing cmake dependency on mrpt-slam
+* ament_lint_cmake: clean warnings
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.7 (2024-07-24)
 ------------------
 * Fix GNSS typo
