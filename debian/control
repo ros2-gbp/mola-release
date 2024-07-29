@@ -1,0 +1,12 @@
+Source: ros-iron-mola-input-rosbag2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-iron-cv-bridge, ros-iron-mola-kernel, ros-iron-mrpt2, ros-iron-rosbag2-cpp, ros-iron-sensor-msgs, ros-iron-tf2-geometry-msgs, ros-iron-tf2-msgs, ros-iron-tf2-ros, ros-iron-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_input_rosbag2
+Standards-Version: 3.9.2
+
+Package: ros-iron-mola-input-rosbag2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-iron-cv-bridge, ros-iron-mola-kernel, ros-iron-mrpt2, ros-iron-rosbag2-cpp, ros-iron-sensor-msgs, ros-iron-tf2-geometry-msgs, ros-iron-tf2-msgs, ros-iron-tf2-ros, ros-iron-ros-workspace
+Description: Offline RawDataSource from rosbag2 datasets
