@@ -2,6 +2,11 @@
 Changelog for package mola_demos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.0.8 (2024-07-29)
+------------------
+* ament_lint_cmake: clean warnings
+* Contributors: Jose Luis Blanco-Claraco
+
 1.0.7 (2024-07-24)
 ------------------
 * Fix GNSS typo
