@@ -1,0 +1,12 @@
+Source: ros-humble-mola-launcher
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-humble-ament-cmake, ros-humble-ament-cmake-gtest, ros-humble-ament-cmake-xmllint, ros-humble-ament-lint-auto <!nocheck>, ros-humble-ament-lint-common <!nocheck>, ros-humble-mola-kernel, ros-humble-mrpt2, ros-humble-ros-environment, ros-humble-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_launcher
+Standards-Version: 3.9.2
+
+Package: ros-humble-mola-launcher
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-humble-mola-kernel, ros-humble-mrpt2, ros-humble-ros-workspace
+Description: Launcher app for MOLA systems
