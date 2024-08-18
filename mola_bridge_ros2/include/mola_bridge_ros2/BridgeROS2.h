@@ -14,9 +14,11 @@
 // MOLA virtual interfaces:
 #include <mola_kernel/interfaces/ExecutableBase.h>
 #include <mola_kernel/interfaces/LocalizationSourceBase.h>
+#include <mola_kernel/interfaces/MapServer.h>
 #include <mola_kernel/interfaces/MapSourceBase.h>
 #include <mola_kernel/interfaces/RawDataConsumer.h>
 #include <mola_kernel/interfaces/RawDataSourceBase.h>
+#include <mola_kernel/interfaces/Relocalization.h>
 
 // MRPT:
 #include <mrpt/obs/CObservationGPS.h>
@@ -36,6 +38,12 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+
+// MOLA <-> ROS services:
+#include <mola_msgs/srv/map_load.hpp>
+#include <mola_msgs/srv/map_save.hpp>
+#include <mola_msgs/srv/relocalize_from_gnss.hpp>
+#include <mola_msgs/srv/relocalize_near_pose.hpp>
 
 namespace mola
 {
@@ -163,24 +171,18 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         auto lck = mrpt::lockHelper(rosNodeMtx_);
         return rosNode_;
     }
-    std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr>
-        subsPointCloud_;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> subsPointCloud_;
 
-    std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr>
-        subsLaserScan_;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr> subsLaserScan_;
 
-    std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr>
-        subsOdometry_;
+    std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> subsOdometry_;
 
-    std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr>
-        subsImu_;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr> subsImu_;
 
-    std::vector<rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr>
-        subsGNSS_;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr> subsGNSS_;
 
     void callbackOnPointCloud2(
-        const sensor_msgs::msg::PointCloud2&       o,
-        const std::string&                         outSensorLabel,
+        const sensor_msgs::msg::PointCloud2& o, const std::string& outSensorLabel,
         const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
 
     void callbackOnLaserScan(
@@ -195,12 +197,11 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         const sensor_msgs::msg::NavSatFix& o, const std::string& outSensorLabel,
         const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
 
-    void callbackOnOdometry(
-        const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel);
+    void callbackOnOdometry(const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel);
 
     bool waitForTransform(
-        mrpt::poses::CPose3D& des, const std::string& target_frame,
-        const std::string& source_frame, bool printErrors);
+        mrpt::poses::CPose3D& des, const std::string& target_frame, const std::string& source_frame,
+        bool printErrors);
 
     void publishOdometry();
 
@@ -211,9 +212,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     struct RosPubs
     {
         /// Map <sensor_label> => publisher
-        std::map<
-            std::string, rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr>
-            pub_poses;
+        std::map<std::string, rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> pub_poses;
 
         /// Map <sensor_label> => publisher
         std::map<std::string, rclcpp::PublisherBase::SharedPtr> pub_sensors;
@@ -227,23 +226,46 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
     struct MolaSubs
     {
+        // MOLA subscribers:
         std::set<mola::RawDataSourceBase::Ptr>                  dataSources;
         std::set<std::shared_ptr<mola::LocalizationSourceBase>> locSources;
         std::set<std::shared_ptr<mola::MapSourceBase>>          mapSources;
+        std::set<std::shared_ptr<mola::Relocalization>>         relocalization;
+        std::set<std::shared_ptr<mola::MapServer>>              mapServers;
     };
 
     MolaSubs   molaSubs_;
     std::mutex molaSubsMtx_;
 
-    void onNewLocalization(
-        const mola::LocalizationSourceBase::LocalizationUpdate& l);
+    // ROS services:
+    rclcpp::Service<mola_msgs::srv::RelocalizeFromGNSS>::SharedPtr srvRelocGNNS_;
+    rclcpp::Service<mola_msgs::srv::RelocalizeNearPose>::SharedPtr srvRelocPose_;
+    rclcpp::Service<mola_msgs::srv::MapLoad>::SharedPtr            srvMapLoad_;
+    rclcpp::Service<mola_msgs::srv::MapSave>::SharedPtr            srvMapSave_;
+
+    void service_relocalize_from_gnss(
+        const std::shared_ptr<mola_msgs::srv::RelocalizeFromGNSS::Request> request,
+        std::shared_ptr<mola_msgs::srv::RelocalizeFromGNSS::Response>      response);
+
+    void service_relocalize_near_pose(
+        const std::shared_ptr<mola_msgs::srv::RelocalizeNearPose::Request> request,
+        std::shared_ptr<mola_msgs::srv::RelocalizeNearPose::Response>      response);
+
+    void service_map_load(
+        const std::shared_ptr<mola_msgs::srv::MapLoad::Request> request,
+        std::shared_ptr<mola_msgs::srv::MapLoad::Response>      response);
+
+    void service_map_save(
+        const std::shared_ptr<mola_msgs::srv::MapSave::Request> request,
+        std::shared_ptr<mola_msgs::srv::MapSave::Response>      response);
+
+    void onNewLocalization(const mola::LocalizationSourceBase::LocalizationUpdate& l);
 
     void onNewMap(const mola::MapSourceBase::MapUpdate& m);
 
-    std::mutex lastLocMapMtx_;
-    std::optional<mola::LocalizationSourceBase::LocalizationUpdate> lastLoc_;
-    std::map<std::string /*map_name*/, mola::MapSourceBase::MapUpdate>
-        lastMaps_;
+    std::mutex                                                         lastLocMapMtx_;
+    std::optional<mola::LocalizationSourceBase::LocalizationUpdate>    lastLoc_;
+    std::map<std::string /*map_name*/, mola::MapSourceBase::MapUpdate> lastMaps_;
 
     void timerPubLocalization();
     void timerPubMap();
@@ -261,8 +283,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         const mrpt::obs::CObservationPointCloud& obs, bool isSensorTopic,
         const std::string& sSensorFrameId);
 
-    void internalAnalyzeTopicsToSubscribe(
-        const mrpt::containers::yaml& ds_subscribe);
+    void internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& ds_subscribe);
 
     void publishStaticTFs();
 };
