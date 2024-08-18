@@ -53,7 +53,7 @@ MOLA
 :octicon:`mark-github` `MOLA`_ is a Modular system for Localization and Mapping.
 
 Get started:
- - Read the tutorial: :ref:`building-maps`.
+ - Read: :ref:`building-maps`.
  - Read :octicon:`rocket` :ref:`mola_lidar_odometry` documentation.
  - See :ref:`use-cases` for examples of use.
  - See :ref:`installing` and :ref:`how to cite it <citing_mola>`.
@@ -66,6 +66,55 @@ Get started:
 .. _videos: https://www.youtube.com/playlist?list=PLOJ3GF0x2_eVaujK78PoVOvxJGrl_Z7fV
 
 |
+
+.. humble badges ------
+
+.. |badgeHdev| image:: https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/badge/icon
+   :scale: 100%
+   :align: middle
+   :target: https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/
+
+.. |badgeHrel| image:: https://img.shields.io/ros/v/humble/mola
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/search/?term=mola
+
+.. iron badges ------
+
+.. |badgeIdev| image:: https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/badge/icon
+   :scale: 100%
+   :align: middle
+   :target: https://build.ros2.org/job/Idev__mola__ubuntu_jammy_amd64/
+
+.. |badgeIrel| image:: https://img.shields.io/ros/v/iron/mola
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/search/?term=mola
+
+.. jazzy badges ------
+
+.. |badgeJdev| image:: https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/badge/icon
+   :scale: 100%
+   :align: middle
+   :target: https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/
+
+.. |badgeJrel| image:: https://img.shields.io/ros/v/jazzy/mola
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/search/?term=mola
+
+.. rolling badges ------
+
+.. |badgeRdev| image:: https://build.ros2.org/job/Rdev__mola__ubuntu_noble_amd64/badge/icon
+   :scale: 100%
+   :align: middle
+   :target: https://build.ros2.org/job/Rdev__mola__ubuntu_noble_amd64/
+
+.. |badgeRrel| image:: https://img.shields.io/ros/v/rolling/mola
+   :scale: 100%
+   :align: middle
+   :target: https://index.ros.org/search/?term=mola
+
 
 .. _installing:
 
@@ -89,7 +138,9 @@ How to install all MOLA modules:
         sudo apt install ros-$ROS_DISTRO-mola
         
         # Install the MOLA LIDAR odometry package:
-        sudo apt install ros-$ROS_DISTRO-mola-lidar-odometry
+        # sudo apt install ros-$ROS_DISTRO-mola-lidar-odometry
+        # As of Jul 2024, this package is not available from apt yet! 
+        # Please see instructions below to clone and build it from sources
 
         # Install example small datasets to run demos/unit tests:
         sudo apt install ros-$ROS_DISTRO-mola-test-datasets
@@ -98,15 +149,23 @@ How to install all MOLA modules:
 
     .. code-block:: bash
 
-        cd ~/ros2_mola_ws/
-        . install/setup.bash
-
         # For example, let's launch the mm map viewer. 
         # If a GUI app is opened, it means installation was successful.
         mm-viewer
 
-    Check the `build status table <https://github.com/MOLAorg/mola>`_ to find out
-    what MOLA version is available for your ROS distribution.
+    These are the versions available from ROS build farms:
+
+    +-------------------------+-----------------------------+------------------------------------+
+    | ROS distribution        | Development build status    | Last release (available via apt)   |
+    +=========================+=============================+====================================+
+    | ROS 2 Humble (u22.04)   |    |badgeHdev|              |     |badgeHrel|                    |
+    +-------------------------+-----------------------------+------------------------------------+
+    | ROS 2 Iron (u22.04)     |    |badgeIdev|              |     |badgeIrel|                    |
+    +-------------------------+-----------------------------+------------------------------------+
+    | ROS 2 Jazzy (u24.04)    |    |badgeJdev|              |     |badgeJrel|                    |
+    +-------------------------+-----------------------------+------------------------------------+
+    | ROS 2 Rolling (u24.04)  |    |badgeRdev|              |     |badgeRrel|                    |
+    +-------------------------+-----------------------------+------------------------------------+
 
 
 .. dropdown:: Build from sources
@@ -128,9 +187,6 @@ How to install all MOLA modules:
 
         mkdir -p ~/ros2_mola_ws/src/ 
         cd ~/ros2_mola_ws/src/
-
-        # Optional: Get latest version of mrpt2.
-        # git clone https://github.com/MRPT/mrpt.git mrpt2 --recursive
 
         # Main MOLA modules:
         git clone https://github.com/MOLAorg/mola_common.git
@@ -186,7 +242,7 @@ The ``mola_lidar_odometry`` system was presented in :cite:`blanco2024mola_lo`:
   `A flexible framework for accurate LiDAR odometry, map manipulation, and localization`_, in
   ArXiV, 2024.
 
-.. _A flexible framework for accurate LiDAR odometry, map manipulation, and localization: https://TBD
+.. _A flexible framework for accurate LiDAR odometry, map manipulation, and localization: https://arxiv.org/abs/2407.20465
 
 The basics of the MOLA framework were introduced in :cite:`blanco2019modular`.
 
