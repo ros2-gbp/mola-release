@@ -5,15 +5,14 @@
 -->
 <package format="3">
   <name>mola_kernel</name>
-  <version>1.0.8</version>
+  <version>1.1.0</version>
   <description>Fundamental C++ virtual interfaces and data types for the rest of MOLA modules</description>
 
-  <author     email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</author>
   <maintainer email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</maintainer>
+  <license file="LICENSE">GPLv3</license>
 
   <url type="website">https://github.com/MOLAorg/mola/tree/develop/mola_kernel</url>
 
-  <license file="LICENSE">GPLv3</license>
 
   <depend>mola_common</depend>
   <depend>mola_yaml</depend>
