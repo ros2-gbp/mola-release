@@ -1,3 +1,49 @@
+## mola (humble) - 1.1.0-1
+
+The packages in the `mola` repository were released into the `humble` distro by running `/usr/bin/bloom-release -y -r humble mola` on `Sun, 18 Aug 2024 20:49:35 -0000`
+
+These packages were released:
+- `kitti_metrics_eval`
+- `mola`
+- `mola_bridge_ros2`
+- `mola_demos`
+- `mola_imu_preintegration`
+- `mola_input_euroc_dataset`
+- `mola_input_kitti360_dataset`
+- `mola_input_kitti_dataset`
+- `mola_input_mulran_dataset`
+- `mola_input_paris_luco_dataset`
+- `mola_input_rawlog`
+- `mola_input_rosbag2`
+- `mola_kernel`
+- `mola_launcher`
+- `mola_metric_maps`
+- `mola_msgs`
+- `mola_navstate_fg`
+- `mola_navstate_fuse`
+- `mola_pose_list`
+- `mola_relocalization`
+- `mola_traj_tools`
+- `mola_viz`
+- `mola_yaml`
+
+Version of package(s) in repository `mola`:
+
+- upstream repository: https://github.com/MOLAorg/mola.git
+- release repository: https://github.com/ros2-gbp/mola-release.git
+- rosdistro version: `1.0.8-1`
+- old version: `1.0.8-1`
+- new version: `1.1.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.12.0`
+- catkin_pkg version: `1.0.0`
+- rosdep version: `0.25.0`
+- rosdistro version: `0.9.1`
+- vcstools version: `0.1.42`
+
+
 ## mola (rolling) - 1.0.8-1
 
 The packages in the `mola` repository were released into the `rolling` distro by running `/home/jlblanco/code/bloom-venv/bin/bloom-release -y -r rolling mola` on `Mon, 29 Jul 2024 15:58:12 -0000`
