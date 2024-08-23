@@ -2,6 +2,9 @@
 Changelog for package mola_input_rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.1.1 (2024-08-23)
+------------------
+
 1.1.0 (2024-08-18)
 ------------------
 * Update clang-format style; add reformat bash script
