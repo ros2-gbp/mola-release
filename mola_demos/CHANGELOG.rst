@@ -2,6 +2,15 @@
 Changelog for package mola_demos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.1.3 (2024-08-28)
+------------------
+
+1.1.2 (2024-08-26)
+------------------
+
+1.1.1 (2024-08-23)
+------------------
+
 1.1.0 (2024-08-18)
 ------------------
 * Merge pull request `#62 <https://github.com/MOLAorg/mola/issues/62>`_ from MOLAorg/docs-fixes
