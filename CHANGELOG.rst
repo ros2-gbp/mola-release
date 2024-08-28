@@ -3,6 +3,19 @@ Changelog for package mola_input_rosbag2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+1.1.3 (2024-08-28)
+------------------
+* Depend on new mrpt_lib packages (deprecate mrpt2)
+* Contributors: Jose Luis Blanco-Claraco
+
+1.1.2 (2024-08-26)
+------------------
+* rosbag2 input: support for input directories for split bag datasets
+* Contributors: Jose Luis Blanco-Claraco
+
+1.1.1 (2024-08-23)
+------------------
+
 1.1.0 (2024-08-18)
 ------------------
 * Merge pull request `#62 <https://github.com/MOLAorg/mola/issues/62>`_ from MOLAorg/docs-fixes
