@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-demos
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-jazzy-ament-cmake, ros-jazzy-ament-cmake-gtest, ros-jazzy-ament-cmake-xmllint, ros-jazzy-ament-lint-auto <!nocheck>, ros-jazzy-ament-lint-common <!nocheck>, ros-jazzy-ros-environment, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-demos
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-jazzy-ros-workspace
+Description: Demo and example launch files for MOLA
