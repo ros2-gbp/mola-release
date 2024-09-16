@@ -2,6 +2,9 @@
 Changelog for package mola_traj_tools
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.2.0 (2024-09-16)
+------------------
+
 1.1.3 (2024-08-28)
 ------------------
 * Depend on new mrpt_lib packages (deprecate mrpt2)
