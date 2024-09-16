@@ -90,6 +90,7 @@ or from the :ref:`UI controls <mola_lo_gui_common_parts>` in the ``mola_lidar_od
                 MOLA_LIDAR_TOPIC=/ouster/points \
                 MOLA_GENERATE_SIMPLEMAP=true \
                 MOLA_SIMPLEMAP_OUTPUT=myMap.simplemap \
+                MOLA_SIMPLEMAP_GENERATE_LAZY_LOAD=true \
                   mola-lo-gui-rosbag2 /path/to/your/dataset.mcap
 
             .. note::
@@ -99,12 +100,32 @@ or from the :ref:`UI controls <mola_lo_gui_common_parts>` in the ``mola_lidar_od
 
             .. code-block:: bash
 
+                MOLA_SIMPLEMAP_GENERATE_LAZY_LOAD=true \
                 mola-lidar-odometry-cli \
                   -c $(ros2 pkg prefix mola_lidar_odometry)/share/mola_lidar_odometry/pipelines/lidar3d-default.yaml \
                   --input-rosbag2 /path/to/your/dataset.mcap \
                   --lidar-sensor-label /ouster/points \
                   --output-tum-path trajectory.tum \
                   --output-simplemap myMap.simplemap
+
+            .. note::
+                Remember changing ``--lidar-sensor-label /ouster/points`` to your actual raw (unfiltered) LiDAR topic (``sensor_msgs/PointCloud2``).
+
+        .. tab-item:: From a rosbag2 (CLI) (Large datasets)
+
+            For maps large enough such as the final `.simplemap` does not fit in RAM, you can enable
+            lazy-load simplemap generation in the CLI with:
+
+            .. code-block:: bash
+
+                MOLA_GENERATE_SIMPLEMAP=true \
+                MOLA_SIMPLEMAP_GENERATE_LAZY_LOAD=true \
+                MOLA_SIMPLEMAP_OUTPUT=myMap.simplemap \
+                mola-lidar-odometry-cli \
+                  -c $(ros2 pkg prefix mola_lidar_odometry)/share/mola_lidar_odometry/pipelines/lidar3d-default.yaml \
+                  --input-rosbag2 /path/to/your/dataset.mcap \
+                  --lidar-sensor-label /ouster/points \
+                  --output-tum-path trajectory.tum
 
             .. note::
                 Remember changing ``--lidar-sensor-label /ouster/points`` to your actual raw (unfiltered) LiDAR topic (``sensor_msgs/PointCloud2``).
@@ -210,13 +231,16 @@ Afterwards, visualizing :ref:`metric map files <mp2p_icp_basics>` (``*.mm``) can
         .. tab-item:: Build an aggregated 3D point cloud
           :selected:
 
-            Download the example pipeline `sm2mm_pointcloud_voxelize.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_pointcloud_voxelize.yaml>`_
+            Download the example pipeline `sm2mm_pointcloud_voxelize_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_pointcloud_voxelize_no_deskew.yaml>`_
             and then run:
 
             .. code-block:: bash
 
                 # Build metric map (mm) from simplemap (sm):
-                sm2mm -i mvsim-warehouse01.simplemap -o mvsim-warehouse01.mm -p sm2mm_pointcloud_voxelize.yaml
+                sm2mm \
+                 -i mvsim-warehouse01.simplemap \
+                 -o mvsim-warehouse01.mm \
+                 -p sm2mm_pointcloud_voxelize_no_deskew.yaml
 
                 # View mm:
                 mm-viewer mvsim-warehouse01.mm
@@ -225,13 +249,16 @@ Afterwards, visualizing :ref:`metric map files <mp2p_icp_basics>` (``*.mm``) can
 
         .. tab-item:: Build a voxel map + 2D grid map
 
-            Download the example pipeline `sm2mm_bonxai_voxelmap_gridmap.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_pointcloud_voxelize.yaml>`_
+            Download the example pipeline `sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml>`_
             and then run:
 
             .. code-block:: bash
 
                 # Build metric map (mm) from simplemap (sm):
-                sm2mm -i mvsim-warehouse01.simplemap -o mvsim-warehouse01.mm -p sm2mm_bonxai_voxelmap_gridmap.yaml
+                sm2mm \
+                  -i mvsim-warehouse01.simplemap \
+                  -o mvsim-warehouse01.mm \
+                  -p sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml
 
                 # View mm:
                 mm-viewer mvsim-warehouse01.mm
@@ -273,16 +300,43 @@ Please, read carefully `its documentation <https://github.com/mrpt-ros-pkg/mrpt_
 
   .. image:: https://mrpt.github.io/imgs/screenshot-rviz2-mrpt-map-server-demo-warehouse.png
 
+|
+
+6. See the inner workings of ICP
+----------------------------------------
+If you are interested in learning about the internal workings of each ICP optimization,
+or if there is something wrong at some particular timestamp and want to **debug it**,
+you can enable the generation of :ref:`ICP log files <pipeline_icp_log_files>`
+and then visualize them with the GUI app :ref:`icp-log-viewer <app_icp-log-viewer>`.
+
+.. dropdown:: Debug ICP
+
+  First, re-run MOLA LO enabling the generation of ICP log files (see :ref:`all the available options <pipeline_icp_log_files>`):
+
+  .. code-block:: bash
+
+      # Generate ICP log files:
+      MP2P_ICP_GENERATE_DEBUG_FILES=1 \
+      MP2P_ICP_LOG_FILES_DECIMATION=1 \
+      mola-lo-gui-rosbag  [...]  # the rest remains the same
+
+  You should now have a directory ``icp-logs`` with as many files as times ICP invocations.
+  Then, visualize the logs in the GUI with:
+
+  .. code-block:: bash
+
+      # Open the logs:
+      icp-log-viewer -d icp-logs/ -l libmola_metric_maps.so
+
 
 |
 
 
-6. What's next?
+7. What's next?
 ----------------------------------------
+Once you have a map, here are some next steps:
 
-Write me:
-
-- georeferencing
-- loop closure
-- Use for localization
+- loop closure (Write me!)
+- :ref:`geo-referencing`.
+- :ref:`Use for localization <localization-only>`.
 
