@@ -1,0 +1,12 @@
+Source: ros-humble-mola-navstate-fg
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, libboost-chrono-dev, libboost-date-time-dev, libboost-filesystem-dev, libboost-program-options-dev, libboost-regex-dev, libboost-serialization-dev, libboost-system-dev, libboost-thread-dev, libboost-timer-dev, ros-humble-gtsam, ros-humble-mola-common, ros-humble-mola-imu-preintegration, ros-humble-mola-kernel, ros-humble-mrpt-libobs, ros-humble-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_navstate_fuse
+Standards-Version: 3.9.2
+
+Package: ros-humble-mola-navstate-fg
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-humble-mola-common, ros-humble-mola-imu-preintegration, ros-humble-mola-kernel, ros-humble-mrpt-libobs, ros-humble-ros-workspace
+Description: SE(3) pose and twist path data fusion estimator
