@@ -16,6 +16,7 @@ MOLA
   localization
   geo-referencing
   use-cases
+  ros2api
   solutions
 
 .. toctree::
@@ -43,7 +44,7 @@ MOLA
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: Details
+  :caption: Learn more
 
   mola_architecture
   tutorials
