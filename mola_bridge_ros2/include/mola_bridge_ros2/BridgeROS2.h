@@ -43,6 +43,8 @@
 // MOLA <-> ROS services:
 #include <mola_msgs/srv/map_load.hpp>
 #include <mola_msgs/srv/map_save.hpp>
+#include <mola_msgs/srv/mola_runtime_param_get.hpp>
+#include <mola_msgs/srv/mola_runtime_param_set.hpp>
 #include <mola_msgs/srv/relocalize_from_gnss.hpp>
 #include <mola_msgs/srv/relocalize_near_pose.hpp>
 
@@ -134,6 +136,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
         bool publish_tf_from_robot_pose_observations = true;
 
+        std::string relocalize_from_topic = "/initialpose";  //!< Default in RViz
+
         /// If true, the original dataset timestamps will be used to publish.
         /// Otherwise, the wallclock time will be used.
         bool publish_in_sim_time = false;
@@ -182,6 +186,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
     std::vector<rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr> subsGNSS_;
 
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subInitPose_;
+
     void callbackOnPointCloud2(
         const sensor_msgs::msg::PointCloud2& o, const std::string& outSensorLabel,
         const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
@@ -199,6 +205,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
 
     void callbackOnOdometry(const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel);
+
+    void callbackOnRelocalizeTopic(const geometry_msgs::msg::PoseWithCovarianceStamped& o);
 
     bool waitForTransform(
         mrpt::poses::CPose3D& des, const std::string& target_frame, const std::string& source_frame,
@@ -239,10 +247,12 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     std::mutex molaSubsMtx_;
 
     // ROS services:
-    rclcpp::Service<mola_msgs::srv::RelocalizeFromGNSS>::SharedPtr srvRelocGNNS_;
-    rclcpp::Service<mola_msgs::srv::RelocalizeNearPose>::SharedPtr srvRelocPose_;
-    rclcpp::Service<mola_msgs::srv::MapLoad>::SharedPtr            srvMapLoad_;
-    rclcpp::Service<mola_msgs::srv::MapSave>::SharedPtr            srvMapSave_;
+    rclcpp::Service<mola_msgs::srv::RelocalizeFromGNSS>::SharedPtr  srvRelocGNNS_;
+    rclcpp::Service<mola_msgs::srv::RelocalizeNearPose>::SharedPtr  srvRelocPose_;
+    rclcpp::Service<mola_msgs::srv::MapLoad>::SharedPtr             srvMapLoad_;
+    rclcpp::Service<mola_msgs::srv::MapSave>::SharedPtr             srvMapSave_;
+    rclcpp::Service<mola_msgs::srv::MolaRuntimeParamGet>::SharedPtr srvParamGet_;
+    rclcpp::Service<mola_msgs::srv::MolaRuntimeParamSet>::SharedPtr srvParamSet_;
 
     void service_relocalize_from_gnss(
         const std::shared_ptr<mola_msgs::srv::RelocalizeFromGNSS::Request> request,
@@ -259,6 +269,14 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     void service_map_save(
         const std::shared_ptr<mola_msgs::srv::MapSave::Request> request,
         std::shared_ptr<mola_msgs::srv::MapSave::Response>      response);
+
+    void service_param_get(
+        const std::shared_ptr<mola_msgs::srv::MolaRuntimeParamGet::Request> request,
+        std::shared_ptr<mola_msgs::srv::MolaRuntimeParamGet::Response>      response);
+
+    void service_param_set(
+        const std::shared_ptr<mola_msgs::srv::MolaRuntimeParamSet::Request> request,
+        std::shared_ptr<mola_msgs::srv::MolaRuntimeParamSet::Response>      response);
 
     void onNewLocalization(const mola::LocalizationSourceBase::LocalizationUpdate& l);
 
