@@ -2,6 +2,9 @@
 Changelog for package mola_viz
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.4.0 (2024-12-18)
+------------------
+
 1.3.0 (2024-12-11)
 ------------------
 * mola_viz: Show IMU data in the GUI too

@@ -11,14 +11,7 @@ or LiDAR-odometry module. At present, this applies to:
   MOLA modules and the ROS 2 system.
 - :ref:`mola_lidar_odometry`
 
-.. note::
-
-   It is recommended to start with the tutorial on how to :ref:`build a map <building-maps>`,
-   then check out :ref:`how to launch MOLA-LO for ROS 2 <mola_lo_ros>`.
-
 .. image:: https://mrpt.github.io/imgs/mola-lo-ros2-launch-demo-kitti.png
-
-
 
 ____________________________________________
 
@@ -31,7 +24,21 @@ ____________________________________________
 
 |
 
-1. Map loading / saving
+1. Nodes and launch files
+--------------------------------------
+
+.. _ros2_node_lo_docs:
+
+1.1. ROS 2 node for Lidar Odometry (LO)
+============================================
+
+.. include:: ../../../mola_lidar_odometry/docs/mola_lo_ros_node.rst
+
+|
+
+----
+
+2. Map loading / saving
 --------------------------------------
 During a live SLAM run, ``BridgeROS2`` will look for modules implementing
 :ref:`MapServer <doxid-classmola_1_1_map_server>` and will expose
@@ -43,13 +50,13 @@ these **ROS 2 services** to load or save the current map:
 
 .. dropdown:: Example ROS 2 cli service calls
 
-    To save the current map:
+   To save the current map:
 
    .. code-block:: bash
 
       ros2 service call /map_save mola_msgs/srv/MapSave "map_path: '/tmp/my_map_file_prefix'"
 
-    To load a map from disk:
+   To load a map from disk:
 
    .. code-block:: bash
 
@@ -70,7 +77,9 @@ the corresponding checkbox in the
 
 ----
 
-2. Re-localization
+.. _mola_ros2api_relocalization:
+
+3. Re-localization
 --------------------------------------
 Write me!
 
@@ -80,7 +89,7 @@ Write me!
 
 .. _mola_ros2_tf_frames:
 
-3. ``/tf`` frames
+4. Published ``/tf`` frames
 --------------------------------------
 These frames of reference exist when using MOLA :ref:`geo-referenced <geo-referencing>` maps:
 
@@ -90,8 +99,7 @@ These frames of reference exist when using MOLA :ref:`geo-referenced <geo-refere
 
 .. note::
 
-   For non geo-referenced maps, the meaning of all frames are the same but ``utm`` and ``enu``
-   will not be present.
+   For non geo-referenced maps, all frames remain the same but ``utm`` and ``enu`` will not exist.
 
 These are the existing frames:
 
@@ -112,11 +120,14 @@ And this is who is responsible of publishing each transformation:
 - ``enu → {map, utm}``: Published by ``mrpt_map_server`` (`github <https://github.com/mrpt-ros-pkg/mrpt_navigation/tree/ros2/mrpt_map_server/>`_),
   if fed with a geo-referenced metric map (``.mm``) file.
 
-
+|
 
 ----
 
-4. Map publishing
+|
+
+
+5. Map publishing
 --------------------------------------
 There are two ways of publishing maps to ROS:
 
@@ -142,7 +153,88 @@ The metric map layer C++ class will determine the ROS topic type to use.
 
 |
 
+----
 
+|
 
+.. _ros2api_runtime_params:
 
+6. Runtime dynamic reconfiguration
+----------------------------------------
+MOLA modules may expose a subset of their parameters through an interface that allows
+runtime reconfiguration via ROS 2 service requests:
 
+6.1. Runtime parameters for ``mola_lidar_odometry``
+======================================================
+
+List all existing parameters:
+
+   .. code-block:: bash
+
+      ros2 service call /mola_runtime_param_get mola_msgs/srv/MolaRuntimeParamGet
+
+.. dropdown:: Example output
+  :open:
+
+   .. code-block:: bash
+
+      requester: making request: mola_msgs.srv.MolaRuntimeParamGet_Request()
+
+      response:
+      mola_msgs.srv.MolaRuntimeParamGet_Response(parameters='mola::LidarOdometry:lidar_odom:\n  active: true\n  generate_simplemap: false\n  mapping_enabled: true\n')
+
+   Returned ``parameters`` as YAML:
+
+   .. code-block:: yaml
+
+      mola::LidarOdometry:lidar_odom:
+        active: true
+        generate_simplemap: false
+        mapping_enabled: true
+
+Documented parameters:
+
+- ``active``: Whether MOLA-LO should process incoming sensor data (``active: true``)
+  or ignore them (``active: false``).
+
+.. dropdown:: Copy & paste commands for ``active``
+
+   .. code-block:: bash
+
+      # active: true
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  active: true\n\"}"
+
+      # active: false
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  active: false\n\"}"
+
+- ``mapping_enabled``: Whether MOLA-LO should update the localmap (``true``) or just use
+  it in localization-only mode (``false``).
+
+.. dropdown:: Copy & paste commands for ``mapping_enabled``
+
+   .. code-block:: bash
+
+      # mapping_enabled: true
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  mapping_enabled: true\n\"}"
+
+      # mapping_enabled: false
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  mapping_enabled: false\n\"}"
+
+- ``generate_simplemap``: Whether MOLA-LO should build the keyframes-based map (apart of the local metric map),
+  so you end up with a ``*.simplemap`` file.
+
+.. dropdown:: Copy & paste commands for ``generate_simplemap``
+
+   .. code-block:: bash
+
+      # generate_simplemap: true
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  generate_simplemap: true\n\"}"
+
+      # generate_simplemap: false
+      ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+         "{parameters: \"mola::LidarOdometry:lidar_odom:\n  generate_simplemap: false\n\"}"
