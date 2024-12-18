@@ -2,6 +2,9 @@
 Changelog for package mola_metric_maps
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.4.0 (2024-12-18)
+------------------
+
 1.3.0 (2024-12-11)
 ------------------
 * NDT maps: more render options (enable colormaps,etc.)
