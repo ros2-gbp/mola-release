@@ -2,6 +2,11 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.4.0 (2024-12-18)
+------------------
+* Parser now supports replacing custom variables
+* Contributors: Jose Luis Blanco-Claraco
+
 1.3.0 (2024-12-11)
 ------------------
 
