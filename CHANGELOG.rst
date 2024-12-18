@@ -2,6 +2,9 @@
 Changelog for package mola_navstate_fg
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.4.0 (2024-12-18)
+------------------
+
 1.3.0 (2024-12-11)
 ------------------
 * Start integrating GNSS observation. Added a new CLI program mola-navstate-cli for testing state fusion
