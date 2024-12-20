@@ -1,0 +1,128 @@
+ros-rolling-mola-navstate-fg (1.4.1-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 19 Dec 2024 23:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.4.0-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 17 Dec 2024 23:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.3.0-1bookworm) bookworm; urgency=high
+
+  * Start integrating GNSS observation. Added a new CLI program mola-navstate-cli for testing state fusion
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 10 Dec 2024 23:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.2.1-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 28 Sep 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.2.0-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 15 Sep 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.1.3-1bookworm) bookworm; urgency=high
+
+  * Depend on new mrpt_lib packages (deprecate mrpt2)
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 27 Aug 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.1.2-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 25 Aug 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.1.1-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 22 Aug 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.1.0-1bookworm) bookworm; urgency=high
+
+  * Update test-navstate-basic.cpp: less noisy test data for more predictable results
+  * Merge pull request #62 <https://github.com/MOLAorg/mola/issues/62> from MOLAorg/docs-fixes
+    Docs fixes
+  * Fix ament_xmllint warnings in package.xml
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 17 Aug 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.8-1bookworm) bookworm; urgency=high
+
+  * ament_lint_cmake: clean warnings
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 28 Jul 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.7-1bookworm) bookworm; urgency=high
+
+  * Fix GNSS typo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 23 Jul 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.6-1bookworm) bookworm; urgency=high
+
+  * Create new NavStateFilter interface and separate the simple fuser and the factor-graph approach in two packages
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 20 Jun 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.5-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 27 May 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.4-1bookworm) bookworm; urgency=high
+
+  * bump cmake_minimum_required to 3.5
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 13 May 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.3-1bookworm) bookworm; urgency=high
+
+  * Fix package.xml website URL
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 21 Apr 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.2-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.1-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-navstate-fg (1.0.0-1bookworm) bookworm; urgency=high
+
+  * use odometry
+  * add new package mola_navstate_fuse
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-rolling-mola-navstate-fg (0.2.2-1bookworm) bookworm; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+
