@@ -2,6 +2,9 @@
 Changelog for package mola_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.4.1 (2024-12-20)
+------------------
+
 1.4.0 (2024-12-18)
 ------------------
 * Add new Parameters interface ROS 2 service definitions
