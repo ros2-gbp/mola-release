@@ -31,23 +31,29 @@ MOLA
 .. toctree::
   :maxdepth: 2
   :hidden:
+  :caption: State estimation
+
+  mola_sta_est_index
+
+.. toctree::
+  :maxdepth: 2
+  :hidden:
   :caption: mp2p_icp
 
   module-mp2p-icp
   mp2p_icp_basics
   mp2p_icp_optimal-transformations
   mp2p_icp_applications
-  mp2p_icp_demos
 
 .. toctree::
   :maxdepth: 2
   :hidden:
   :caption: Learn more
 
-  mola_architecture
   tutorials
-  supported-sensors
+  mola_architecture
   dataset-conversions
+  supported-sensors
   modules
   doxygen-index
   bibliography
@@ -56,7 +62,7 @@ MOLA
 :octicon:`mark-github` `MOLA`_ is a Modular system for Localization and Mapping.
 
 Get started:
- - Read: :ref:`building-maps`.
+ - Follow the tutorials: :ref:`Building your first map <building-maps>`, :ref:`Mapping and localization <tutorial-mola-lo-map-and-localize>`.
  - Read :octicon:`rocket` :ref:`mola_lidar_odometry` documentation.
  - See :ref:`use-cases` for examples of use.
  - See :ref:`installing` and :ref:`how to cite it <citing_mola>`.
