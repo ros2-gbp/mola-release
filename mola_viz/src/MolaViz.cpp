@@ -750,12 +750,14 @@ void MolaViz::dataset_ui_update()
 mrpt::gui::CDisplayWindowGUI::Ptr MolaViz::create_and_add_window(
     const window_name_t& name)
 {
+    using namespace std::string_literals;
+
     MRPT_LOG_DEBUG_FMT("Creating new window `%s`", name.c_str());
 
     mrpt::gui::CDisplayWindowGUI_Params cp;
     cp.maximized   = true;
-    windows_[name] = {
-        mrpt::gui::CDisplayWindowGUI::Create(name, 1000, 800, cp)};
+    windows_[name] = {mrpt::gui::CDisplayWindowGUI::Create(
+        "MOLAViz - "s + name, 1000, 800, cp)};
 
     // create empty list of subwindows too:
     subWindows_[name];
@@ -1207,3 +1209,42 @@ if (1)
     viz->update_3d_object("ground_truth", glObjs);
 }
 #endif
+
+std::future<void> MolaViz::subwindow_grid_layout(
+    const std::string& subWindowTitle, const bool orientationVertical,
+    int resolution, const std::string& parentWindow)
+{
+    return enqueue_custom_nanogui_code(
+        [this, subWindowTitle, orientationVertical, resolution, parentWindow]()
+        {
+            auto itWin = subWindows_.find(parentWindow);
+            ASSERTMSG_(
+                itWin != subWindows_.end(), "Unknown GUI top-level window");
+            auto itSubWin = itWin->second.find(subWindowTitle);
+            ASSERTMSG_(itSubWin != itWin->second.end(), "Unknown subwindow");
+
+            itSubWin->second->setLayout(new nanogui::GridLayout(
+                orientationVertical ? nanogui::Orientation::Vertical
+                                    : nanogui::Orientation::Horizontal,
+                resolution, nanogui::Alignment::Fill, 2, 2));
+        });
+}
+
+std::future<void> MolaViz::subwindow_move_resize(
+    const std::string&                subWindowTitle,
+    const mrpt::math::TPoint2D_<int>& location,
+    const mrpt::math::TPoint2D_<int>& size, const std::string& parentWindow)
+{
+    return enqueue_custom_nanogui_code(
+        [this, subWindowTitle, location, size, parentWindow]()
+        {
+            auto itWin = subWindows_.find(parentWindow);
+            ASSERTMSG_(
+                itWin != subWindows_.end(), "Unknown GUI top-level window");
+            auto itSubWin = itWin->second.find(subWindowTitle);
+            ASSERTMSG_(itSubWin != itWin->second.end(), "Unknown subwindow");
+
+            itSubWin->second->setPosition({location.x, location.y});
+            itSubWin->second->setSize({size.x, size.y});
+        });
+}
