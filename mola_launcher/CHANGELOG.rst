@@ -2,6 +2,11 @@
 Changelog for package mola_launcher
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.5.1 (2024-12-29)
+------------------
+* Fix comment typo
+* Contributors: Jose Luis Blanco-Claraco
+
 1.5.0 (2024-12-26)
 ------------------
 
