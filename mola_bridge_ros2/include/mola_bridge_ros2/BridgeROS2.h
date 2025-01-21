@@ -21,6 +21,7 @@
 #include <mola_kernel/interfaces/Relocalization.h>
 
 // MRPT:
+#include <mrpt/maps/COccupancyGridMap2D.h>
 #include <mrpt/obs/CObservationGPS.h>
 #include <mrpt/obs/CObservationIMU.h>
 #include <mrpt/obs/CObservationImage.h>
@@ -129,10 +130,14 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         std::string odom_frame = "odom";
 
         /// tf frame name for odometry's frame of reference:
+        /// Note that this frame is NOT used for calls from LocalizationSources,
+        /// which follows what explained below for publish_localization_following_rep105
         std::string reference_frame = "map";
 
         /// Direct mode (false):
         ///   reference_frame ("map") -> base_link ("base_link")
+        ///
+        /// reference_frame comes from the localization source module, it is not configured here.
         ///
         ///  Indirect mode (true), following ROS REP 105 https://ros.org/reps/rep-0105.html
         ///   map -> odom  (such as "map -> odom -> base_link" = "map -> base_link")
@@ -290,7 +295,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     void onNewMap(const mola::MapSourceBase::MapUpdate& m);
 
     std::mutex                                                         lastLocMapMtx_;
-    std::optional<mola::LocalizationSourceBase::LocalizationUpdate>    lastLoc_;
+    std::vector<mola::LocalizationSourceBase::LocalizationUpdate>      lastLocUpdates_;
     std::map<std::string /*map_name*/, mola::MapSourceBase::MapUpdate> lastMaps_;
 
     void timerPubLocalization();
@@ -309,6 +314,10 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     void internalOn(
         const mrpt::obs::CObservationPointCloud& obs, bool isSensorTopic,
         const std::string& sSensorFrameId);
+
+    void internalPublishGridMap(
+        const mrpt::maps::COccupancyGridMap2D& m, const std::string& sMapTopicName,
+        const std::string& sReferenceFrame);
 
     void internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& ds_subscribe);
 
