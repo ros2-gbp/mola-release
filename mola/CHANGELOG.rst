@@ -2,6 +2,9 @@
 Changelog for package mola
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.6.0 (2025-01-21)
+------------------
+
 1.5.1 (2024-12-29)
 ------------------
 * Update docs on how to install the state estimators packages
