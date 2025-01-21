@@ -23,6 +23,7 @@
 #include <mola_yaml/yaml_helpers.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/core/initializer.h>
+#include <mrpt/maps/COccupancyGridMap2D.h>
 #include <mrpt/maps/CPointsMapXYZI.h>
 #include <mrpt/maps/CPointsMapXYZIRT.h>
 #include <mrpt/maps/CSimplePointsMap.h>
@@ -36,12 +37,14 @@
 #include <mrpt/ros2bridge/image.h>
 #include <mrpt/ros2bridge/imu.h>
 #include <mrpt/ros2bridge/laser_scan.h>
+#include <mrpt/ros2bridge/map.h>
 #include <mrpt/ros2bridge/point_cloud2.h>
 #include <mrpt/ros2bridge/pose.h>
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/system/filesystem.h>
 
 // ROS 2:
+#include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/float32.hpp>
@@ -181,7 +184,7 @@ void BridgeROS2::initialize_rds(const Yaml& c)
 
     MRPT_LOG_DEBUG_STREAM("Initializing with these params:\n" << cfgCopy);
 
-    // params of the ROS2->MOLA part:
+    // params for ROS2->MOLA:
     YAML_LOAD_OPT(params_, base_link_frame, std::string);
     YAML_LOAD_OPT(params_, odom_frame, std::string);
     YAML_LOAD_OPT(params_, base_footprint_frame, std::string);
@@ -199,7 +202,7 @@ void BridgeROS2::initialize_rds(const Yaml& c)
         params_.base_footprint_to_base_link_tf = mrpt::math::TPose3D::FromString(s);
     }
 
-    // params of the MOLA-ROS2 part:
+    // params for MOLA->ROS2:
     YAML_LOAD_OPT(params_, base_link_frame, std::string);
     YAML_LOAD_OPT(params_, reference_frame, std::string);
     YAML_LOAD_OPT(params_, publish_odometry_msgs_from_slam, bool);
@@ -1246,7 +1249,7 @@ void BridgeROS2::onNewLocalization(const mola::LocalizationSourceBase::Localizat
 {
     auto lck = mrpt::lockHelper(lastLocMapMtx_);
 
-    lastLoc_ = l;
+    lastLocUpdates_.push_back(l);
 }
 
 void BridgeROS2::onNewMap(const mola::MapSourceBase::MapUpdate& m)
@@ -1261,112 +1264,121 @@ void BridgeROS2::timerPubLocalization()
     using namespace std::string_literals;
 
     // get a copy of the data minimizing the time owning the mutex:
-    std::optional<mola::LocalizationSourceBase::LocalizationUpdate> l;
+    std::vector<mola::LocalizationSourceBase::LocalizationUpdate> ls;
     {
         auto lck = mrpt::lockHelper(lastLocMapMtx_);
-        l        = lastLoc_;
-        lastLoc_.reset();
+        ls       = lastLocUpdates_;
+        lastLocUpdates_.clear();
     }
-    if (!l) return;
+    if (ls.empty()) return;
 
-    MRPT_LOG_DEBUG_STREAM(
-        "New localization available from '"
-        << l->method << "' frame: '" << l->reference_frame << "' t="
-        << mrpt::system::dateTimeLocalToString(l->timestamp) << " pose=" << l->pose.asString());
-
-    // 1/2: Publish to /tf:
-    const std::string locLabel = (l->method.empty() ? "slam"s : l->method) + "/pose"s;
-    const std::string locQualityLabel =
-        (l->method.empty() ? "slam"s : l->method) + "/pose_quality"s;
-
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub = rosPubs_.pub_sensors.find(locLabel) == rosPubs_.pub_sensors.end();
-    auto&      pub        = rosPubs_.pub_sensors[locLabel];
-    auto&      pubQuality = rosPubs_.pub_sensors[locQualityLabel];
-
-    if (is_1st_pub)
+    for (const auto& l : ls)
     {
-        pub = rosNode()->create_publisher<nav_msgs::msg::Odometry>(
-            locLabel, rclcpp::SystemDefaultsQoS());
-        pubQuality = rosNode()->create_publisher<std_msgs::msg::Float32>(
-            locQualityLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
+        MRPT_LOG_DEBUG_STREAM(
+            "New localization available from '"
+            << l.method << "' ref.frame: '" << l.reference_frame << "' child_frame: '"
+            << l.child_frame << "'  <<  t=" << mrpt::system::dateTimeLocalToString(l.timestamp)
+            << " pose=" << l.pose.asString());
 
-    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdo =
-        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::Odometry>>(pub);
-    ASSERT_(pubOdo);
+        // 1/2: Publish to /tf:
+        const std::string locLabel = (l.method.empty() ? "slam"s : l.method) + "/pose"s;
+        const std::string locQualityLabel =
+            (l.method.empty() ? "slam"s : l.method) + "/pose_quality"s;
 
-    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pubOdoQuality =
-        std::dynamic_pointer_cast<rclcpp::Publisher<std_msgs::msg::Float32>>(pubQuality);
-    ASSERT_(pubOdoQuality);
+        auto lck = mrpt::lockHelper(rosPubsMtx_);
 
-    // Send TF with localization result
-    // 1) Direct mode:    reference_frame ("map") -> base_link ("base_link")
-    // 2) Indirect mode:  map -> odom  (such as "map -> odom -> base_link" = "map -> base_link")
-    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l->pose);
+        // Create the publisher the first time an observation arrives:
+        const bool is_1st_pub = rosPubs_.pub_sensors.find(locLabel) == rosPubs_.pub_sensors.end();
+        auto&      pub        = rosPubs_.pub_sensors[locLabel];
+        auto&      pubQuality = rosPubs_.pub_sensors[locQualityLabel];
 
-    geometry_msgs::msg::TransformStamped tfStmp;
-    tfStmp.header.stamp = myNow(l->timestamp);
-    if (params_.publish_localization_following_rep105)
-    {
-        // Recompute:
-        mrpt::poses::CPose3D T_base_to_odom;
-        bool                 base_to_odom_ok = this->waitForTransform(
-                            T_base_to_odom, params_.odom_frame, params_.base_link_frame, true);
-        // Note: this wait above typ takes ~50 us
-
-        if (!base_to_odom_ok)
+        if (is_1st_pub)
         {
-            MRPT_LOG_ERROR_STREAM(
-                "publish_localization_following_rep105 is true but could not resolve tf for odom "
-                "-> base_link");
+            pub = rosNode()->create_publisher<nav_msgs::msg::Odometry>(
+                locLabel, rclcpp::SystemDefaultsQoS());
+            pubQuality = rosNode()->create_publisher<std_msgs::msg::Float32>(
+                locQualityLabel, rclcpp::SystemDefaultsQoS());
+        }
+        lck.unlock();
+
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdo =
+            std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::Odometry>>(pub);
+        ASSERT_(pubOdo);
+
+        rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pubOdoQuality =
+            std::dynamic_pointer_cast<rclcpp::Publisher<std_msgs::msg::Float32>>(pubQuality);
+        ASSERT_(pubOdoQuality);
+
+        // Send TF with localization result
+        // 1) Direct mode:    reference_frame ("map") -> base_link ("base_link")
+        // 2) Indirect mode:  map -> odom  (such as "map -> odom -> base_link" = "map -> base_link")
+        tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l.pose);
+
+        geometry_msgs::msg::TransformStamped tfStmp;
+        tfStmp.header.stamp = myNow(l.timestamp);
+
+        // Follow REP105 only if we are publishing "map" -> "base_link" poses.
+        if (params_.publish_localization_following_rep105 &&
+            l.child_frame == params_.base_link_frame &&
+            l.reference_frame == params_.reference_frame)
+        {
+            // Recompute:
+            mrpt::poses::CPose3D T_base_to_odom;
+            bool                 base_to_odom_ok =
+                this->waitForTransform(T_base_to_odom, params_.odom_frame, l.child_frame, true);
+            // Note: this wait above typ takes ~50 us
+
+            if (!base_to_odom_ok)
+            {
+                MRPT_LOG_ERROR_STREAM(
+                    "publish_localization_following_rep105 is true but could not resolve tf for "
+                    "odom "
+                    "-> base_link");
+            }
+            else
+            {
+                const tf2::Transform baseOnMap_tf = transform;
+
+                const tf2::Transform odomOnBase_tf =
+                    mrpt::ros2bridge::toROS_tfTransform(T_base_to_odom);
+
+                tfStmp.transform       = tf2::toMsg(baseOnMap_tf * odomOnBase_tf);
+                tfStmp.child_frame_id  = params_.odom_frame;
+                tfStmp.header.frame_id = l.reference_frame;
+            }
         }
         else
         {
-            const tf2::Transform baseOnMap_tf = transform;
-
-            const tf2::Transform odomOnBase_tf =
-                mrpt::ros2bridge::toROS_tfTransform(T_base_to_odom);
-
-            tfStmp.transform       = tf2::toMsg(baseOnMap_tf * odomOnBase_tf);
-            tfStmp.child_frame_id  = params_.odom_frame;
-            tfStmp.header.frame_id = params_.reference_frame;
+            tfStmp.transform       = tf2::toMsg(transform);
+            tfStmp.child_frame_id  = l.child_frame;
+            tfStmp.header.frame_id = l.reference_frame;
         }
-    }
-    else
-    {
-        tfStmp.transform       = tf2::toMsg(transform);
-        tfStmp.child_frame_id  = params_.base_link_frame;
-        tfStmp.header.frame_id = params_.reference_frame;
-    }
-    tf_bc_->sendTransform(tfStmp);
+        tf_bc_->sendTransform(tfStmp);
 
-    // 2/2: Publish Odometry msg:
-    if (params_.publish_odometry_msgs_from_slam)
-    {
-        // Convert observation MRPT -> ROS
-        nav_msgs::msg::Odometry msg;
-        msg.header.stamp    = myNow(l->timestamp);
-        msg.child_frame_id  = params_.base_link_frame;
-        msg.header.frame_id = params_.reference_frame;
+        // 2/2: Publish Odometry msg:
+        if (params_.publish_odometry_msgs_from_slam)
+        {
+            // Convert observation MRPT -> ROS
+            nav_msgs::msg::Odometry msg;
+            msg.header.stamp    = myNow(l.timestamp);
+            msg.child_frame_id  = l.child_frame;
+            msg.header.frame_id = l.reference_frame;
 
-        mrpt::poses::CPose3DPDFGaussian posePdf;
-        posePdf.mean = mrpt::poses::CPose3D(l->pose);
-        if (l->cov) posePdf.cov = l->cov.value();
+            mrpt::poses::CPose3DPDFGaussian posePdf;
+            posePdf.mean = mrpt::poses::CPose3D(l.pose);
+            if (l.cov) posePdf.cov = l.cov.value();
 
-        msg.pose = mrpt::ros2bridge::toROS_Pose(posePdf);
+            msg.pose = mrpt::ros2bridge::toROS_Pose(posePdf);
 
-        pubOdo->publish(msg);
-    }
+            pubOdo->publish(msg);
+        }
 
-    // And always publish quality:
-    {
-        std_msgs::msg::Float32 msg;
-        msg.data = l->quality;
-        pubOdoQuality->publish(msg);
+        // And always publish quality:
+        {
+            std_msgs::msg::Float32 msg;
+            msg.data = l.quality;
+            pubOdoQuality->publish(msg);
+        }
     }
 }
 
@@ -1389,19 +1401,28 @@ void BridgeROS2::timerPubMap()
     {
         const std::string mapTopic = (mu.method.empty() ? "slam"s : mu.method) + "/"s + layerName;
 
-        // Reuse code for point cloud observations: build a "fake" observation:
-        mrpt::obs::CObservationPointCloud obs;
-        obs.sensorLabel = mapTopic;
-        obs.pointcloud  = std::dynamic_pointer_cast<mrpt::maps::CPointsMap>(mu.map);
-        if (!obs.pointcloud)
+        // Is it a point cloud?
+        if (const auto mapPts = std::dynamic_pointer_cast<mrpt::maps::CPointsMap>(mu.map); mapPts)
         {
-            MRPT_LOG_WARN_STREAM(
-                "Do not know how to publish map layer '"
-                << layerName << "' of type '" << mu.map->GetRuntimeClass()->className << "'");
-            continue;
+            mrpt::obs::CObservationPointCloud obs;
+            obs.sensorLabel = mapTopic;
+            obs.pointcloud  = mapPts;
+            // Reuse code for point cloud observations: build a "fake" observation:
+            internalOn(obs, false /*no tf*/, mu.reference_frame);
         }
-
-        internalOn(obs, false /*no tf*/, mu.reference_frame);
+        else
+            // Is it a grid map?
+            if (auto grid = std::dynamic_pointer_cast<mrpt::maps::COccupancyGridMap2D>(mu.map);
+                grid)
+            {
+                internalPublishGridMap(*grid, mapTopic, mu.reference_frame);
+            }
+            else
+            {
+                MRPT_LOG_WARN_STREAM(
+                    "Do not know how to publish map layer '"
+                    << layerName << "' of type '" << mu.map->GetRuntimeClass()->className << "'");
+            }
     }
 }
 
@@ -1498,5 +1519,52 @@ void BridgeROS2::publishStaticTFs()
 
         tf_static_bc_->sendTransform(tfStmp);
         // tf_bc_->sendTransform(tfStmp);
+    }
+}
+
+void BridgeROS2::internalPublishGridMap(
+    const mrpt::maps::COccupancyGridMap2D& m, const std::string& sMapTopicName,
+    const std::string& sReferenceFrame)
+{
+    using namespace std::string_literals;
+
+    auto lck = mrpt::lockHelper(rosPubsMtx_);
+
+    const std::string grid_topic          = sMapTopicName + "_gridmap"s;
+    const std::string grid_metadata_topic = sMapTopicName + "_gridmap_metadata"s;
+
+    // Create the publisher the first time an observation arrives:
+    const bool is_1st_pub = rosPubs_.pub_sensors.find(grid_topic) == rosPubs_.pub_sensors.end();
+    auto&      pub        = rosPubs_.pub_sensors[grid_topic];
+    auto&      pubM       = rosPubs_.pub_sensors[grid_metadata_topic];
+
+    if (is_1st_pub)
+    {
+        // REP-2003: https://ros.org/reps/rep-2003.html#id5
+        // - Maps:  reliable transient-local
+        auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
+
+        pub  = rosNode()->create_publisher<nav_msgs::msg::OccupancyGrid>(grid_topic, qos);
+        pubM = rosNode()->create_publisher<nav_msgs::msg::MapMetaData>(grid_metadata_topic, qos);
+    }
+    lck.unlock();
+
+    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pubGrid =
+        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>>(pub);
+    ASSERT_(pubGrid);
+
+    rclcpp::Publisher<nav_msgs::msg::MapMetaData>::SharedPtr pubMeta =
+        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::MapMetaData>>(pubMeta);
+    ASSERT_(pubMeta);
+
+    std_msgs::msg::Header msg_header;
+    msg_header.stamp    = rosNode_->get_clock()->now();
+    msg_header.frame_id = sReferenceFrame;
+
+    {
+        nav_msgs::msg::OccupancyGrid gridMsg;
+        mrpt::ros2bridge::toROS(m, gridMsg, msg_header);
+        pubGrid->publish(gridMsg);
+        pubMeta->publish(gridMsg.info);
     }
 }
