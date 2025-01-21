@@ -48,6 +48,9 @@ class LocalizationSourceBase
         /** Vehicle/robot pose is given wrt this frame of reference */
         std::string reference_frame = "map";
 
+        /** Vehicle/robot pose frame */
+        std::string child_frame = "base_link";
+
         /** The source of the localization (e.g. "slam", "lidar_odometry",
          * "wheel_odometry", etc.) */
         std::string method = "slam";
