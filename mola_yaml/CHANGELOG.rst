@@ -2,6 +2,11 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.6.1 (2025-02-13)
+------------------
+* FIX: parser bug; it should not try to parse commented-out env variables
+* Contributors: Jose Luis Blanco-Claraco
+
 1.6.0 (2025-01-21)
 ------------------
 
