@@ -53,6 +53,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/float32.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 using namespace mola;
@@ -138,18 +139,62 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
         auto timerLoc = rosNode_->create_wall_timer(
             std::chrono::microseconds(
                 static_cast<unsigned int>(1e6 * params_.period_publish_new_localization)),
-            [this]() { timerPubLocalization(); });
+            [this]()
+            {
+                try
+                {
+                    timerPubLocalization();
+                }
+                catch (const std::exception& e)
+                {
+                    MRPT_LOG_ERROR(e.what());
+                }
+            });
 
         auto timerMap = rosNode_->create_wall_timer(
             std::chrono::microseconds(
                 static_cast<unsigned int>(1e6 * params_.period_publish_new_map)),
-            [this]() { timerPubMap(); });
+            [this]()
+            {
+                try
+                {
+                    timerPubMap();
+                }
+                catch (const std::exception& e)
+                {
+                    MRPT_LOG_ERROR(e.what());
+                }
+            });
 
-        // Static tf:
         auto timerStaticTFs = rosNode_->create_wall_timer(
             std::chrono::microseconds(
                 static_cast<unsigned int>(1e6 * params_.period_publish_static_tfs)),
-            [this]() { publishStaticTFs(); });
+            [this]()
+            {
+                try
+                {
+                    publishStaticTFs();
+                }
+                catch (const std::exception& e)
+                {
+                    MRPT_LOG_ERROR(e.what());
+                }
+            });
+
+        auto timerDiagnostics = rosNode_->create_wall_timer(
+            std::chrono::microseconds(
+                static_cast<unsigned int>(1e6 * params_.period_publish_diagnostics)),
+            [this]()
+            {
+                try
+                {
+                    publishDiagnostics();
+                }
+                catch (const std::exception& e)
+                {
+                    MRPT_LOG_ERROR(e.what());
+                }
+            });
 
         //
         if (!params_.relocalize_from_topic.empty())
@@ -181,7 +226,7 @@ void BridgeROS2::initialize_rds(const Yaml& c)
 
     // Mandatory parameters:
     ENSURE_YAML_ENTRY_EXISTS(c, "params");
-    auto cfg = c["params"];
+    const auto cfg = c["params"];
 
     std::stringstream ss;
     cfg.printAsYAML(ss);
@@ -205,20 +250,33 @@ void BridgeROS2::initialize_rds(const Yaml& c)
 
     if (cfg.has("base_footprint_to_base_link_tf"))
     {
-        const auto s = cfg["base_footprint_to_base_link_tf"].as<std::string>();
+        ASSERT_(cfg["base_footprint_to_base_link_tf"].isSequence());
+        ASSERT_EQUAL_(cfg["base_footprint_to_base_link_tf"].asSequenceRange().size(), 6UL);
 
         // Format: "[x y z yaw pitch roll]" (meters & degrees)
-        params_.base_footprint_to_base_link_tf = mrpt::math::TPose3D::FromString(s);
+        auto poseSeq = cfg["base_footprint_to_base_link_tf"].toStdVector<double>();
+        ASSERT_EQUAL_(poseSeq.size(), 6UL);
+        for (int i = 0; i < 3; i++) poseSeq[3 + i] = mrpt::DEG2RAD(poseSeq[3 + i]);
+
+        params_.base_footprint_to_base_link_tf = mrpt::math::TPose3D::FromVector(poseSeq);
     }
 
     // params for MOLA->ROS2:
     YAML_LOAD_OPT(params_, base_link_frame, std::string);
     YAML_LOAD_OPT(params_, reference_frame, std::string);
+
     YAML_LOAD_OPT(params_, publish_odometry_msgs_from_slam, bool);
+    YAML_LOAD_OPT(params_, publish_odometry_msgs_from_slam_source, std::string);
+
     YAML_LOAD_OPT(params_, publish_tf_from_slam, bool);
+    YAML_LOAD_OPT(params_, publish_tf_from_slam_source, std::string);
+
     YAML_LOAD_OPT(params_, publish_in_sim_time, bool);
     YAML_LOAD_OPT(params_, period_publish_new_localization, double);
     YAML_LOAD_OPT(params_, period_publish_new_map, double);
+    YAML_LOAD_OPT(params_, period_publish_static_tfs, double);
+    YAML_LOAD_OPT(params_, period_publish_diagnostics, double);
+
     YAML_LOAD_OPT(params_, publish_tf_from_robot_pose_observations, bool);
     YAML_LOAD_OPT(params_, relocalize_from_topic, std::string);
 
@@ -571,25 +629,10 @@ void BridgeROS2::onNewObservation(const CObservation::Ptr& o)
 
 void BridgeROS2::internalOn(const mrpt::obs::CObservationImage& obs)
 {
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub =
-        rosPubs_.pub_sensors.find(obs.sensorLabel) == rosPubs_.pub_sensors.end();
-    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: Sensor sources should use SystemDefaultsQoS
-        // See: https://ros.org/reps/rep-2003.html
-        pub = rosNode()->create_publisher<sensor_msgs::msg::Image>(
-            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr pubImg =
-        std::dynamic_pointer_cast<rclcpp::Publisher<sensor_msgs::msg::Image>>(pub);
-    ASSERT_(pubImg);
+    // REP-2003: Sensor sources should use SystemDefaultsQoS
+    // See: https://ros.org/reps/rep-2003.html
+    auto pubImg =
+        get_publisher<sensor_msgs::msg::Image>(obs.sensorLabel, rclcpp::SystemDefaultsQoS());
 
     const std::string sSensorFrameId = obs.sensorLabel;
 
@@ -624,25 +667,10 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationImage& obs)
 
 void BridgeROS2::internalOn(const mrpt::obs::CObservation2DRangeScan& obs)
 {
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub =
-        rosPubs_.pub_sensors.find(obs.sensorLabel) == rosPubs_.pub_sensors.end();
-    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: Sensor sources should use SystemDefaultsQoS
-        // See: https://ros.org/reps/rep-2003.html
-        pub = rosNode()->create_publisher<sensor_msgs::msg::LaserScan>(
-            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr pubLS =
-        std::dynamic_pointer_cast<rclcpp::Publisher<sensor_msgs::msg::LaserScan>>(pub);
-    ASSERT_(pubLS);
+    // REP-2003: Sensor sources should use SystemDefaultsQoS
+    // See: https://ros.org/reps/rep-2003.html
+    auto pubLS =
+        get_publisher<sensor_msgs::msg::LaserScan>(obs.sensorLabel, rclcpp::SystemDefaultsQoS());
 
     const std::string sSensorFrameId = obs.sensorLabel;
 
@@ -685,30 +713,15 @@ void BridgeROS2::internalOn(
 {
     using namespace std::string_literals;
 
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
+    // REP-2003: https://ros.org/reps/rep-2003.html#id5
+    // - Sensors: SystemDefaultsQoS()
+    // - Maps:  reliable transient-local
+    auto mapQos = isSensorTopic ? rclcpp::SystemDefaultsQoS()
+                                : rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
 
     const auto lbPoints = obs.sensorLabel + "_points"s;
 
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub = rosPubs_.pub_sensors.find(lbPoints) == rosPubs_.pub_sensors.end();
-
-    auto& pubPts = rosPubs_.pub_sensors[lbPoints];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: https://ros.org/reps/rep-2003.html#id5
-        // - Sensors: SystemDefaultsQoS()
-        // - Maps:  reliable transient-local
-        auto mapQos = isSensorTopic ? rclcpp::SystemDefaultsQoS()
-                                    : rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
-
-        pubPts = rosNode()->create_publisher<sensor_msgs::msg::PointCloud2>(lbPoints, mapQos);
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubPoints =
-        std::dynamic_pointer_cast<rclcpp::Publisher<sensor_msgs::msg::PointCloud2>>(pubPts);
-    ASSERT_(pubPoints);
+    auto pubPoints = get_publisher<sensor_msgs::msg::PointCloud2>(lbPoints, mapQos);
 
     const std::string sSensorFrameId_points = lbPoints;
 
@@ -771,27 +784,10 @@ void BridgeROS2::internalOn(
 
 void BridgeROS2::internalOn(const mrpt::obs::CObservationRobotPose& obs)
 {
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    ASSERT_(!obs.sensorLabel.empty());
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub =
-        rosPubs_.pub_sensors.find(obs.sensorLabel) == rosPubs_.pub_sensors.end();
-    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: Sensor sources should use SystemDefaultsQoS
-        // See: https://ros.org/reps/rep-2003.html
-        pub = rosNode()->create_publisher<nav_msgs::msg::Odometry>(
-            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdo =
-        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::Odometry>>(pub);
-    ASSERT_(pubOdo);
+    // REP-2003: Sensor sources should use SystemDefaultsQoS
+    // See: https://ros.org/reps/rep-2003.html
+    auto pubOdo =
+        get_publisher<nav_msgs::msg::Odometry>(obs.sensorLabel, rclcpp::SystemDefaultsQoS());
 
     // Send TF:
     if (params_.publish_tf_from_robot_pose_observations)
@@ -824,25 +820,8 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationRobotPose& obs)
 
 void BridgeROS2::internalOn(const mrpt::obs::CObservationGPS& obs)
 {
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub =
-        rosPubs_.pub_sensors.find(obs.sensorLabel) == rosPubs_.pub_sensors.end();
-    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: Sensor sources should use SystemDefaultsQoS
-        // See: https://ros.org/reps/rep-2003.html
-        pub = rosNode()->create_publisher<sensor_msgs::msg::NavSatFix>(
-            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr pubGPS =
-        std::dynamic_pointer_cast<rclcpp::Publisher<sensor_msgs::msg::NavSatFix>>(pub);
-    ASSERT_(pubGPS);
+    auto pubGPS =
+        get_publisher<sensor_msgs::msg::NavSatFix>(obs.sensorLabel, rclcpp::SystemDefaultsQoS());
 
     const std::string sSensorFrameId = obs.sensorLabel;
 
@@ -877,25 +856,10 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationGPS& obs)
 
 void BridgeROS2::internalOn(const mrpt::obs::CObservationIMU& obs)
 {
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub =
-        rosPubs_.pub_sensors.find(obs.sensorLabel) == rosPubs_.pub_sensors.end();
-    auto& pub = rosPubs_.pub_sensors[obs.sensorLabel];
-
-    if (is_1st_pub)
-    {
-        // REP-2003: Sensor sources should use SystemDefaultsQoS
-        // See: https://ros.org/reps/rep-2003.html
-        pub = rosNode()->create_publisher<sensor_msgs::msg::Imu>(
-            obs.sensorLabel, rclcpp::SystemDefaultsQoS());
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr pubImu =
-        std::dynamic_pointer_cast<rclcpp::Publisher<sensor_msgs::msg::Imu>>(pub);
-    ASSERT_(pubImu);
+    // REP-2003: Sensor sources should use SystemDefaultsQoS
+    // See: https://ros.org/reps/rep-2003.html
+    auto pubImu =
+        get_publisher<sensor_msgs::msg::Imu>(obs.sensorLabel, rclcpp::SystemDefaultsQoS());
 
     const std::string sSensorFrameId = obs.sensorLabel;
 
@@ -1295,34 +1259,15 @@ void BridgeROS2::timerPubLocalization()
         const std::string locQualityLabel =
             (l.method.empty() ? "slam"s : l.method) + "/pose_quality"s;
 
-        auto lck = mrpt::lockHelper(rosPubsMtx_);
-
-        // Create the publisher the first time an observation arrives:
-        const bool is_1st_pub = rosPubs_.pub_sensors.find(locLabel) == rosPubs_.pub_sensors.end();
-        auto&      pub        = rosPubs_.pub_sensors[locLabel];
-        auto&      pubQuality = rosPubs_.pub_sensors[locQualityLabel];
-
-        if (is_1st_pub)
-        {
-            pub = rosNode()->create_publisher<nav_msgs::msg::Odometry>(
-                locLabel, rclcpp::SystemDefaultsQoS());
-            pubQuality = rosNode()->create_publisher<std_msgs::msg::Float32>(
-                locQualityLabel, rclcpp::SystemDefaultsQoS());
-        }
-        lck.unlock();
-
-        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pubOdo =
-            std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::Odometry>>(pub);
-        ASSERT_(pubOdo);
-
-        rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pubOdoQuality =
-            std::dynamic_pointer_cast<rclcpp::Publisher<std_msgs::msg::Float32>>(pubQuality);
-        ASSERT_(pubOdoQuality);
+        auto pubOdo = get_publisher<nav_msgs::msg::Odometry>(locLabel, rclcpp::SystemDefaultsQoS());
+        auto pubOdoQuality =
+            get_publisher<std_msgs::msg::Float32>(locQualityLabel, rclcpp::SystemDefaultsQoS());
 
         // Send TF with localization result
         // 1) Direct mode:    reference_frame ("map") -> base_link ("base_link")
         // 2) Indirect mode:  map -> odom  (such as "map -> odom -> base_link" = "map -> base_link")
-        if (params_.publish_tf_from_slam)
+        if (params_.publish_tf_from_slam && (params_.publish_tf_from_slam_source.empty() ||
+                                             params_.publish_tf_from_slam_source == l.method))
         {
             tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l.pose);
 
@@ -1370,7 +1315,9 @@ void BridgeROS2::timerPubLocalization()
         }
 
         // 2/2: Publish Odometry msg:
-        if (params_.publish_odometry_msgs_from_slam)
+        if (params_.publish_odometry_msgs_from_slam &&
+            (params_.publish_odometry_msgs_from_slam_source.empty() ||
+             params_.publish_odometry_msgs_from_slam_source == l.method))
         {
             // Convert observation MRPT -> ROS
             nav_msgs::msg::Odometry msg;
@@ -1501,23 +1448,11 @@ void BridgeROS2::publishMetricMapGeoreferencingData(
     // 2) g.geo_coord => georefTopic
     auto lck = mrpt::lockHelper(rosPubsMtx_);
 
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub = rosPubs_.pub_sensors.find(georefTopic) == rosPubs_.pub_sensors.end();
-    auto&      pub        = rosPubs_.pub_sensors[georefTopic];
+    // Publish georef info as transient local:
+    auto mapQos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
 
-    if (is_1st_pub)
-    {
-        // Publish georef info as transient local:
-        auto mapQos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
-
-        pub = rosNode()->create_publisher<mrpt_nav_interfaces::msg::GeoreferencingMetadata>(
-            georefTopic, mapQos);
-    }
-    lck.unlock();
-
-    auto pubGeoRef = std::dynamic_pointer_cast<
-        rclcpp::Publisher<mrpt_nav_interfaces::msg::GeoreferencingMetadata>>(pub);
-    ASSERT_(pubGeoRef);
+    auto pubGeoRef =
+        get_publisher<mrpt_nav_interfaces::msg::GeoreferencingMetadata>(georefTopic, mapQos);
 
     mrpt_nav_interfaces::msg::GeoreferencingMetadata geoRefMsg;
     geoRefMsg.valid = true;
@@ -1617,16 +1552,101 @@ void BridgeROS2::publishStaticTFs()
     if (params_.base_footprint_frame.empty()) return;
 
     const tf2::Transform transform =
-        mrpt::ros2bridge::toROS_tfTransform(params_.base_footprint_to_base_link_tf);
+        mrpt::ros2bridge::toROS_tfTransform(-params_.base_footprint_to_base_link_tf);
 
     geometry_msgs::msg::TransformStamped tfStmp;
 
     tfStmp.transform       = tf2::toMsg(transform);
-    tfStmp.child_frame_id  = params_.base_link_frame;
-    tfStmp.header.frame_id = params_.base_footprint_frame;
+    tfStmp.child_frame_id  = params_.base_footprint_frame;
+    tfStmp.header.frame_id = params_.base_link_frame;
     tfStmp.header.stamp    = myNow(mrpt::Clock::now());
 
     tf_static_bc_->sendTransform(tfStmp);
+}
+
+namespace
+{
+/// 'mola::LidarOdometry:lidar_odom' -> 'lidar_odom'
+std::string module_name_to_valid_topic(const std::string& s)
+{
+    const auto lastPos = s.find_last_of(':');
+    if (lastPos == std::string::npos) return s;
+
+    return s.substr(lastPos + 1);
+}
+}  // namespace
+
+void BridgeROS2::publishDiagnostics()
+{
+#if MOLA_VERSION_CHECK(1, 6, 2)
+    using namespace std::string_literals;
+
+    const auto qos = rclcpp::SystemDefaultsQoS();
+
+    // Get all MOLA modules:
+    auto listMods = this->findService<mola::ExecutableBase>();
+    for (auto& m : listMods)
+    {
+        const std::string topicPrefix =
+            "mola_diagnostics/"s + module_name_to_valid_topic(m->getModuleInstanceName()) + "/"s;
+
+        const auto diagnosticsMsgs = m->module_move_out_diagnostics_messages();
+
+        for (const auto& diag : diagnosticsMsgs)
+        {
+            const std::string topic = topicPrefix + diag.label;
+
+            // TODO: No way to embed this in std_msgs (!): diag.timestamp;
+
+            if (const auto* valString = std::any_cast<std::string>(&diag.value); valString)
+            {
+                auto                  pubDiag = get_publisher<std_msgs::msg::String>(topic, qos);
+                std_msgs::msg::String msg;
+                msg.data = *valString;
+                pubDiag->publish(msg);
+            }
+            else if (const auto* valYaml = std::any_cast<mola::Yaml>(&diag.value); valYaml)
+            {
+                auto                  pubDiag = get_publisher<std_msgs::msg::String>(topic, qos);
+                std_msgs::msg::String msg;
+                std::stringstream     ss;
+                mrpt::containers::YamlEmitOptions eo;
+                eo.emitHeader = false;
+                valYaml->printAsYAML(ss, eo);
+                msg.data = ss.str();
+                pubDiag->publish(msg);
+            }
+            else if (const auto* valDouble = std::any_cast<double>(&diag.value); valDouble)
+            {
+                auto                   pubDiag = get_publisher<std_msgs::msg::Float32>(topic, qos);
+                std_msgs::msg::Float32 msg;
+                msg.data = *valDouble;
+                pubDiag->publish(msg);
+            }
+            else if (const auto* valFloat = std::any_cast<float>(&diag.value); valFloat)
+            {
+                auto                   pubDiag = get_publisher<std_msgs::msg::Float32>(topic, qos);
+                std_msgs::msg::Float32 msg;
+                msg.data = *valFloat;
+                pubDiag->publish(msg);
+            }
+            else if (const auto* valInt = std::any_cast<int>(&diag.value); valInt)
+            {
+                auto                   pubDiag = get_publisher<std_msgs::msg::Float32>(topic, qos);
+                std_msgs::msg::Float32 msg;
+                msg.data = *valInt;
+                pubDiag->publish(msg);
+            }
+            else
+            {
+                MRPT_LOG_THROTTLE_WARN_STREAM(
+                    10.0, "Do not know how to publish diagnostic message named '"
+                              << topic << "' of unknown type.");
+            }
+
+        }  // fof each diagnostics message
+    }  // end for each module
+#endif
 }
 
 void BridgeROS2::internalPublishGridMap(
@@ -1635,34 +1655,15 @@ void BridgeROS2::internalPublishGridMap(
 {
     using namespace std::string_literals;
 
-    auto lck = mrpt::lockHelper(rosPubsMtx_);
-
     const std::string grid_topic          = sMapTopicName + "_gridmap"s;
     const std::string grid_metadata_topic = sMapTopicName + "_gridmap_metadata"s;
 
-    // Create the publisher the first time an observation arrives:
-    const bool is_1st_pub = rosPubs_.pub_sensors.find(grid_topic) == rosPubs_.pub_sensors.end();
-    auto&      pub        = rosPubs_.pub_sensors[grid_topic];
-    auto&      pubM       = rosPubs_.pub_sensors[grid_metadata_topic];
+    // REP-2003: https://ros.org/reps/rep-2003.html#id5
+    // - Maps:  reliable transient-local
+    auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
 
-    if (is_1st_pub)
-    {
-        // REP-2003: https://ros.org/reps/rep-2003.html#id5
-        // - Maps:  reliable transient-local
-        auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();
-
-        pub  = rosNode()->create_publisher<nav_msgs::msg::OccupancyGrid>(grid_topic, qos);
-        pubM = rosNode()->create_publisher<nav_msgs::msg::MapMetaData>(grid_metadata_topic, qos);
-    }
-    lck.unlock();
-
-    rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr pubGrid =
-        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>>(pub);
-    ASSERT_(pubGrid);
-
-    rclcpp::Publisher<nav_msgs::msg::MapMetaData>::SharedPtr pubMeta =
-        std::dynamic_pointer_cast<rclcpp::Publisher<nav_msgs::msg::MapMetaData>>(pubM);
-    ASSERT_(pubMeta);
+    auto pubGrid = get_publisher<nav_msgs::msg::OccupancyGrid>(grid_topic, qos);
+    auto pubMeta = get_publisher<nav_msgs::msg::MapMetaData>(grid_metadata_topic, qos);
 
     std_msgs::msg::Header msg_header;
     msg_header.stamp    = rosNode_->get_clock()->now();
