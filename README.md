@@ -1,3 +1,46 @@
+## mola (jazzy) - 1.6.2-1
+
+The packages in the `mola` repository were released into the `jazzy` distro by running `/usr/bin/bloom-release -r jazzy -y mola` on `Sat, 22 Feb 2025 21:39:45 -0000`
+
+These packages were released:
+- `kitti_metrics_eval`
+- `mola`
+- `mola_bridge_ros2`
+- `mola_demos`
+- `mola_input_euroc_dataset`
+- `mola_input_kitti360_dataset`
+- `mola_input_kitti_dataset`
+- `mola_input_mulran_dataset`
+- `mola_input_paris_luco_dataset`
+- `mola_input_rawlog`
+- `mola_input_rosbag2`
+- `mola_kernel`
+- `mola_launcher`
+- `mola_metric_maps`
+- `mola_msgs`
+- `mola_pose_list`
+- `mola_relocalization`
+- `mola_traj_tools`
+- `mola_viz`
+- `mola_yaml`
+
+Version of package(s) in repository `mola`:
+
+- upstream repository: https://github.com/MOLAorg/mola.git
+- release repository: https://github.com/ros2-gbp/mola-release.git
+- rosdistro version: `1.6.1-1`
+- old version: `1.6.1-1`
+- new version: `1.6.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.12.0`
+- catkin_pkg version: `1.0.0`
+- rosdep version: `0.25.1`
+- rosdistro version: `1.0.1`
+- vcstools version: `0.1.42`
+
+
 ## mola (humble) - 1.6.2-1
 
 The packages in the `mola` repository were released into the `humble` distro by running `/usr/bin/bloom-release -r humble -y mola` on `Sat, 22 Feb 2025 21:32:05 -0000`
