@@ -119,8 +119,8 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         /// SLAM/localization results (read below).
         std::string base_link_frame = "base_link";
 
-        /// If not empty, the node will broadcast a static /tf from base_link to
-        /// base_footprint with the TF base_footprint_to_base_link_tf at start
+        /// If not empty, the node will broadcast a static /tf from base_footprint to
+        /// base_link with the TF base_footprint_to_base_link_tf at start
         /// up.
         /// Normally: "base_footprint"
         std::string base_footprint_frame;  // Disabled by default
@@ -157,9 +157,15 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         /// If enabled, SLAM/Localization results will be published as nav_msgs/Odometry messages.
         bool publish_odometry_msgs_from_slam = true;
 
+        // Which source will be forwarded (empty=any)
+        std::string publish_odometry_msgs_from_slam_source = {};
+
         /// If enabled, SLAM/Localization results will be published as tf messages, for frames
         /// according to explained above for `publish_localization_following_rep105`.
         bool publish_tf_from_slam = true;
+
+        // Which source will be forwarded (empty=any)
+        std::string publish_tf_from_slam_source = {};
 
         /// If enabled, robot pose observations (typically, ground truth from datasets), will be
         /// forwarded to ROS as /tf messages: ``${reference_frame} => ${base_link}``
@@ -174,6 +180,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
         double period_publish_new_localization = 0.2;  // [s]
         double period_publish_new_map          = 5.0;  // [s]
         double period_publish_static_tfs       = 1.0;  // [s]
+        double period_publish_diagnostics      = 1.0;  // [s]
 
         double period_check_new_mola_subs = 1.0;  // [s]
 
@@ -251,20 +258,28 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     /// or the equivalent of the passed argument in ROS 2 format otherwise.
     rclcpp::Time myNow(const mrpt::Clock::time_point& observationStamp);
 
-    struct RosPubs
+    /// Generic Map <topic> => publisher
+    std::map<std::string, rclcpp::PublisherBase::SharedPtr> rosPubs_;
+    std::mutex                                              rosPubsMtx_;
+
+    /// Gets or creates (upon first use) a publisher for a given type:
+    template <typename MSG_TYPE>
+    [[nodiscard]] auto get_publisher(const std::string& topic, const rclcpp::QoS& qos)
+        -> std::shared_ptr<rclcpp::Publisher<MSG_TYPE>>
     {
-        /// Map <sensor_label> => publisher
-        std::map<std::string, rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> pub_poses;
+        auto lck = mrpt::lockHelper(rosPubsMtx_);
 
-        /// Map <sensor_label> => publisher
-        std::map<std::string, rclcpp::PublisherBase::SharedPtr> pub_sensors;
+        // Create the publisher the first time an observation arrives:
+        const bool is_1st_pub = rosPubs_.find(topic) == rosPubs_.end();
+        auto&      pub        = rosPubs_[topic];
 
-        // rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr
-        // pub_markers;
-    };
+        if (is_1st_pub) { pub = rosNode()->create_publisher<MSG_TYPE>(topic, qos); }
+        lck.unlock();
 
-    RosPubs    rosPubs_;
-    std::mutex rosPubsMtx_;
+        auto ret = std::dynamic_pointer_cast<rclcpp::Publisher<MSG_TYPE>>(pub);
+        ASSERT_(ret);
+        return ret;
+    }
 
     struct MolaSubs
     {
@@ -343,6 +358,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     void internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& ds_subscribe);
 
     void publishStaticTFs();
+    void publishDiagnostics();
     void publishMetricMapGeoreferencingData(
         const mola::Georeferencing& g, const std::string& georefTopic);
 };
