@@ -222,7 +222,7 @@ void BridgeROS2::initialize_rds(const Yaml& c)
     using namespace std::string_literals;
 
     MRPT_START
-    ProfilerEntry tle(profiler_, "initialize");
+    const ProfilerEntry tle(profiler_, "initialize");
 
     // Mandatory parameters:
     ENSURE_YAML_ENTRY_EXISTS(c, "params");
@@ -291,7 +291,7 @@ void BridgeROS2::spinOnce()
     using mrpt::system::timeDifference;
 
     MRPT_START
-    ProfilerEntry tleg(profiler_, "spinOnce");
+    const ProfilerEntry tleg(profiler_, "spinOnce");
 
     // Publish odometry?
     importRosOdometryToMOLA();
@@ -311,7 +311,7 @@ void BridgeROS2::callbackOnPointCloud2(
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
     MRPT_START
-    ProfilerEntry tle(profiler_, "callbackOnPointCloud2");
+    const ProfilerEntry tle(profiler_, "callbackOnPointCloud2");
 
     const std::set<std::string> fields = mrpt::ros2bridge::extractFields(o);
 
@@ -406,7 +406,7 @@ void BridgeROS2::callbackOnOdometry(
     const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel)
 {
     MRPT_START
-    ProfilerEntry tle(profiler_, "callbackOnOdometry");
+    const ProfilerEntry tle(profiler_, "callbackOnOdometry");
 
     auto obs         = mrpt::obs::CObservationOdometry::Create();
     obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
@@ -464,7 +464,7 @@ void BridgeROS2::callbackOnLaserScan(
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
     MRPT_START
-    ProfilerEntry tle(profiler_, "callbackOnLaserScan");
+    const ProfilerEntry tle(profiler_, "callbackOnLaserScan");
 
     // Sensor pose wrt robot base:
     mrpt::poses::CPose3D sensorPose;
@@ -506,7 +506,7 @@ void BridgeROS2::callbackOnImu(
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
     MRPT_START
-    ProfilerEntry tle(profiler_, "callbackOnImu");
+    const ProfilerEntry tle(profiler_, "callbackOnImu");
 
     // Sensor pose wrt robot base:
     mrpt::poses::CPose3D sensorPose;
@@ -548,7 +548,7 @@ void BridgeROS2::callbackOnNavSatFix(
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
     MRPT_START
-    ProfilerEntry tle(profiler_, "callbackOnNavSatFix");
+    const ProfilerEntry tle(profiler_, "callbackOnNavSatFix");
 
     // Sensor pose wrt robot base:
     mrpt::poses::CPose3D sensorPose;
@@ -980,13 +980,13 @@ void BridgeROS2::doLookForNewMolaSubs()
     // Advertise relocalization ROS 2 service now if not done already:
     auto lckNode = mrpt::lockHelper(rosNodeMtx_);
 
-    if (!molaSubs_.relocalization.empty() && !srvRelocGNNS_ && rosNode_)
+    if (!molaSubs_.relocalization.empty() && !srvRelocSE_ && rosNode_)
     {
         using namespace std::placeholders;
 
-        srvRelocGNNS_ = rosNode_->create_service<mola_msgs::srv::RelocalizeFromGNSS>(
-            "relocalize_from_gnss",
-            std::bind(&BridgeROS2::service_relocalize_from_gnss, this, _1, _2));
+        srvRelocSE_ = rosNode_->create_service<mola_msgs::srv::RelocalizeFromStateEstimator>(
+            "relocalize_from_state_estimator",
+            std::bind(&BridgeROS2::service_relocalize_from_se, this, _1, _2));
 
         srvRelocPose_ = rosNode_->create_service<mola_msgs::srv::RelocalizeNearPose>(
             "relocalize_near_pose",
@@ -1043,9 +1043,10 @@ void BridgeROS2::doLookForNewMolaSubs()
     }
 }
 
-void BridgeROS2::service_relocalize_from_gnss(
-    [[maybe_unused]] const std::shared_ptr<mola_msgs::srv::RelocalizeFromGNSS::Request> request,
-    std::shared_ptr<mola_msgs::srv::RelocalizeFromGNSS::Response>                       response)
+void BridgeROS2::service_relocalize_from_se(
+    [[maybe_unused]] const std::shared_ptr<mola_msgs::srv::RelocalizeFromStateEstimator::Request>
+                                                                            request,
+    std::shared_ptr<mola_msgs::srv::RelocalizeFromStateEstimator::Response> response)
 {
     auto lck = mrpt::lockHelper(rosPubsMtx_);
     if (molaSubs_.relocalization.empty())
