@@ -2,6 +2,9 @@
 Changelog for package mola_msgs
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.6.4 (2025-04-23)
+------------------
+
 1.6.3 (2025-03-15)
 ------------------
 * Service renamed: RelocalizeFromGNSS -> RelocalizeFromStateEstimator
