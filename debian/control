@@ -1,0 +1,12 @@
+Source: ros-kilted-mola-imu-preintegration
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-kilted-mola-common, ros-kilted-mrpt-libobs, ros-kilted-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_imu_preintegration
+Standards-Version: 3.9.2
+
+Package: ros-kilted-mola-imu-preintegration
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-mola-common, ros-kilted-mrpt-libobs, ros-kilted-ros-workspace
+Description: Integrator of IMU angular velocity readings
