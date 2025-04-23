@@ -1,1 +1,1 @@
-{"base": "0d692f89f", "parent": "debian/rolling/mola_kernel", "previous": "698b9526b", "trim": "", "trimbase": ""}
+{"base": "80a0aefc5420", "parent": "debian/kilted/mola_kernel", "previous": "5b3164cb5c12", "trim": "", "trimbase": ""}
