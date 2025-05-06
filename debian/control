@@ -1,0 +1,12 @@
+Source: ros-kilted-mola-relocalization
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-kilted-mola-common, ros-kilted-mola-pose-list, ros-kilted-mola-test-datasets <!nocheck>, ros-kilted-mp2p-icp, ros-kilted-mrpt-libmaps, ros-kilted-mrpt-libobs, ros-kilted-mrpt-libslam, ros-kilted-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_relocalization
+Standards-Version: 3.9.2
+
+Package: ros-kilted-mola-relocalization
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-mola-common, ros-kilted-mola-pose-list, ros-kilted-mp2p-icp, ros-kilted-mrpt-libmaps, ros-kilted-mrpt-libobs, ros-kilted-mrpt-libslam, ros-kilted-ros-workspace
+Description: C++ library with algorithms for relocalization, global localization, or pose estimation given a large initial uncertainty
