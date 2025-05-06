@@ -2,6 +2,11 @@
 Changelog for package mola_input_rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.7.0 (2025-05-06)
+------------------
+* code clean up: remove useless dtors, and mark the required copy ctors as deleted
+* Contributors: Jose Luis Blanco-Claraco
+
 1.6.4 (2025-04-23)
 ------------------
 * modernize clang-format
