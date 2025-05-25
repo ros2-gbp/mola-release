@@ -2,7 +2,7 @@
 #        A Modular Optimization framework for Localization and mApping
 #                               (MOLA)
 #
-# Copyright (C) 2018-2024, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
+# Copyright (C) 2018-2025, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
 # All rights reserved.
 # Released under GNU GPL v3. See LICENSE file
 # ------------------------------------------------------------------------------
@@ -43,7 +43,6 @@ mola_add_library(
     mrpt::ros2bridge
     tf2::tf2
     rosbag2_cpp::rosbag2_cpp
-    #nav_msgs
     tf2_geometry_msgs::tf2_geometry_msgs
     tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
     sensor_msgs::sensor_msgs_library
