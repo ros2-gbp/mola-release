@@ -2,6 +2,11 @@
 Changelog for package mola_input_video
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2025-05-25)
+------------------
+* Update copyright year
+* Contributors: Jose Luis Blanco-Claraco
+
 1.7.0 (2025-05-06)
 ------------------
 * Implement live camera mode too
