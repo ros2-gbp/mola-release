@@ -2,7 +2,7 @@
 #        A Modular Optimization framework for Localization and mApping
 #                               (MOLA)
 #
-# Copyright (C) 2018-2024, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
+# Copyright (C) 2018-2025, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
 # All rights reserved.
 # Released under GNU GPL v3. See LICENSE file
 # ------------------------------------------------------------------------------
@@ -47,3 +47,7 @@ if(DETECTED_ROS2)
 
   ament_package()
 endif()
+
+# Silent warning on unused variable:
+set(ignored CMAKE_EXPORT_COMPILE_COMMANDS)
+unset(ignored)
