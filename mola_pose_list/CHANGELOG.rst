@@ -2,6 +2,11 @@
 Changelog for package mola_pose_list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.0 (2025-05-25)
+------------------
+* Update copyright year
+* Contributors: Jose Luis Blanco-Claraco
+
 1.7.0 (2025-05-06)
 ------------------
 
