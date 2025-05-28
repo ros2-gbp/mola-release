@@ -2,6 +2,9 @@
 Changelog for package mola_viz
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.8.1 (2025-05-28)
+------------------
+
 1.8.0 (2025-05-25)
 ------------------
 * Implement new virtual Viz methods
