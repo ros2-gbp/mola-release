@@ -2,6 +2,12 @@
 Changelog for package mola
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.9.0 (2025-06-06)
+------------------
+* Fix silent cmake warnings on unused variables
+* Depend less on ament and more on pure cmake
+* Contributors: Jose Luis Blanco-Claraco
+
 1.8.1 (2025-05-28)
 ------------------
 
