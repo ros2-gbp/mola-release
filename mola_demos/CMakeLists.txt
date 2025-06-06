@@ -41,13 +41,9 @@ if(DETECTED_ROS2)
   # find dependencies
   find_package(ament_cmake REQUIRED)
 
-  #ament_target_dependencies(MY_TARGET
-  #  rclcpp...
-  #)
-
   ament_package()
 endif()
 
 # Silent warning on unused variable:
-set(ignored CMAKE_EXPORT_COMPILE_COMMANDS)
+set(ignored ${CMAKE_EXPORT_COMPILE_COMMANDS})
 unset(ignored)
