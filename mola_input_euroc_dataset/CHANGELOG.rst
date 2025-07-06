@@ -2,6 +2,9 @@
 Changelog for package mola_input_euroc_dataset
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.9.1 (2025-07-07)
+------------------
+
 1.9.0 (2025-06-06)
 ------------------
 * Depend less on ament and more on pure cmake
