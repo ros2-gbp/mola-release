@@ -14,7 +14,7 @@ Check out the tutorials: :ref:`building-maps`, and :ref:`tutorial-mola-lo-map-an
 It provides:
 
 - LiDAR-only odometry (LO, no IMU).
-- LiDAR-inertial odometry (LIO, with IMU): **pending**.
+- LiDAR-inertial odometry (LIO, with IMU).
 
 in two modes: mapping, and localization based on a prebuilt map.
 
@@ -51,7 +51,7 @@ Write me!
 Build **georeferenced** consistent global maps, even mixing indoor and outdoor scenarios.
 This functionality is provided by:
 
-- ``mola_sm_loop_closure``: At present, this package is not open-sourced, see: :ref:`mola_licenses`.
+- ``mola_sm_loop_closure``:
 
   - **Geo-referencing** metric maps with consumer-grade GNSS sensors. See: :ref:`geo-referencing`.
   - Off-line **loop closure** for consistent global maps. (TO-DO: Write docs)
@@ -99,6 +99,10 @@ The complete framework comprises these software repositories:
 
 .. _mola_state_estimation: https://github.com/MOLAorg/mola_state_estimation/
 .. |mola_state_estimation| replace:: **mola_state_estimation**
+
+.. _mola_sm_loop_closure: https://github.com/MOLAorg/mola_sm_loop_closure/
+.. |mola_sm_loop_closure| replace:: **mola_sm_loop_closure**
+
 
 .. list-table:: Software repositories and modules
    :widths: 75 25
@@ -154,12 +158,12 @@ The complete framework comprises these software repositories:
 
      - GNU-GPLv3
 
-   * - **mola_sm_loop_closure**
+   * - |mola_sm_loop_closure|_
        
        |
        
        Map geo-referencing, SLAM with loop-closure for consistent large maps.
-     - Upon licensing only
+     - GNU-GPLv3
 
 |
 
