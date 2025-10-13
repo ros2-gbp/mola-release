@@ -1,8 +1,15 @@
-/* -------------------------------------------------------------------------
- *   A Modular Optimization framework for Localization and mApping  (MOLA)
- * Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria
- * See LICENSE for license information.
- * ------------------------------------------------------------------------- */
+/*               _
+ _ __ ___   ___ | | __ _
+| '_ ` _ \ / _ \| |/ _` | Modular Optimization framework for
+| | | | | | (_) | | (_| | Localization and mApping (MOLA)
+|_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
+
+ Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+                         and individual contributors.
+ SPDX-License-Identifier: GPL-3.0
+ See LICENSE for full license information.
+*/
+
 /**
  * @file   KittiOdometryDataset.cpp
  * @brief  RawDataSource from Kitti odometry/SLAM datasets
@@ -541,7 +548,7 @@ void KittiOdometryDataset::load_lidar(timestep_t step) const
     const size_t nPts = xs.size();
 
     // Based on:
-    // https://github.com/TixiaoShan/LIO-SAM/blob/master/config/doc/kitti2bag/kitti2bag.py
+    // https://github.com/TixiaoShan/LIO-SAM/blob/develop/config/doc/kitti2bag/kitti2bag.py
 
     // (JLBC) Note that this code assumes scan deskew has not been already
     // applied!
