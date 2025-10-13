@@ -3,6 +3,12 @@ Changelog for package mola_bridge_ros2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+2.0.0 (2025-10-13)
+------------------
+* fix clang-format
+* Modernize copyright notice
+* Contributors: Jose Luis Blanco-Claraco
+
 1.9.1 (2025-07-07)
 ------------------
 
