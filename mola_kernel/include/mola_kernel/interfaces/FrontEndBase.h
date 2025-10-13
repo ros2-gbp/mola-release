@@ -1,8 +1,15 @@
-/* -------------------------------------------------------------------------
- *   A Modular Optimization framework for Localization and mApping  (MOLA)
- * Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria
- * See LICENSE for license information.
- * ------------------------------------------------------------------------- */
+/*               _
+ _ __ ___   ___ | | __ _
+| '_ ` _ \ / _ \| |/ _` | Modular Optimization framework for
+| | | | | | (_) | | (_| | Localization and mApping (MOLA)
+|_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
+
+ Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+                         and individual contributors.
+ SPDX-License-Identifier: GPL-3.0
+ See LICENSE for full license information.
+*/
+
 /**
  * @file   FrontEndBase.h
  * @brief  Virtual interface for SLAM front-ends
@@ -12,11 +19,13 @@
 #pragma once
 
 #include <mola_kernel/Yaml.h>
-#include <mola_kernel/interfaces/BackEndBase.h>
 #include <mola_kernel/interfaces/ExecutableBase.h>
 #include <mola_kernel/interfaces/RawDataConsumer.h>
 #include <mola_kernel/interfaces/VizInterface.h>
 #include <mrpt/version.h>
+
+#include <set>
+#include <string>
 
 namespace mola
 {
@@ -34,11 +43,7 @@ namespace mola
  * \ingroup mola_kernel_interfaces_grp */
 class FrontEndBase : public ExecutableBase, public RawDataConsumer
 {
-#if MRPT_VERSION < 0x020e00
-  DEFINE_VIRTUAL_MRPT_OBJECT(FrontEndBase)
-#else
   DEFINE_VIRTUAL_MRPT_OBJECT(FrontEndBase, mola)
-#endif
 
  public:
   FrontEndBase();
@@ -73,10 +78,7 @@ class FrontEndBase : public ExecutableBase, public RawDataConsumer
    */
   std::set<std::string> front_end_source_names_;
 
-  /** A reference to my associated SLAM backend.
-   * Populated by initialize_common() */
-  BackEndBase::Ptr  slam_backend_;
-  WorldModel::Ptr   worldmodel_;
+  /** References to other modules. Populated by initialize_common() */
   VizInterface::Ptr visualizer_;
 };
 
