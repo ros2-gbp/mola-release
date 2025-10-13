@@ -2,6 +2,15 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.0.0 (2025-10-13)
+------------------
+* Modernize copyright notice
+* Use ament linters
+* Contributors: Jose Luis Blanco-Claraco
+
+1.9.1 (2025-07-07)
+------------------
+
 1.9.0 (2025-06-06)
 ------------------
 
