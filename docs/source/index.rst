@@ -42,6 +42,7 @@ MOLA
 
   module-mp2p-icp
   mp2p_icp_basics
+  mp2p_icp_filters
   mp2p_icp_optimal-transformations
   mp2p_icp_applications
 
@@ -55,6 +56,7 @@ MOLA
   dataset-conversions
   supported-sensors
   modules
+  changelog
   doxygen-index
   bibliography
 
@@ -67,6 +69,14 @@ Get started:
  - See :ref:`use-cases` for examples of use.
  - See :ref:`installing` and :ref:`how to cite it <citing_mola>`.
  - See `videos`_ on YouTube.
+
+.. raw:: html
+
+   <div style="width: 100%; overflow: hidden;">
+     <video controls autoplay loop muted style="width: 512px;">
+       <source src="https://mrpt.github.io/videos/mola-lo-mulran-dcc02-demo-decaying-clouds.mp4" type="video/mp4">
+     </video>
+   </div>
 
 .. image:: https://mrpt.github.io/imgs/mola-slam-kitti-demo.gif
 
