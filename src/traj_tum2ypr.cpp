@@ -11,7 +11,6 @@
 */
 
 #include <mrpt/core/exceptions.h>
-#include <mrpt/poses/CPose3D.h>
 #include <mrpt/poses/CPose3DInterpolator.h>
 
 #include <iostream>
@@ -20,36 +19,18 @@ int main(int argc, char** argv)
 {
   try
   {
-    if (argc != 4)
+    if (argc != 3)
     {
-      std::cerr << "Usage: " << argv[0]
-                << " INPUT.tum OUTPUT.tum \"[x y z yaw_deg pitch_deg "
-                   "roll_deg]\""
-                << std::endl;
+      std::cerr << "Usage: " << argv[0] << " INPUT.tum  OUTPUT.ypr" << std::endl;
       return 1;
     }
 
     const std::string sIn  = argv[1];
     const std::string sOut = argv[2];
-    const std::string sTF  = argv[3];
 
-    mrpt::poses::CPose3DInterpolator pIn;
-    pIn.loadFromTextFile_TUM(sIn);
-
-    std::cout << "Loaded: " << pIn.size() << " poses.\n";
-    ASSERT_(!pIn.empty());
-
-    auto in0 = pIn.begin()->second;
-
-    // Apply tf:
-    const auto tf = mrpt::poses::CPose3D::FromString(sTF);
-    std::cout << "tf: " << tf << "\n";
-
-    for (auto& [t, pose] : pIn)  //
-      pose = (tf + mrpt::poses::CPose3D(pose - in0)).asTPose();
-
-    // save:
-    pIn.saveToTextFile_TUM(sOut);
+    mrpt::poses::CPose3DInterpolator p;
+    p.loadFromTextFile_TUM(sIn);
+    p.saveToTextFile(sOut);
 
     return 0;
   }
