@@ -3,6 +3,13 @@ Changelog for package mola_input_rosbag2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+2.0.0 (2025-10-13)
+------------------
+* fix clang-format
+* Modernize copyright notice
+* fix clang-format
+* Contributors: Jose Luis Blanco-Claraco
+
 1.9.1 (2025-07-07)
 ------------------
 * fix build against latest tf2
