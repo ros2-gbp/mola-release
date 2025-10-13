@@ -1,8 +1,15 @@
-/* -------------------------------------------------------------------------
- *   A Modular Optimization framework for Localization and mApping  (MOLA)
- * Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria
- * See LICENSE for license information.
- * ------------------------------------------------------------------------- */
+/*               _
+ _ __ ___   ___ | | __ _
+| '_ ` _ \ / _ \| |/ _` | Modular Optimization framework for
+| | | | | | (_) | | (_| | Localization and mApping (MOLA)
+|_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
+
+ Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+                         and individual contributors.
+ SPDX-License-Identifier: GPL-3.0
+ See LICENSE for full license information.
+*/
+
 /**
  * @file   MolaLauncherApp.h
  * @brief  Main launcher for MOLA systems
@@ -14,7 +21,6 @@
  * systems
  */
 
-#include <mola_kernel/interfaces/FrontEndBase.h>
 #include <mola_kernel/interfaces/RawDataSourceBase.h>
 #include <mola_launcher/MolaLauncherApp.h>
 #include <mola_yaml/yaml_helpers.h>
@@ -121,11 +127,6 @@ void MolaLauncherApp::shutdown()
   // Stop data sources first
   MRPT_LOG_DEBUG("shutdown(): stopping RawDataSourceBase modules.");
   stopAllThreadsOfType<RawDataSourceBase>();
-  std::this_thread::sleep_for(50ms);
-
-  // Front ends next:
-  MRPT_LOG_DEBUG("shutdown(): stopping FrontEndBase modules.");
-  stopAllThreadsOfType<FrontEndBase>();
   std::this_thread::sleep_for(50ms);
 
   // End all threads:
@@ -377,11 +378,11 @@ void MolaLauncherApp::spin()
 
   // Main SLAM/Localization infinite loop
   // -------------------------------------------
-  // clang-format off
-    MRPT_LOG_INFO("╔═══════════════════════════════════════╦═════════════════════════════════╗");
-    MRPT_LOG_INFO("║  Entering main MOLA application loop  ║ > CTRL+C for mola-cli to quit < ║");
-    MRPT_LOG_INFO("╚═══════════════════════════════════════╩═════════════════════════════════╝");
-  // clang-format on
+  MRPT_LOG_INFO(
+      "\n"
+      "╔═══════════════════════════════════════╦═════════════════════════════════╗\n"
+      "║  Entering main MOLA application loop  ║ > CTRL+C for mola-cli to quit < ║\n"
+      "╚═══════════════════════════════════════╩═════════════════════════════════╝");
 
   spin_thread_id_ = std::this_thread::get_id();
   while (!threads_must_end_)
