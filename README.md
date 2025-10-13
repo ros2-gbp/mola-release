@@ -1,6 +1,33 @@
-[![CI Check clang-format](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml)
-[![CI ROS](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml/badge.svg)](https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml)
-[![Docs](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.mola-slam.org/latest/)
+<h1 align="center">
+  :robot: MOLA :compass:  
+  <br/>
+  <sub>Modular Optimization framework for Localization and mApping</sub>
+</h1>
+
+<p align="center">
+  <a href="https://docs.mola-slam.org/latest/">
+    <img alt="Docs" src="https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat-square" />
+  </a>
+  <a href="https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml">
+    <img alt="CI ROS" src="https://github.com/MOLAorg/mola/actions/workflows/build-ros.yml/badge.svg?style=flat-square" />
+  </a>
+  <a href="https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml">
+    <img alt="CI Check clang-format" src="https://github.com/MOLAorg/mola/actions/workflows/check-clang-format.yml/badge.svg?style=flat-square" />
+  </a>
+  <a href="LICENSE">
+    <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" />
+  </a>
+</p>
+
+<p align="center">
+  A modern, modular C++ and ROS 2 framework for <b>Localization</b> and <b>SLAM</b>.  
+  Configurable pipelines for LiDAR Odometry, LIO, and more.
+</p>
+
+---
+
+
+
 
 | Distro | Build dev | Release |
 | --- | --- | --- |
@@ -13,11 +40,28 @@
 | --- | ---
 | ROS 2 Iron (u22.04) | [![Version](https://img.shields.io/ros/v/iron/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
 
-# MOLA
-A Modular Optimization framework for Localization and mApping (MOLA).
+
+## 🤖 What is MOLA?
+MOLA (Modular Optimization framework for Localization and mApping) is a 
+modular, extensible, and high-performance framework for robotics 
+localization and 🗺️ mapping.  
+
 This repository contains the base open-sourced packages for the MOLA project. Other packages exist under the [MOLAorg](https://github.com/MOLAorg/) organization.
 
 Refer to the [official documentation](https://docs.mola-slam.org/latest/) for build instructions, demos, API reference, etc.
+
+## 🗺️ Features
+- 📍 LiDAR Odometry (LO), LiDAR-Inertial Odometry (LIO), geo-referenced maps, sensor fusion
+- 🧩 Plug-and-play modules to build configurable ICP and SLAM pipelines 
+- 🤖 ROS 2 ready (Humble, Jazzy, Kilted, Rolling) but also usable from standalone pure C++
+
+## 🚀 Demo videos
+
+Lidar-Inertial-Odometry (LIO) demo with Oxford Spires:
+
+![Peek 2025-10-10 10-29](https://github.com/user-attachments/assets/f3a83a42-a9d7-4007-b0a0-a87c13893c0e)
+
+Lidar-Odometry (LO) demo with KITTI:
 
 ![kitti_demo_06](https://github.com/MOLAorg/mola/assets/5497818/76cf07e2-ab20-41a3-abc6-df5c5ba74b97)
 
@@ -40,6 +84,7 @@ Note: Rows within each cell are for ``amd64`` and ``arm64`` architectures.
 | mola_input_euroc_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_euroc_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_euroc_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_euroc_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_euroc_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_euroc_dataset__ubuntu_noble_arm64__binary/) | 
 | mola_input_kitti360_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti360_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_kitti360_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_kitti360_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti360_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_kitti360_dataset__ubuntu_noble_arm64__binary/) | 
 | mola_input_kitti_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_kitti_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_kitti_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_kitti_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_kitti_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_kitti_dataset__ubuntu_noble_arm64__binary/) | 
+| mola_input_lidar_bin_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_lidar_bin_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_lidar_bin_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_lidar_bin_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_lidar_bin_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_lidar_bin_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_lidar_bin_dataset__ubuntu_noble_arm64__binary/) | 
 | mola_input_mulran_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_mulran_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_mulran_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_mulran_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_mulran_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_mulran_dataset__ubuntu_noble_arm64__binary/) | 
 | mola_input_paris_luco_dataset | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_paris_luco_dataset__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_paris_luco_dataset__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_paris_luco_dataset__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_paris_luco_dataset__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_paris_luco_dataset__ubuntu_noble_arm64__binary/) | 
 | mola_input_rawlog | [![Build Status](https://build.ros2.org/job/Hbin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/badge/icon)](https://build.ros2.org/job/Hbin_uJ64__mola_input_rawlog__ubuntu_jammy_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_rawlog__ubuntu_jammy_arm64__binary/badge/icon)](https://build.ros2.org/job/Hbin_ujv8_uJv8__mola_input_rawlog__ubuntu_jammy_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Jbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Jbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Jbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Kbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Kbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/) <br> [![Build Status](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Kbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/)  | [![Build Status](https://build.ros2.org/job/Rbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/badge/icon)](https://build.ros2.org/job/Rbin_uN64__mola_input_rawlog__ubuntu_noble_amd64__binary/)<br> [![Build Status](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/badge/icon)](https://build.ros2.org/job/Rbin_unv8_uNv8__mola_input_rawlog__ubuntu_noble_arm64__binary/) | 
@@ -64,11 +109,11 @@ The latest publications on MOLA are ([ArXiV](https://arxiv.org/abs/2407.20465)).
 ```bibtex
 @article{blanco2025mola_lo,
     author = {Jose Luis Blanco-Claraco},
-    title ={A flexible framework for accurate LiDAR odometry, map manipulation, and localization},
+    title = {{A flexible framework for accurate LiDAR odometry, map manipulation, and localization}},
     journal = {The International Journal of Robotics Research},
-    volume = {0},
-    number = {0},
-    pages = {02783649251316881},
+    volume = {44},
+    number = {9},
+    pages = {1553--1599},
     year = {2025},
     doi = {10.1177/02783649251316881},
     URL = { https://doi.org/10.1177/02783649251316881},
@@ -81,7 +126,7 @@ MOLA was initially presented in 2019 in ([PDF](http://www.roboticsproceedings.or
 ```bibtex
 @INPROCEEDINGS{Blanco-Claraco-RSS-19, 
     AUTHOR    = {Jose Luis Blanco-Claraco}, 
-    TITLE     = {A Modular Optimization Framework for Localization and Mapping}, 
+    TITLE     = {{A Modular Optimization Framework for Localization and Mapping}}, 
     BOOKTITLE = {Proceedings of Robotics: Science and Systems}, 
     YEAR      = {2019}, 
     ADDRESS   = {FreiburgimBreisgau, Germany}, 
