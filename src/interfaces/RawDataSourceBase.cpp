@@ -1,8 +1,15 @@
-/* -------------------------------------------------------------------------
- *   A Modular Optimization framework for Localization and mApping  (MOLA)
- * Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria
- * See LICENSE for license information.
- * ------------------------------------------------------------------------- */
+/*               _
+ _ __ ___   ___ | | __ _
+| '_ ` _ \ / _ \| |/ _` | Modular Optimization framework for
+| | | | | | (_) | | (_| | Localization and mApping (MOLA)
+|_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
+
+ Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+                         and individual contributors.
+ SPDX-License-Identifier: GPL-3.0
+ See LICENSE for full license information.
+*/
+
 /**
  * @file   RawDataSourceBase.cpp
  * @brief  Virtual interface for data sources, either real sensors or datasets
@@ -27,9 +34,10 @@ IMPLEMENTS_VIRTUAL_MRPT_OBJECT(RawDataSourceBase, ExecutableBase, mola)
 
 struct RawDataSourceBase::SensorViewerImpl
 {
-  unsigned int decimation{1}, decim_counter{0};
-  std::string  sensor_label;
-  std::string  win_pos;  //!< "[x,y,width,height]"
+  unsigned int           decimation{1}, decimation_counter{0};
+  std::string            sensor_label;
+  std::string            win_pos;  //!< "[x,y,width,height]"
+  mrpt::containers::yaml extra_parameters;
 
   nanogui::Window* win = nullptr;
 };
@@ -63,10 +71,10 @@ void RawDataSourceBase::initialize(const Yaml& cfg)
     auto ds_preview = cfg["gui_preview_sensors"];
     for (const auto& s : ds_preview.asSequence())
     {
-      const auto sensor  = mrpt::containers::yaml(s);
-      const auto label   = sensor["raw_sensor_label"].as<std::string>();
-      const auto decim   = sensor.getOrDefault<unsigned int>("decimation", 1);
-      const auto win_pos = sensor.getOrDefault<std::string>("win_pos", "");
+      const auto sensor     = mrpt::containers::yaml(s);
+      const auto label      = sensor["raw_sensor_label"].as<std::string>();
+      const auto decimation = sensor.getOrDefault<unsigned int>("decimation", 1);
+      const auto win_pos    = sensor.getOrDefault<std::string>("win_pos", "");
 
       // Allow quickly disabling sections:
       if (!sensor.getOrDefault("enabled", true))
@@ -80,9 +88,10 @@ void RawDataSourceBase::initialize(const Yaml& cfg)
       auto& sv = sensor_preview_gui_[label] =
           mrpt::make_impl<RawDataSourceBase::SensorViewerImpl>();
 
-      sv->decimation   = decim;
-      sv->sensor_label = label;
-      sv->win_pos      = win_pos;
+      sv->decimation       = decimation;
+      sv->sensor_label     = label;
+      sv->win_pos          = win_pos;
+      sv->extra_parameters = sensor;
       // sv->win: Create a window when the sensor actually publishes.
     }
   }
@@ -148,11 +157,16 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
     auto fut = worker_pool_export_rawlog_.enqueue(
         [this](mrpt::obs::CObservation::Ptr o)
         {
-          if (!o) return;
+          if (!o)
+          {
+            return;
+          }
           auto a = mrpt::serialization::archiveFrom(this->export_to_rawlog_out_);
           a << o;
         },
         obs);
+
+    (void)fut;
   }
 
   // Send this observation for GUI preview, if enabled:
@@ -171,8 +185,11 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
         using namespace mrpt::opengl;
 
         // GUI update decimation:
-        if (++sv->decim_counter < sv->decimation) return;
-        sv->decim_counter = 0;
+        if (++sv->decimation_counter < sv->decimation)
+        {
+          return;
+        }
+        sv->decimation_counter = 0;
 
         // Create subwindow now:
         auto vizMods = this->findService<mola::VizInterface>();
@@ -199,6 +216,7 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
             if ((ss >> x) && (ss >> y) && (ss >> w) && (ss >> h))
             {
               auto futMove = viz->subwindow_move_resize(sv->sensor_label, {x, y}, {w, h});
+              (void)futMove;
             }
           }
         }
@@ -206,7 +224,7 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
         // Update the GUI:
         // (We don't need to wait for the future result, just move on)
         // auto fut =
-        viz->subwindow_update_visualization(obs, sv->sensor_label);
+        viz->subwindow_update_visualization(obs, sv->sensor_label, &sv->extra_parameters);
       }
       catch (const std::exception& e)
       {
@@ -215,6 +233,7 @@ void RawDataSourceBase::sendObservationsToFrontEnds(const mrpt::obs::CObservatio
     };
 
     auto fut = gui_updater_threadpool_.enqueue(func);
+    (void)fut;
   }
 
   MRPT_TRY_END
@@ -262,7 +281,10 @@ void RawDataSourceBase::prepareObservationBeforeFrontEnds(const CObservation::Pt
 
 void RawDataSourceBase::onDatasetPlaybackEnds()
 {
-  if (!quit_mola_app_on_dataset_end_) return;  // do nothing
+  if (!quit_mola_app_on_dataset_end_)
+  {
+    return;  // do nothing
+  }
 
   this->requestShutdown();  // Quit mola app
 }
