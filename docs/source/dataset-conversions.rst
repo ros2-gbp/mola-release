@@ -172,6 +172,40 @@ The rest will be discarded, after emitting a warning to the terminal.
         image_topic: '/alphasense_driver_ros/cam0/compressed'
         fixed_sensor_pose: "0 0 0 0 0 0"  # 'x y z yaw_deg pitch_deg roll_deg''
 
+
+.. dropdown:: Example: Oxford Spires Dataset
+
+  To import sequences from the `Oxford Spires dataset <https://dynamic.robots.ox.ac.uk/datasets/oxford-spires/>`_ to MRPT format:
+
+  .. code-block:: yaml
+
+    # Config file for rosbag2rawlog. It must contain a top-level "sensors" node
+    sensors:
+      # Then, one node per sensor to convert. This name will be used as
+      # sensorLabel in MRPT observations.
+      lidar:
+        # Type: C++ class name (see mrpt::obs)
+        type: "CObservationPointCloud"
+        # Parameters for this particular type of sensor.
+        # Topic to subscribe for the pointcloud:
+        topic: "/hesai/pandar"
+        fixed_sensor_pose: "0.0 0.0 0.124 180 0 0" # 'x y z yaw_deg pitch_deg roll_deg'
+
+        # pCL_CI             : (x,y,z,yaw,pitch,roll)=(-0.0078,-0.0190,0.0705,90.63deg,-0.13deg,0.17deg)
+        #T_base_imu_t_xyz_q_xyzw: [-0.018, 0.006, 0.058, 0.0, 0.0, 0.707, 0.707]   # qx qy qz qw
+        #T_base_lidar_t_xyz_q_xyzw: [0.0, 0.0, 0.124, 0.0, 0.0, 1.0, 0.0]   # qx qy qz qw
+
+      imu:
+        type: "CObservationIMU"
+        topic: "/alphasense_driver_ros/imu"
+        fixed_sensor_pose: "-0.018 0.006 0.058 90 0 0" # 'x y z yaw_deg pitch_deg roll_deg'
+
+    #  cam0:
+    #    type: "CObservationImage"
+    #    image_topic: "/alphasense_driver_ros/cam0/debayered/image/compressed"
+    #    fixed_sensor_pose: "0 0 0 0 0 0" # 'x y z yaw_deg pitch_deg roll_deg'' # COMPUTE PROPERLY!
+
+
 .. dropdown:: Example: LiDAR + wheels odometry from /odom
 
   .. code-block:: yaml
@@ -273,4 +307,79 @@ with corresponding MOLA cli launch files in the `mola-cli-launchs <https://githu
   :open:
 
   Refer to the :ref:`complete tutorial <tutorial-mulran-replay-to-ros2>`.
+
+|
+
+.. _pointcloud-to-mm:
+
+6. Point-cloud files ⇒ ``.mm`` metric maps
+--------------------------------------------
+
+In some cases, you may want to **import point-cloud files** in popular formats (e.g. PCD, LAS, etc.)
+as a **layer within a metric map** in :ref:`mp2p_icp's metric map format <mp2p_icp_basics>` (``*.mm`` files).
+Providing specialized converter programs for each format would require depending on many larger libraries
+so, instead of that approach, ``mp2p_icp`` provides one single program (:ref:`app_txt2mm`) to **import
+point-cloud files in text format** (e.g. ``.txt``, ``.csv``).
+
+Therefore, the remaining step is to convert your point-cloud files to text format. Common cases are described below:
+
+6.1. PCD files
+===============
+
+PCD files are serialized point-clouds as defined in the `PCL <https://pointclouds.org/>`_ library.
+
+.. dropdown:: Example python script to convert PCD to text
+
+  .. code-block:: python
+
+    #!/bin/env python3
+    # Save as 'pcd2txt.py'
+
+    import open3d as o3d
+    import numpy as np
+    import pandas as pd
+
+    import sys
+
+    # Load PCD file
+    pcd = o3d.io.read_point_cloud(sys.argv[1])
+
+    # Convert to numpy array
+    points = np.asarray(pcd.points)
+
+    # If colors exist
+    if pcd.has_colors():
+        colors = np.asarray(pcd.colors)
+        data = np.hstack((points, colors))
+        header = "# x y z r g b"
+    else:
+        data = points
+        header = "# x y z"
+
+    # Save to TXT
+    np.savetxt(sys.argv[1] + ".txt", data, fmt="%.6f", header=header, comments='')
+
+
+  Then, you can convert a PCD file to text format with:
+
+  .. code-block:: bash
+
+      ./pcd2txt.py input.pcd
+
+
+6.2. LAS files
+===============
+
+LAS files can be converted to text format using the ``las2txt`` (or ``las2txt64``) program,
+which is part of the `LAStools <https://rapidlasso.com/lastools/>`_ library.
+
+Once installed or built from sources, you can convert a LAS file to text format with:
+
+.. code-block:: bash
+
+    # If you only want XYZ coordinates (no color):
+    las2txt64 -i input.las -o output.txt -parse xyz
+
+    # For .las files with RGB color:
+    las2txt64 -i input.las -o output.txt -parse xyzRGB -scale_RGB_to_8bit
 
