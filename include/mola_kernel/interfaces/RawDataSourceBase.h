@@ -1,8 +1,15 @@
-/* -------------------------------------------------------------------------
- *   A Modular Optimization framework for Localization and mApping  (MOLA)
- * Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria
- * See LICENSE for license information.
- * ------------------------------------------------------------------------- */
+/*               _
+ _ __ ___   ___ | | __ _
+| '_ ` _ \ / _ \| |/ _` | Modular Optimization framework for
+| | | | | | (_) | | (_| | Localization and mApping (MOLA)
+|_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
+
+ Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+                         and individual contributors.
+ SPDX-License-Identifier: GPL-3.0
+ See LICENSE for full license information.
+*/
+
 /**
  * @file   RawDataSourceBase.h
  * @brief  Virtual interface for data sources, either real sensors or datasets
@@ -30,11 +37,7 @@ using timestep_t = std::size_t;
  * parsers,...) \ingroup mola_kernel_interfaces_grp */
 class RawDataSourceBase : public mola::ExecutableBase
 {
-#if MRPT_VERSION < 0x020e00
-  DEFINE_VIRTUAL_MRPT_OBJECT(RawDataSourceBase)
-#else
   DEFINE_VIRTUAL_MRPT_OBJECT(RawDataSourceBase, mola)
-#endif
 
  public:
   RawDataSourceBase();
