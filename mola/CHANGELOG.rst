@@ -2,6 +2,16 @@
 Changelog for package mola
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.0.0 (2025-10-13)
+------------------
+* Merge pull request `#93 <https://github.com/MOLAorg/mola/issues/93>`_ from MOLAorg/feature/better-lio
+  Changes for new LIO
+* Avoid cmake warning on no install target
+* Contributors: Jose Luis Blanco-Claraco
+
+1.9.1 (2025-07-07)
+------------------
+
 1.9.0 (2025-06-06)
 ------------------
 * Fix silent cmake warnings on unused variables
