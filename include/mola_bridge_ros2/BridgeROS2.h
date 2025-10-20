@@ -111,7 +111,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
   void spinOnce() override;
 
   // RawDataConsumer implementation:
-  void onNewObservation(const CObservation::Ptr& o) override;
+  void onNewObservation(const CObservation::ConstPtr& o) override;
 
  protected:
   // See docs in base class
@@ -340,9 +340,9 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
   void onNewMap(const mola::MapSourceBase::MapUpdate& m);
 
-  std::mutex                                                         lastLocMapMtx_;
-  std::vector<mola::LocalizationSourceBase::LocalizationUpdate>      lastLocUpdates_;
-  std::map<std::string /*map_name*/, mola::MapSourceBase::MapUpdate> lastMaps_;
+  std::mutex                                                              lastLocMapMtx_;
+  std::vector<mola::LocalizationSourceBase::LocalizationUpdate>           lastLocUpdates_;
+  std::multimap<std::string /*map_name*/, mola::MapSourceBase::MapUpdate> lastMaps_;
 
   void timerPubLocalization();
   void timerPubMap();
@@ -363,7 +363,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
   void internalPublishGridMap(
       const mrpt::maps::COccupancyGridMap2D& m, const std::string& sMapTopicName,
-      const std::string& sReferenceFrame);
+      const std::string& sReferenceFrame, const mrpt::Clock::time_point& timestamp);
 
   void internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& ds_subscribe);
 
