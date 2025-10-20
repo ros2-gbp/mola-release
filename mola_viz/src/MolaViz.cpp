@@ -80,14 +80,23 @@ constexpr const char* DECAY_CLOUDS_NAME = "__viz_decaying_clouds";
 
 void gui_handler_show_common_sensor_info(
     const mrpt::obs::CObservation& obs, nanogui::Window* w,
-    const std::vector<std::string>& additionalMsgs = {})
+    const double sensor_rate_decimation = 1.0, const std::vector<std::string>& additionalMsgs = {})
 {
   auto glControl = dynamic_cast<mrpt::gui::MRPT2NanoguiGLCanvas*>(w->children().at(1));
-  if (!glControl) return;
-  if (!glControl->scene) return;
+  if (!glControl)
+  {
+    return;
+  }
+  if (!glControl->scene)
+  {
+    return;
+  }
 
   auto glView = glControl->scene->getViewport();
-  if (!glView) return;
+  if (!glView)
+  {
+    return;
+  }
 
   constexpr unsigned int TXT_ID_TIMESTAMP   = 0;
   constexpr unsigned int TXT_ID_RATE        = 1;
@@ -101,7 +110,8 @@ void gui_handler_show_common_sensor_info(
   fp.vfont_scale  = 9;
 
   // Computes the "y" coordinate of a text line by index
-  const auto line_y = [&fp](const int line) { return 2 + line * (2 + fp.vfont_scale); };
+  const auto line_y = [&fp](const int line)
+  { return 2 + static_cast<float>(line) * (2 + fp.vfont_scale); };
 
   glView->addTextMessage(
       2, line_y(TXT_ID_TIMESTAMP),
@@ -128,7 +138,7 @@ void gui_handler_show_common_sensor_info(
   else
   {
     const double At    = curTim - lastTimestamp[w];
-    const double curHz = At > 0 ? (1.0 / At) : 1.0;
+    const double curHz = (At > 0 ? (1.0 / At) : 1.0) * sensor_rate_decimation;
     const double alpha = 0.9;
 
     double showHz;
@@ -158,13 +168,13 @@ void gui_handler_show_common_sensor_info(
   for (size_t i = 0; i < additionalMsgs.size(); i++)
   {
     const auto id = TXT_ID_ADDITIONALS + i;
-    glView->addTextMessage(2, line_y(id), additionalMsgs.at(i), id, fp);
+    glView->addTextMessage(2, line_y(static_cast<int>(id)), additionalMsgs.at(i), id, fp);
   }
 }
 
 // CObservationImage
 void gui_handler_images(
-    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, MolaViz::window_name_t parentWin,
+    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, const MolaViz::window_name_t& parentWin,
     MolaViz* instance, [[maybe_unused]] const mrpt::containers::yaml* extra_parameters)
 {
   mrpt::img::CImage imgToShow;
@@ -189,7 +199,8 @@ void gui_handler_images(
   if (w->children().size() == 1)
   {
     // Guess window size:
-    int winW = imgToShow.getWidth(), winH = imgToShow.getHeight();
+    auto winW = static_cast<int>(imgToShow.getWidth());
+    auto winH = static_cast<int>(imgToShow.getHeight());
 
     // Guess if we need to decimate subwindow size:
     while (winW > 512 || winH > 512)
@@ -213,14 +224,24 @@ void gui_handler_images(
   }
   ASSERT_(glControl != nullptr);
 
-  const int imgW = imgToShow.getWidth(), imgH = imgToShow.getHeight();
-  const int imgChannels = imgToShow.channelCount();
+  const double sensorDecimation = [&]()
+  {
+    if (extra_parameters)
+    {
+      return extra_parameters->getOrDefault("sensor_rate_decimation", 1.0);
+    }
+    return 1.0;
+  }();
+
+  const auto imgW        = static_cast<int>(imgToShow.getWidth());
+  const auto imgH        = static_cast<int>(imgToShow.getHeight());
+  const int  imgChannels = imgToShow.channelCount();
 
   auto lck = mrpt::lockHelper(glControl->scene_mtx);
   glControl->scene->getViewport()->setImageView(imgToShow);
 
   gui_handler_show_common_sensor_info(
-      *std::dynamic_pointer_cast<mrpt::obs::CObservation>(o), w,
+      *std::dynamic_pointer_cast<mrpt::obs::CObservation>(o), w, sensorDecimation,
       {mrpt::format("Size: %ix%ix%i", imgW, imgH, imgChannels)});
 }
 
@@ -230,7 +251,7 @@ void gui_handler_images(
 // CObservationRotatingScan
 // CObservationVelodyneScan
 void gui_handler_point_cloud(
-    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, MolaViz::window_name_t parentWin,
+    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, const MolaViz::window_name_t& parentWin,
     MolaViz* instance, const mrpt::containers::yaml* extra_parameters)
 {
   using namespace mrpt::obs;
@@ -239,6 +260,15 @@ void gui_handler_point_cloud(
   mrpt::opengl::CPointCloudColoured::Ptr      glPc;
   mrpt::opengl::CSetOfObjects::Ptr            glCornerRef, glCornerSensor;
   std::optional<mrpt::LockHelper<std::mutex>> lck;
+
+  const double sensorDecimation = [&]()
+  {
+    if (extra_parameters)
+    {
+      return extra_parameters->getOrDefault("sensor_rate_decimation", 1.0);
+    }
+    return 1.0;
+  }();
 
   bool  color_from_z = true;
   float point_size   = 3.0f;
@@ -315,7 +345,7 @@ void gui_handler_point_cloud(
       additionalMsgs.push_back(mrpt::format("Intensity range: [%.02f,%.02f]", *itMin, *itMax));
     }
 
-    gui_handler_show_common_sensor_info(*objPc, w, additionalMsgs);
+    gui_handler_show_common_sensor_info(*objPc, w, sensorDecimation, additionalMsgs);
   }
   else if (auto objRS = std::dynamic_pointer_cast<CObservationRotatingScan>(o); objRS)
   {
@@ -341,7 +371,7 @@ void gui_handler_point_cloud(
     }
     glPc->recolorizeByCoordinate(bbox.min.z, bbox.max.z);
 
-    gui_handler_show_common_sensor_info(*objRS, w);
+    gui_handler_show_common_sensor_info(*objRS, w, sensorDecimation);
   }
   else if (auto obj3D = std::dynamic_pointer_cast<CObservation3DRangeScan>(o);
            instance->show_rgbd_as_point_cloud_ && obj3D)
@@ -380,7 +410,7 @@ void gui_handler_point_cloud(
         obj3D->unprojectInto(*glPc, pp);
       }
     }
-    gui_handler_show_common_sensor_info(*obj3D, w);
+    gui_handler_show_common_sensor_info(*obj3D, w, sensorDecimation);
   }
   else if (auto obj2D = std::dynamic_pointer_cast<CObservation2DRangeScan>(o); obj2D)
   {
@@ -388,7 +418,7 @@ void gui_handler_point_cloud(
     auxMap.insertObservationPtr(obj2D);
     glPc->loadFromPointsMap(&auxMap);
 
-    gui_handler_show_common_sensor_info(*obj2D, w);
+    gui_handler_show_common_sensor_info(*obj2D, w, sensorDecimation);
   }
   else if (auto objVel = std::dynamic_pointer_cast<CObservationVelodyneScan>(o); objVel)
   {
@@ -404,12 +434,12 @@ void gui_handler_point_cloud(
     for (size_t i = 0; i < N; i++)
     {
       pts.setPoint(i, pc.x[i], pc.y[i], pc.z[i]);
-      pts.setPointIntensity(i, pc.intensity[i] / 255.0f);
+      pts.setPointIntensity(i, static_cast<float>(pc.intensity[i]) / 255.0f);
     }
     glPc->loadFromPointsMap(&pts);
 
     gui_handler_show_common_sensor_info(
-        *objVel, w,
+        *objVel, w, sensorDecimation,
         {
             mrpt::format("Point count: %zu", N),
         });
@@ -429,7 +459,7 @@ void gui_handler_point_cloud(
 
 // CObservationGPS
 void gui_handler_gps(
-    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, MolaViz::window_name_t parentWin,
+    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, const MolaViz::window_name_t& parentWin,
     MolaViz* instance, [[maybe_unused]] const mrpt::containers::yaml* extra_parameters)
 {
   auto obj = std::dynamic_pointer_cast<mrpt::obs::CObservationGPS>(o);
@@ -492,7 +522,7 @@ void gui_handler_gps(
 
 // CObservationIMU
 void gui_handler_imu(
-    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, MolaViz::window_name_t parentWin,
+    const mrpt::rtti::CObject::Ptr& o, nanogui::Window* w, const MolaViz::window_name_t& parentWin,
     MolaViz* instance, [[maybe_unused]] const mrpt::containers::yaml* extra_parameters)
 {
   auto obj = std::dynamic_pointer_cast<mrpt::obs::CObservationIMU>(o);
@@ -500,6 +530,15 @@ void gui_handler_imu(
   {
     return;
   }
+
+  const double sensorDecimation = [&]()
+  {
+    if (extra_parameters)
+    {
+      return extra_parameters->getOrDefault("sensor_rate_decimation", 1.0);
+    }
+    return 1.0;
+  }();
 
   mrpt::gui::MRPT2NanoguiGLCanvas* glControl;
   // mrpt::opengl::CSetOfObjects::Ptr            glCornerRef, glCornerSensor;
@@ -561,7 +600,7 @@ void gui_handler_imu(
     txts.push_back("acc=None");
   }
 
-  gui_handler_show_common_sensor_info(*obj, w, txts);
+  gui_handler_show_common_sensor_info(*obj, w, sensorDecimation, txts);
 }
 
 }  // namespace
@@ -589,7 +628,7 @@ MolaViz*                     MolaViz::instance_ = nullptr;
 std::shared_mutex            MolaViz::instanceMtx_;
 const MolaViz::window_name_t MolaViz::DEFAULT_WINDOW_NAME = "main";
 
-void MolaViz::register_gui_handler(class_name_t name, update_handler_t handler)
+void MolaViz::register_gui_handler(const class_name_t& name, const update_handler_t& handler)
 {
   auto& hc  = HandlersContainer::Instance();
   auto  lck = mrpt::lockHelper(hc.guiHandlersMtx_);
@@ -730,7 +769,7 @@ void MolaViz::dataset_ui_check_new_modules()
     {
       if (rates[i] == initialRate)
       {
-        selIdx = i;
+        selIdx = static_cast<int>(i);
         break;
       }
     }
@@ -771,8 +810,9 @@ void MolaViz::dataset_ui_update()
 
           e.lbPlaybackPosition->setCaption(mrpt::format("%zu / %zu", pos, N));
           e.slider->setRange(std::make_pair<float>(0, N));
-          e.slider->setValue(pos);
-          e.slider->setHighlightedRange(std::make_pair<float>(0.f, pos * 1.0f / (N)));
+          e.slider->setValue(static_cast<float>(pos));
+          e.slider->setHighlightedRange(
+              std::make_pair<float>(0.f, static_cast<float>(pos) / static_cast<float>(N)));
         });
   }
 }
@@ -968,18 +1008,18 @@ std::future<nanogui::Window*> MolaViz::create_subwindow(
         auto topWin = windows_.at(parentWindow).win;
         ASSERT_(topWin);
 
-        auto subw = topWin->createManagedSubWindow(subWindowTitle);
+        auto subwin = topWin->createManagedSubWindow(subWindowTitle);
         // add to list of subwindows too:
-        subWindows_[parentWindow][subWindowTitle] = subw;
+        subWindows_[parentWindow][subWindowTitle] = subwin;
 
         // Reduce size button:
-        subw->buttonPanel()
+        subwin->buttonPanel()
             ->add<nanogui::Button>("", ENTYPO_ICON_RESIZE_100_PERCENT)
             ->setCallback(
-                [subw, topWin]()
+                [subwin, topWin]()
                 {
                   if (auto glControl =
-                          dynamic_cast<mrpt::gui::MRPT2NanoguiGLCanvas*>(subw->children().at(1));
+                          dynamic_cast<mrpt::gui::MRPT2NanoguiGLCanvas*>(subwin->children().at(1));
                       glControl)
                   {
                     auto s = glControl->size();
@@ -992,13 +1032,13 @@ std::future<nanogui::Window*> MolaViz::create_subwindow(
                 });
 
         // Enlarge button:
-        subw->buttonPanel()
+        subwin->buttonPanel()
             ->add<nanogui::Button>("", ENTYPO_ICON_RESIZE_FULL_SCREEN)
             ->setCallback(
-                [subw, topWin]()
+                [subwin, topWin]()
                 {
                   if (auto glControl =
-                          dynamic_cast<mrpt::gui::MRPT2NanoguiGLCanvas*>(subw->children().at(1));
+                          dynamic_cast<mrpt::gui::MRPT2NanoguiGLCanvas*>(subwin->children().at(1));
                       glControl)
                   {
                     auto s = glControl->size();
@@ -1011,7 +1051,7 @@ std::future<nanogui::Window*> MolaViz::create_subwindow(
                   topWin->performLayout();
                 });
 
-        return subw;
+        return subwin;
       });
 
   auto lck = mrpt::lockHelper(guiThreadPendingTasksMtx_);
@@ -1228,12 +1268,12 @@ std::future<bool> MolaViz::update_viewport_camera_azimuth(
 
         if (absolute_falseForRelative)
         {
-          topWin->camera().setAzimuthDegrees(mrpt::RAD2DEG(azimuth));
+          topWin->camera().setAzimuthDegrees(static_cast<float>(mrpt::RAD2DEG(azimuth)));
         }
         else
         {
           topWin->camera().setAzimuthDegrees(
-              mrpt::RAD2DEG(azimuth) + topWin->camera().getAzimuthDegrees());
+              static_cast<float>(mrpt::RAD2DEG(azimuth)) + topWin->camera().getAzimuthDegrees());
         }
         return true;
       });
@@ -1344,7 +1384,7 @@ std::future<bool> MolaViz::output_console_message(
         const double              LINE_HEIGHT  = console_text_font_size_;
         const double              LINE_SPACING = 3.0;
         mrpt::opengl::TFontParams fp;
-        fp.vfont_scale = LINE_HEIGHT;
+        fp.vfont_scale = static_cast<float>(LINE_HEIGHT);
 
         for (size_t i = 0; i < winData.console_messages.size(); i++)
         {
@@ -1353,11 +1393,13 @@ std::future<bool> MolaViz::output_console_message(
           fp.color.A = 1.0f;
           if (invIdx > 1 && invIdx + 3 >= max_console_lines_)
           {
-            fp.color.A = 1.0f - (invIdx - (max_console_lines_ * 1.0f - 3.5f)) / 3.5f;
+            fp.color.A = 1.0f - (static_cast<float>(invIdx) -
+                                 (static_cast<float>(max_console_lines_) - 3.5f)) /
+                                    3.5f;
           }
 
           topWin->background_scene->getViewport()->addTextMessage(
-              3.0, LINE_SPACING + (LINE_SPACING + LINE_HEIGHT) * invIdx,
+              3.0, LINE_SPACING + (LINE_SPACING + LINE_HEIGHT) * static_cast<float>(invIdx),
               winData.console_messages.at(i), i, fp);
         }
 
