@@ -1,1 +1,1 @@
-{"base": "cba9cfc69", "parent": "debian/rolling/mola_navstate_fuse", "previous": "fd0e4fc7c", "trim": "", "trimbase": ""}
+{"base": "f17c05fa9", "parent": "debian/kilted/mola_navstate_fuse", "previous": "31c3a3dfc", "trim": "", "trimbase": ""}
