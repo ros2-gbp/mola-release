@@ -3,6 +3,9 @@ Changelog for package kitti_metrics_eval
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+2.1.0 (2025-10-20)
+------------------
+
 2.0.0 (2025-10-13)
 ------------------
 * Modernize copyright notice
