@@ -21,6 +21,7 @@
 #include <mp2p_icp/IcpPrepareCapable.h>
 #include <mp2p_icp/MetricMapMergeCapable.h>
 #include <mp2p_icp/NearestPointWithCovCapable.h>
+#include <mrpt/containers/NonCopiableData.h>
 #include <mrpt/img/color_maps.h>
 #include <mrpt/maps/CMetricMap.h>
 #include <mrpt/maps/CPointsMap.h>
@@ -418,7 +419,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   std::map<KeyFrameID, KeyFrame> keyframes_;
 
-  mutable std::recursive_mutex state_mtx_;  //!< for cached_ and _keyframes
+  /// for cached_ and _keyframes
+  mutable mrpt::containers::NonCopiableData<std::recursive_mutex> state_mtx_;
 
   struct CachedData
   {
@@ -435,6 +437,13 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   };
 
   CachedData cached_;
+
+  /** This will be a copy of cachedPoints, but kept here as long as possible until
+   * getAsSimplePointsMap() is called again, to extend the life of the returned pointer.
+   * A better solution would be for MRPT-3.0 to have shared_ptr return values, when that happens,
+   * remove this one.
+   */
+  mutable mrpt::maps::CSimplePointsMap::Ptr cachedPointsLastReturned_;
 
  protected:
   // See docs in base CMetricMap class:
