@@ -453,10 +453,8 @@ class NDT : public mrpt::maps::CMetricMap,
     mrpt::img::TColormap points_colormap = mrpt::img::cmHOT;
     mrpt::img::TColormap planes_colormap = mrpt::img::cmHOT;
 
-    /** If colormap!=mrpt::img::cmNONE, use this coordinate
-     *  as color index: 0=x  1=y  2=z
-     */
-    uint8_t recolorizeByCoordinateIndex = 2;
+    /** If colormap!=mrpt::img::cmNONE, use this channel as color index */
+    std::string recolorByPointField = "intensity";
   };
   TRenderOptions renderOptions;
 
