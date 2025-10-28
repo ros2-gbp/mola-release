@@ -339,12 +339,32 @@ void gui_handler_point_cloud(
     };
 
     // Collect optional stats:
+#if MRPT_VERSION >= 0x020f00  // 2.15.0
+    for (const auto& field : objPc->pointcloud->getPointFieldNames_float())
+    {
+      if (const auto* buf = objPc->pointcloud->getPointsBufferRef_float_field(field);
+          buf && !buf->empty())
+      {
+        const auto [itMin, itMax] = std::minmax_element(buf->begin(), buf->end());
+        additionalMsgs.push_back(mrpt::format(
+            "%.*s range: [%.02f,%.02f]", static_cast<int>(field.size()), field.data(), *itMin,
+            *itMax));
+      }
+      if (const auto* buf = objPc->pointcloud->getPointsBufferRef_uint_field(field);
+          buf && !buf->empty())
+      {
+        const auto [itMin, itMax] = std::minmax_element(buf->begin(), buf->end());
+        additionalMsgs.push_back(mrpt::format(
+            "%.*s range: [%hu,%hu]", static_cast<int>(field.size()), field.data(), *itMin, *itMax));
+      }
+    }
+#else
     if (const auto* Is = objPc->pointcloud->getPointsBufferRef_intensity(); Is && !Is->empty())
     {
       const auto [itMin, itMax] = std::minmax_element(Is->begin(), Is->end());
       additionalMsgs.push_back(mrpt::format("Intensity range: [%.02f,%.02f]", *itMin, *itMax));
     }
-
+#endif
     gui_handler_show_common_sensor_info(*objPc, w, sensorDecimation, additionalMsgs);
   }
   else if (auto objRS = std::dynamic_pointer_cast<CObservationRotatingScan>(o); objRS)
