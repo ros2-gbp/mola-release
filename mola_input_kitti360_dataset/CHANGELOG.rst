@@ -2,6 +2,12 @@
 Changelog for package mola_input_kitti_dataset
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.2.0 (2025-10-28)
+------------------
+* Use new mrpt 2.15.0 fast insertion
+* Upgrade to use the upcoming MRPT 2.15 API for CGenericsPointsMap
+* Contributors: Jose Luis Blanco-Claraco
+
 2.1.0 (2025-10-20)
 ------------------
 
