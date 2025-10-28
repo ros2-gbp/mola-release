@@ -3,6 +3,12 @@ Changelog for package mola_input_rosbag2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+2.2.0 (2025-10-28)
+------------------
+* format
+* Upgrade to use the upcoming MRPT 2.15 API for CGenericsPointsMap
+* Contributors: Jose Luis Blanco-Claraco
+
 2.1.0 (2025-10-20)
 ------------------
 
