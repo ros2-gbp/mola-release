@@ -1,0 +1,12 @@
+Source: ros-rolling-mola-bridge-ros2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-rolling-ament-cmake, ros-rolling-ament-cmake-gmock, ros-rolling-ament-cmake-gtest, ros-rolling-ament-cmake-xmllint <!nocheck>, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-ament-lint-cmake <!nocheck>, ros-rolling-geometry-msgs, ros-rolling-mola-common, ros-rolling-mola-kernel, ros-rolling-mola-msgs, ros-rolling-mrpt-libmaps, ros-rolling-mrpt-libros-bridge, ros-rolling-mrpt-nav-interfaces, ros-rolling-nav-msgs, ros-rolling-rclcpp, ros-rolling-ros-environment, ros-rolling-sensor-msgs, ros-rolling-tf2, ros-rolling-tf2-geometry-msgs, ros-rolling-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_bridge_ros2
+Standards-Version: 3.9.2
+
+Package: ros-rolling-mola-bridge-ros2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-geometry-msgs, ros-rolling-mola-common, ros-rolling-mola-kernel, ros-rolling-mola-msgs, ros-rolling-mrpt-libmaps, ros-rolling-mrpt-libros-bridge, ros-rolling-mrpt-nav-interfaces, ros-rolling-nav-msgs, ros-rolling-rclcpp, ros-rolling-sensor-msgs, ros-rolling-tf2, ros-rolling-tf2-geometry-msgs, ros-rolling-ros-workspace
+Description: Bidirectional bridge ROS2-MOLA
