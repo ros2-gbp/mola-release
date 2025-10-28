@@ -1,0 +1,62 @@
+ros-rolling-mola-input-video (2.2.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 27 Oct 2025 23:00:00 -0000
+
+ros-rolling-mola-input-video (2.1.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 19 Oct 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (2.0.0-1noble) noble; urgency=high
+
+  * Modernize copyright notice
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 12 Oct 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.9.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 06 Jul 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.9.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 05 Jun 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.8.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 27 May 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.8.0-1noble) noble; urgency=high
+
+  * Update copyright year
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 24 May 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.7.0-1noble) noble; urgency=high
+
+  * Implement live camera mode too
+  * video input from video files also implemented now
+  * Merge pull request #85 <https://github.com/MOLAorg/mola/issues/85> from MOLAorg/feat/video-input-module
+    Feature: new video input MOLA module
+  * Feature: new video input MOLA module. For now, implements "image directory" input.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 05 May 2025 22:00:00 -0000
+
+ros-rolling-mola-input-video (1.6.4-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 22 Apr 2025 22:00:00 -0000
+
+
