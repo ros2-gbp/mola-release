@@ -1,0 +1,12 @@
+Source: ros-kilted-mola-input-rosbag2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-kilted-cv-bridge, ros-kilted-mola-kernel, ros-kilted-mrpt-libobs, ros-kilted-mrpt-libros-bridge, ros-kilted-rosbag2-cpp, ros-kilted-sensor-msgs, ros-kilted-tf2-geometry-msgs, ros-kilted-tf2-msgs, ros-kilted-tf2-ros, ros-kilted-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_input_rosbag2
+Standards-Version: 3.9.2
+
+Package: ros-kilted-mola-input-rosbag2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-cv-bridge, ros-kilted-mola-kernel, ros-kilted-mrpt-libobs, ros-kilted-mrpt-libros-bridge, ros-kilted-rosbag2-cpp, ros-kilted-sensor-msgs, ros-kilted-tf2-geometry-msgs, ros-kilted-tf2-msgs, ros-kilted-tf2-ros, ros-kilted-ros-workspace
+Description: Offline RawDataSource from rosbag2 datasets
