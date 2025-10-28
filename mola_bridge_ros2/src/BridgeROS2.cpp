@@ -351,7 +351,12 @@ void BridgeROS2::callbackOnPointCloud2(
 
     // Fix timestamps for Livox driver:
     // It uses doubles for timestamps, but they are actually nanoseconds!
+#if MRPT_VERSION >= 0x020f00  // 2.15.0
+    auto* ts =
+        p->getPointsBufferRef_float_field(mrpt::maps::CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
+#else
     auto ts = p->getPointsBufferRef_timestamp();
+#endif
     ASSERT_(ts);
     if (!ts->empty())
     {
