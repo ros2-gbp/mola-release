@@ -1,0 +1,230 @@
+ros-jazzy-mola (2.2.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Fri, 07 Nov 2025 23:00:00 -0000
+
+ros-jazzy-mola (2.2.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 27 Oct 2025 23:00:00 -0000
+
+ros-jazzy-mola (2.1.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 19 Oct 2025 22:00:00 -0000
+
+ros-jazzy-mola (2.0.0-1noble) noble; urgency=high
+
+  * Merge pull request #93 <https://github.com/MOLAorg/mola/issues/93> from MOLAorg/feature/better-lio
+    Changes for new LIO
+  * Avoid cmake warning on no install target
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 12 Oct 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.9.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 06 Jul 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.9.0-1noble) noble; urgency=high
+
+  * Fix silent cmake warnings on unused variables
+  * Depend less on ament and more on pure cmake
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 05 Jun 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.8.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 27 May 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.8.0-1noble) noble; urgency=high
+
+  * Update license tag to "BSD-3-Clause"
+  * Fix: "mola" metapackage warning if using CMAKE_EXPORT_COMPILE_COMMANDS
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sat, 24 May 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.7.0-1noble) noble; urgency=high
+
+  * Merge pull request #85 <https://github.com/MOLAorg/mola/issues/85> from MOLAorg/feat/video-input-module
+    Feature: new video input MOLA module
+  * Feature: new video input MOLA module. For now, implements "image directory" input.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 05 May 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.6.4-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 22 Apr 2025 22:00:00 -0000
+
+ros-jazzy-mola (1.6.3-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Fri, 14 Mar 2025 23:00:00 -0000
+
+ros-jazzy-mola (1.6.2-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Fri, 21 Feb 2025 23:00:00 -0000
+
+ros-jazzy-mola (1.6.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Wed, 12 Feb 2025 23:00:00 -0000
+
+ros-jazzy-mola (1.6.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 20 Jan 2025 23:00:00 -0000
+
+ros-jazzy-mola (1.5.1-1noble) noble; urgency=high
+
+  * Update docs on how to install the state estimators packages
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sat, 28 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.5.0-1noble) noble; urgency=high
+
+  * Move state estimation packages out of this repo to its own: https://github.com/MOLAorg/mola_state_estimation
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Wed, 25 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.4.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 19 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.4.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 17 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.3.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 10 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.2.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sat, 28 Sep 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.2.0-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 15 Sep 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.1.3-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 27 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.1.2-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 25 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.1.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 22 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.1.0-1noble) noble; urgency=high
+
+  * Merge pull request #62 <https://github.com/MOLAorg/mola/issues/62> from MOLAorg/docs-fixes
+    Docs fixes
+  * Fix ament_xmllint warnings in package.xml
+  * change ament linters to apply in test builds
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sat, 17 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.8-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 28 Jul 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.7-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Tue, 23 Jul 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.6-1noble) noble; urgency=high
+
+  * Create new NavStateFilter interface and separate the simple fuser and the factor-graph approach in two packages
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 20 Jun 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.5-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 27 May 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.4-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 13 May 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.3-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Sun, 21 Apr 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.2-1noble) noble; urgency=high
+
+  * Add new mola_relocalization as dependency of the metapackage mola
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-jazzy-mola (1.0.1-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-jazzy-mola (1.0.0-1noble) noble; urgency=high
+
+  * add metapackage mola
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-jazzy-mola (0.2.2-1noble) noble; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <jlblanco@ual.es>  Thu, 07 Sep 2023 22:00:00 -0000
+
+
