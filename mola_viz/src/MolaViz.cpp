@@ -78,6 +78,38 @@ namespace
 
 constexpr const char* DECAY_CLOUDS_NAME = "__viz_decaying_clouds";
 
+template <typename Iter>
+std::pair<Iter, Iter> minmax_ignore_nan(Iter begin, Iter end)
+{
+  // Find first non-NaN element
+  Iter first = std::find_if(begin, end, [](auto x) { return !std::isnan(x); });
+
+  if (first == end)
+  {
+    return {end, end};  // no valid elements
+  }
+
+  Iter itMin = first;
+  Iter itMax = first;
+
+  for (Iter it = std::next(first); it != end; ++it)
+  {
+    if (!std::isnan(*it))
+    {
+      if (*it < *itMin)
+      {
+        itMin = it;
+      }
+      if (*it > *itMax)
+      {
+        itMax = it;
+      }
+    }
+  }
+
+  return {itMin, itMax};
+}
+
 void gui_handler_show_common_sensor_info(
     const mrpt::obs::CObservation& obs, nanogui::Window* w,
     const double sensor_rate_decimation = 1.0, const std::vector<std::string>& additionalMsgs = {})
@@ -340,24 +372,42 @@ void gui_handler_point_cloud(
 
     // Collect optional stats:
 #if MRPT_VERSION >= 0x020f00  // 2.15.0
+
     for (const auto& field : objPc->pointcloud->getPointFieldNames_float())
     {
       if (const auto* buf = objPc->pointcloud->getPointsBufferRef_float_field(field);
           buf && !buf->empty())
       {
-        const auto [itMin, itMax] = std::minmax_element(buf->begin(), buf->end());
+        const auto [itMin, itMax] = minmax_ignore_nan(buf->begin(), buf->end());
         additionalMsgs.push_back(mrpt::format(
             "%.*s range: [%.02f,%.02f]", static_cast<int>(field.size()), field.data(), *itMin,
             *itMax));
       }
+    }
+    for (const auto& field : objPc->pointcloud->getPointFieldNames_uint16())
+    {
       if (const auto* buf = objPc->pointcloud->getPointsBufferRef_uint_field(field);
           buf && !buf->empty())
       {
-        const auto [itMin, itMax] = std::minmax_element(buf->begin(), buf->end());
+        const auto [itMin, itMax] = minmax_ignore_nan(buf->begin(), buf->end());
         additionalMsgs.push_back(mrpt::format(
             "%.*s range: [%hu,%hu]", static_cast<int>(field.size()), field.data(), *itMin, *itMax));
       }
     }
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+    for (const auto& field : objPc->pointcloud->getPointFieldNames_double())
+    {
+      if (const auto* buf = objPc->pointcloud->getPointsBufferRef_double_field(field);
+          buf && !buf->empty())
+      {
+        const auto [itMin, itMax] = minmax_ignore_nan(buf->begin(), buf->end());
+        additionalMsgs.push_back(mrpt::format(
+            "%.*s range: [%.02lf,%.02lf]", static_cast<int>(field.size()), field.data(), *itMin,
+            *itMax));
+      }
+    }
+#endif
+
 #else
     if (const auto* Is = objPc->pointcloud->getPointsBufferRef_intensity(); Is && !Is->empty())
     {
@@ -1374,24 +1424,30 @@ std::future<bool> MolaViz::execute_custom_code_on_background_scene(
 }
 
 std::future<bool> MolaViz::output_console_message(
-    const std::string& msg, const std::string& parentWindow)
+    const std::string& message, const std::string& parentWindow)
 {
   using return_type = bool;
 
   auto task = std::make_shared<std::packaged_task<return_type()>>(
-      [this, msg, parentWindow]()
+      [this, message, parentWindow]()
       {
-        MRPT_LOG_DEBUG_STREAM("output_console_message() msg=" << msg);
+        MRPT_LOG_DEBUG_STREAM("output_console_message() msg=" << message);
 
         ASSERT_(windows_.count(parentWindow));
         auto& winData = windows_.at(parentWindow);
 
-        // Append msg:
-        winData.console_messages.push_back(msg);
-        // remove older ones:
-        while (winData.console_messages.size() > max_console_lines_)
+        // Split multiline messages:
+        std::vector<std::string> lines;
+        mrpt::system::tokenize(message, "\r\n", lines);
+        for (const auto& msg : lines)
         {
-          winData.console_messages.erase(winData.console_messages.begin());
+          // Append msg:
+          winData.console_messages.push_back(msg);
+          // remove older ones:
+          while (winData.console_messages.size() > max_console_lines_)
+          {
+            winData.console_messages.erase(winData.console_messages.begin());
+          }
         }
 
         mrpt::gui::CDisplayWindowGUI::Ptr topWin = winData.win;
@@ -1533,8 +1589,8 @@ void MolaViz::internal_handle_decaying_clouds()
       // clouds to be deleted?
       if (delta_time > static_cast<float>(decay_cloud.decay_time_seconds))
       {
-        // Delete clouds from the actual GL container, otherwise they will keep consuming rendering
-        // resources forever!
+        // Delete clouds from the actual GL container, otherwise they will keep consuming
+        // rendering resources forever!
         mrpt::opengl::CSetOfObjects::Ptr glContainer;
         if (auto o = winData.win->background_scene->getByName(
                 DECAY_CLOUDS_NAME, decay_cloud.opengl_viewport_name);
