@@ -2,6 +2,9 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.3.0 (2025-12-15)
+------------------
+
 2.2.1 (2025-11-08)
 ------------------
 * Fix embedded FindFilesystem.cmake to avoid cmake warnings
