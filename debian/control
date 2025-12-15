@@ -1,0 +1,12 @@
+Source: ros-kilted-mola-input-lidar-bin-dataset
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-kilted-mola-common, ros-kilted-mola-kernel, ros-kilted-mrpt-libmaps, ros-kilted-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_input_lidar_bin_dataset
+Standards-Version: 3.9.2
+
+Package: ros-kilted-mola-input-lidar-bin-dataset
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-kilted-mola-common, ros-kilted-mola-kernel, ros-kilted-mrpt-libmaps, ros-kilted-ros-workspace
+Description: Offline RawDataSource from LiDAR datasets stored as `.bin` files in the Kitti binary format
