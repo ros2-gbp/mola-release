@@ -22,6 +22,8 @@
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/opengl/CPointCloudColoured.h>
 #include <mrpt/opengl/Scene.h>
+#include <mrpt/opengl/stock_objects.h>
+#include <mrpt/poses/Lie/SO.h>
 #include <mrpt/serialization/CArchive.h>  // serialization
 #include <mrpt/system/string_utils.h>  // unitsFormat()
 #include <mrpt/version.h>
@@ -298,9 +300,18 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(
     }
 
     // convert query to local coordinates of the keyframe:
-    const auto query_local    = kf.pose().inverseComposePoint(icp_ref_point.translation());
-    const auto dist_to_kf     = query_local.norm();
-    kfs_to_search[dist_to_kf] = kf_id;
+    const auto query_local = icp_ref_point - kf.pose();
+
+    // Heuristic mix of Euclidean and angular distances, to favor nearby frames, but only if their
+    // orientation is similar:
+    const double sigma_rot = mrpt::DEG2RAD(90.0);
+
+    const auto dist_to_kf  = query_local.norm();
+    const auto angle_to_kf = mrpt::poses::Lie::SO<3>::log(query_local.getRotationMatrix()).norm();
+
+    const double metric = dist_to_kf * std::exp(angle_to_kf / sigma_rot);
+
+    kfs_to_search[metric] = kf_id;
   }
 
   // TODO: Explore other criteria here so more distant frames are used too?
@@ -544,6 +555,14 @@ void KeyframePointCloudMap::getVisualizationInto(mrpt::opengl::CSetOfObjects& ou
 #endif
 
     outObj.insert(obj);
+
+    if (renderOptions.keyframes_axes_length > 0)
+    {
+      auto glAxes =
+          mrpt::opengl::stock_objects::CornerXYZSimple(renderOptions.keyframes_axes_length);
+      glAxes->setPose(kf.pose());
+      outObj.insert(glAxes);
+    }
   }
 
   MRPT_END
@@ -712,6 +731,7 @@ void KeyframePointCloudMap::TRenderOptions::loadFromConfigFile(
   MRPT_LOAD_CONFIG_VAR(max_overall_points, uint64_t, c, s);
   colormap = c.read_enum(s, "colormap", this->colormap);
   MRPT_LOAD_CONFIG_VAR(recolorByPointField, string, c, s);
+  MRPT_LOAD_CONFIG_VAR(keyframes_axes_length, float, c, s);
 }
 
 void KeyframePointCloudMap::TRenderOptions::dumpToTextStream(std::ostream& out) const
@@ -728,14 +748,16 @@ void KeyframePointCloudMap::TRenderOptions::dumpToTextStream(std::ostream& out) 
   LOADABLEOPTS_DUMP_VAR(recolorByPointField, string);
   LOADABLEOPTS_DUMP_VAR(max_points_per_kf, int);
   LOADABLEOPTS_DUMP_VAR(max_overall_points, int);
+  LOADABLEOPTS_DUMP_VAR(keyframes_axes_length, float);
 }
 
 void KeyframePointCloudMap::TRenderOptions::writeToStream(mrpt::serialization::CArchive& out) const
 {
-  const int8_t version = 2;
+  const int8_t version = 3;
   out << version;
   out << point_size << color << int8_t(colormap) << recolorByPointField;  // v2
   out << max_points_per_kf << max_overall_points;  // v1
+  out << keyframes_axes_length;  // v3
 }
 
 void KeyframePointCloudMap::TRenderOptions::readFromStream(mrpt::serialization::CArchive& in)
@@ -747,6 +769,7 @@ void KeyframePointCloudMap::TRenderOptions::readFromStream(mrpt::serialization::
     case 0:
     case 1:
     case 2:
+    case 3:
     {
       in >> point_size;
       in >> this->color;
@@ -775,6 +798,10 @@ void KeyframePointCloudMap::TRenderOptions::readFromStream(mrpt::serialization::
       if (version >= 1)
       {
         in >> max_points_per_kf >> max_overall_points;
+      }
+      if (version >= 3)
+      {
+        in >> keyframes_axes_length;
       }
     }
     break;
