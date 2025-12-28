@@ -31,9 +31,8 @@
 #include <mola_yaml/yaml_helpers.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/core/initializer.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/COccupancyGridMap2D.h>
-#include <mrpt/maps/CPointsMapXYZI.h>
-#include <mrpt/maps/CPointsMapXYZIRT.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/maps/CVoxelMap.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
@@ -52,6 +51,12 @@
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/system/filesystem.h>
 #include <mrpt/topography/conversions.h>
+#include <mrpt/version.h>
+
+#if MRPT_VERSION < 0x030000  // Support deprecated classes for mrpt < 3.0.0
+#include <mrpt/maps/CPointsMapXYZI.h>
+#include <mrpt/maps/CPointsMapXYZIRT.h>
+#endif
 
 // Other mrpt pkgs:
 #include <mrpt_nav_interfaces/msg/georeferencing_metadata.hpp>
@@ -111,6 +116,7 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
 
     // Convert to good old C (argc,argv):
     std::vector<const char*> rosArgsC;
+    rosArgsC.reserve(rosArgs.size());
     for (const auto& s : rosArgs)
     {
       rosArgsC.push_back(s.c_str());
@@ -141,11 +147,12 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // TF broadcaster:
-    tf_bc_ = std::make_shared<tf2_ros::TransformBroadcaster>(rosNode_);
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
 
-    // It seems /tf does not find the connection between frames correctly if
-    // using tf_static (!)
+    tf_bc_        = std::make_shared<tf2_ros::TransformBroadcaster>(rosNode_);
     tf_static_bc_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(rosNode_);
+
+    lckTfBc.unlock();
 
     // Subscribe to topics as described by MOLA YAML parameters:
     auto ds_subscribe = cfg["subscribe"];
@@ -340,8 +347,8 @@ void BridgeROS2::callbackOnPointCloud2(
 
   mrpt::maps::CPointsMap::Ptr mapPtr;
 
-  if (fields.count("time") || fields.count("timestamp") || fields.count("t") ||
-      fields.count("ring") || fields.count("intensity"))
+  // If we have anything apart of (x,y,z), use the generic cloud with multiple fields:
+  if (fields.size() > 3)
   {
     auto p = mrpt::maps::CGenericPointsMap::Create();
     if (!mrpt::ros2bridge::fromROS(o, *p))
@@ -351,7 +358,9 @@ void BridgeROS2::callbackOnPointCloud2(
 
     // Fix timestamps for Livox driver:
     // It uses doubles for timestamps, but they are actually nanoseconds!
-#if MRPT_VERSION >= 0x020f00  // 2.15.0
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+    auto* ts = p->getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
+#elif MRPT_VERSION >= 0x020f00  // 2.15.0
     auto* ts =
         p->getPointsBufferRef_float_field(mrpt::maps::CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
 #else
@@ -691,12 +700,17 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationImage& obs)
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
-  geometry_msgs::msg::TransformStamped tfStmp;
-  tfStmp.transform       = tf2::toMsg(transform);
-  tfStmp.child_frame_id  = sSensorFrameId;
-  tfStmp.header.frame_id = params_.base_link_frame;
-  tfStmp.header.stamp    = myNow(obs.timestamp);
-  tf_bc_->sendTransform(tfStmp);
+  if (tf_bc_)
+  {
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+
+    geometry_msgs::msg::TransformStamped tfStmp;
+    tfStmp.transform       = tf2::toMsg(transform);
+    tfStmp.child_frame_id  = sSensorFrameId;
+    tfStmp.header.frame_id = params_.base_link_frame;
+    tfStmp.header.stamp    = myNow(obs.timestamp);
+    tf_bc_->sendTransform(tfStmp);
+  }
 
   // Send observation:
   {
@@ -729,12 +743,17 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservation2DRangeScan& obs)
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
-  geometry_msgs::msg::TransformStamped tfStmp;
-  tfStmp.transform       = tf2::toMsg(transform);
-  tfStmp.child_frame_id  = sSensorFrameId;
-  tfStmp.header.frame_id = params_.base_link_frame;
-  tfStmp.header.stamp    = myNow(obs.timestamp);
-  tf_bc_->sendTransform(tfStmp);
+  if (tf_bc_)
+  {
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+
+    geometry_msgs::msg::TransformStamped tfStmp;
+    tfStmp.transform       = tf2::toMsg(transform);
+    tfStmp.child_frame_id  = sSensorFrameId;
+    tfStmp.header.frame_id = params_.base_link_frame;
+    tfStmp.header.stamp    = myNow(obs.timestamp);
+    tf_bc_->sendTransform(tfStmp);
+  }
 
   // Send observation:
   {
@@ -778,16 +797,21 @@ void BridgeROS2::internalOn(
   // Send TF:
   if (isSensorTopic)
   {
-    mrpt::poses::CPose3D sensorPose = obs.sensorPose;
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
 
-    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
+    if (tf_bc_)
+    {
+      mrpt::poses::CPose3D sensorPose = obs.sensorPose;
 
-    geometry_msgs::msg::TransformStamped tfStmp;
-    tfStmp.transform       = tf2::toMsg(transform);
-    tfStmp.child_frame_id  = sSensorFrameId;
-    tfStmp.header.frame_id = params_.base_link_frame;
-    tfStmp.header.stamp    = myNow(obs.timestamp);
-    tf_bc_->sendTransform(tfStmp);
+      tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
+
+      geometry_msgs::msg::TransformStamped tfStmp;
+      tfStmp.transform       = tf2::toMsg(transform);
+      tfStmp.child_frame_id  = sSensorFrameId;
+      tfStmp.header.frame_id = params_.base_link_frame;
+      tfStmp.header.stamp    = myNow(obs.timestamp);
+      tf_bc_->sendTransform(tfStmp);
+    }
   }
 
   // Send observation:
@@ -801,8 +825,14 @@ void BridgeROS2::internalOn(
 
     obs.load();
 
-    if (auto* xyzirt = dynamic_cast<const mrpt::maps::CPointsMapXYZIRT*>(obs.pointcloud.get());
-        xyzirt)
+    if (auto* xyzgen = dynamic_cast<const mrpt::maps::CGenericPointsMap*>(obs.pointcloud.get());
+        xyzgen)
+    {
+      mrpt::ros2bridge::toROS(*xyzgen, msg_header, msg_pts);
+    }
+#if MRPT_VERSION < 0x030000  // older than v3.0.0, support deprecated classes
+    else if (auto* xyzirt = dynamic_cast<const mrpt::maps::CPointsMapXYZIRT*>(obs.pointcloud.get());
+             xyzirt)
     {
       mrpt::ros2bridge::toROS(*xyzirt, msg_header, msg_pts);
     }
@@ -811,6 +841,7 @@ void BridgeROS2::internalOn(
     {
       mrpt::ros2bridge::toROS(*xyzi, msg_header, msg_pts);
     }
+#endif
     else if (auto* sPts = dynamic_cast<const mrpt::maps::CSimplePointsMap*>(obs.pointcloud.get());
              sPts)
     {
@@ -838,14 +869,19 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationRobotPose& obs)
   // Send TF:
   if (params_.publish_tf_from_robot_pose_observations)
   {
-    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(obs.pose.mean);
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
 
-    geometry_msgs::msg::TransformStamped tfStmp;
-    tfStmp.transform       = tf2::toMsg(transform);
-    tfStmp.child_frame_id  = params_.base_link_frame;
-    tfStmp.header.frame_id = params_.reference_frame;
-    tfStmp.header.stamp    = myNow(obs.timestamp);
-    tf_bc_->sendTransform(tfStmp);
+    if (tf_bc_)
+    {
+      tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(obs.pose.mean);
+
+      geometry_msgs::msg::TransformStamped tfStmp;
+      tfStmp.transform       = tf2::toMsg(transform);
+      tfStmp.child_frame_id  = params_.base_link_frame;
+      tfStmp.header.frame_id = params_.reference_frame;
+      tfStmp.header.stamp    = myNow(obs.timestamp);
+      tf_bc_->sendTransform(tfStmp);
+    }
   }
 
   // Send observation:
@@ -877,12 +913,17 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationGPS& obs)
 
   tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
 
-  geometry_msgs::msg::TransformStamped tfStmp;
-  tfStmp.transform       = tf2::toMsg(transform);
-  tfStmp.child_frame_id  = sSensorFrameId;
-  tfStmp.header.frame_id = params_.base_link_frame;
-  tfStmp.header.stamp    = myNow(obs.timestamp);
-  tf_bc_->sendTransform(tfStmp);
+  if (tf_bc_)
+  {
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+
+    geometry_msgs::msg::TransformStamped tfStmp;
+    tfStmp.transform       = tf2::toMsg(transform);
+    tfStmp.child_frame_id  = sSensorFrameId;
+    tfStmp.header.frame_id = params_.base_link_frame;
+    tfStmp.header.stamp    = myNow(obs.timestamp);
+    tf_bc_->sendTransform(tfStmp);
+  }
 
   // Send observation:
   {
@@ -912,14 +953,19 @@ void BridgeROS2::internalOn(const mrpt::obs::CObservationIMU& obs)
   mrpt::poses::CPose3D sensorPose;
   obs.getSensorPose(sensorPose);
 
-  tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
+  if (tf_bc_)
+  {
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
 
-  geometry_msgs::msg::TransformStamped tfStmp;
-  tfStmp.transform       = tf2::toMsg(transform);
-  tfStmp.child_frame_id  = sSensorFrameId;
-  tfStmp.header.frame_id = params_.base_link_frame;
-  tfStmp.header.stamp    = myNow(obs.timestamp);
-  tf_bc_->sendTransform(tfStmp);
+    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(sensorPose);
+
+    geometry_msgs::msg::TransformStamped tfStmp;
+    tfStmp.transform       = tf2::toMsg(transform);
+    tfStmp.child_frame_id  = sSensorFrameId;
+    tfStmp.header.frame_id = params_.base_link_frame;
+    tfStmp.header.stamp    = myNow(obs.timestamp);
+    tf_bc_->sendTransform(tfStmp);
+  }
 
   // Send observation:
   {
@@ -1373,7 +1419,12 @@ void BridgeROS2::timerPubLocalization()
         tfStmp.child_frame_id  = l.child_frame;
         tfStmp.header.frame_id = l.reference_frame;
       }
-      tf_bc_->sendTransform(tfStmp);
+
+      auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+      if (tf_bc_)
+      {
+        tf_bc_->sendTransform(tfStmp);
+      }
     }
 
     // 2/2: Publish Odometry msg:
@@ -1541,7 +1592,11 @@ void BridgeROS2::publishMetricMapGeoreferencingData(
     tfStmp.header.frame_id = params_.georef_map_enu_frame;  // "enu"
     tfStmp.header.stamp    = myNow(mrpt::Clock::now());
 
-    tf_static_bc_->sendTransform(tfStmp);
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+    if (tf_static_bc_)
+    {
+      tf_static_bc_->sendTransform(tfStmp);
+    }
   }
 
   // 1.b) ENU -> UTM
@@ -1562,7 +1617,11 @@ void BridgeROS2::publishMetricMapGeoreferencingData(
     tfStmp.header.frame_id = params_.georef_map_enu_frame;  // "enu"
     tfStmp.header.stamp    = myNow(mrpt::Clock::now());
 
-    tf_static_bc_->sendTransform(tfStmp);
+    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+    if (tf_static_bc_)
+    {
+      tf_static_bc_->sendTransform(tfStmp);
+    }
   }
 
   // 2) g.geo_coord => georefTopic
@@ -1681,7 +1740,11 @@ void BridgeROS2::publishStaticTFs()
   tfStmp.header.frame_id = params_.base_link_frame;
   tfStmp.header.stamp    = myNow(mrpt::Clock::now());
 
-  tf_static_bc_->sendTransform(tfStmp);
+  auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+  if (tf_static_bc_)
+  {
+    tf_static_bc_->sendTransform(tfStmp);
+  }
 }
 
 namespace
