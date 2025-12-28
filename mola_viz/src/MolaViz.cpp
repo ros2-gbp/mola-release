@@ -34,7 +34,6 @@
 #include <mrpt/core/initializer.h>
 #include <mrpt/core/lock_helper.h>
 #include <mrpt/maps/CColouredPointsMap.h>
-#include <mrpt/maps/CPointsMapXYZI.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
 #include <mrpt/obs/CObservation3DRangeScan.h>
@@ -49,6 +48,12 @@
 #include <mrpt/opengl/stock_objects.h>
 #include <mrpt/system/thread_name.h>
 #include <mrpt/version.h>
+
+#if MRPT_VERSION >= 0x020f03
+#include <mrpt/maps/CGenericPointsMap.h>
+#else
+#include <mrpt/maps/CPointsMapXYZI.h>
+#endif
 
 #include <array>
 
@@ -386,8 +391,13 @@ void gui_handler_point_cloud(
     }
     for (const auto& field : objPc->pointcloud->getPointFieldNames_uint16())
     {
+#if MRPT_VERSION >= 0x020f04  // 2.15.4
+      if (const auto* buf = objPc->pointcloud->getPointsBufferRef_uint16_field(field);
+          buf && !buf->empty())
+#else
       if (const auto* buf = objPc->pointcloud->getPointsBufferRef_uint_field(field);
           buf && !buf->empty())
+#endif
       {
         const auto [itMin, itMax] = minmax_ignore_nan(buf->begin(), buf->end());
         additionalMsgs.push_back(mrpt::format(
@@ -404,6 +414,17 @@ void gui_handler_point_cloud(
         additionalMsgs.push_back(mrpt::format(
             "%.*s range: [%.02lf,%.02lf]", static_cast<int>(field.size()), field.data(), *itMin,
             *itMax));
+      }
+    }
+    for (const auto& field : objPc->pointcloud->getPointFieldNames_uint8())
+    {
+      if (const auto* buf = objPc->pointcloud->getPointsBufferRef_uint8_field(field);
+          buf && !buf->empty())
+      {
+        const auto [itMin, itMax] = minmax_ignore_nan(buf->begin(), buf->end());
+        additionalMsgs.push_back(mrpt::format(
+            "%.*s range: [%i,%i]", static_cast<int>(field.size()), field.data(),
+            static_cast<int>(*itMin), static_cast<int>(*itMax)));
       }
     }
 #endif
@@ -497,15 +518,28 @@ void gui_handler_point_cloud(
       return;
     }
 
+    const auto&  pc = objVel->point_cloud;
+    const size_t N  = pc.size();
+#if MRPT_VERSION >= 0x020f03
+    mrpt::maps::CGenericPointsMap pts;
+    pts.registerField_float(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY);
+    pts.resize(N);
+    for (size_t i = 0; i < N; i++)
+    {
+      pts.setPoint(i, pc.x[i], pc.y[i], pc.z[i]);
+      pts.setPointField_float(
+          i, mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY,
+          static_cast<float>(pc.intensity[i]) / 255.0f);
+    }
+#else
     mrpt::maps::CPointsMapXYZI pts;
-    const auto&                pc = objVel->point_cloud;
-    const size_t               N  = pc.size();
     pts.resize(N);
     for (size_t i = 0; i < N; i++)
     {
       pts.setPoint(i, pc.x[i], pc.y[i], pc.z[i]);
       pts.setPointIntensity(i, static_cast<float>(pc.intensity[i]) / 255.0f);
     }
+#endif
     glPc->loadFromPointsMap(&pts);
 
     gui_handler_show_common_sensor_info(
