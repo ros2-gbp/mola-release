@@ -26,9 +26,7 @@
 #include <mrpt/math/TPose3D.h>
 #include <mrpt/obs/obs_frwds.h>
 
-#include <array>
-
-// fwrd decls:
+// forward declarations:
 namespace mrpt::obs
 {
 class CObservationPointCloud;
@@ -77,7 +75,6 @@ class ParisLucoDataset : public RawDataSourceBase, public OfflineDatasetSource, 
 
  public:
   ParisLucoDataset();
-  ~ParisLucoDataset() override = default;
 
   // See docs in base class
   void         spinOnce() override;
