@@ -28,7 +28,7 @@
 
 #include <array>
 
-// fwrd decls:
+// forward declarations:
 namespace mrpt::obs
 {
 class CObservationPointCloud;
@@ -134,7 +134,6 @@ class Kitti360Dataset : public RawDataSourceBase, public OfflineDatasetSource, p
 
  public:
   Kitti360Dataset();
-  ~Kitti360Dataset() override = default;
 
   // See docs in base class
   void         spinOnce() override;
