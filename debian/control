@@ -1,0 +1,12 @@
+Source: ros-rolling-mola-launcher
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-rolling-ament-cmake, ros-rolling-ament-cmake-gtest, ros-rolling-ament-cmake-pep257 <!nocheck>, ros-rolling-ament-cmake-xmllint <!nocheck>, ros-rolling-ament-lint-auto <!nocheck>, ros-rolling-mola-kernel, ros-rolling-mrpt-libbase, ros-rolling-mrpt-libtclap, ros-rolling-ros-environment, ros-rolling-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_launcher
+Standards-Version: 3.9.2
+
+Package: ros-rolling-mola-launcher
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-rolling-mola-kernel, ros-rolling-mrpt-libbase, ros-rolling-mrpt-libtclap, ros-rolling-ros-workspace
+Description: Launcher app for MOLA systems
