@@ -36,7 +36,10 @@ using namespace mola;
 // arguments: class_name, parent_class, class namespace
 IMPLEMENTS_MRPT_OBJECT(RawlogDataset, RawDataSourceBase, mola)
 
-MRPT_INITIALIZER(do_register_RawlogDataset) { MOLA_REGISTER_MODULE(RawlogDataset); }
+MRPT_INITIALIZER(do_register_RawlogDataset)  // NOLINT(misc-use-anonymous-namespace)
+{
+  MOLA_REGISTER_MODULE(RawlogDataset);
+}
 
 RawlogDataset::RawlogDataset() = default;
 
@@ -135,7 +138,10 @@ void RawlogDataset::spinOnce()
   }
   else
   {
-    if (paused) return;
+    if (paused)
+    {
+      return;
+    }
     // move forward replayed dataset time:
     last_dataset_time_ += dt;
   }
