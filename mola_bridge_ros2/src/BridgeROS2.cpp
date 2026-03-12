@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -27,7 +27,6 @@
 
 // MOLA/MRPT:
 #include <mola_kernel/pretty_print_exception.h>
-#include <mola_kernel/version.h>
 #include <mola_yaml/yaml_helpers.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/core/initializer.h>
@@ -705,6 +704,58 @@ void BridgeROS2::callbackOnNavSatFix(
 
   MRPT_END
 }
+
+#if defined(HAS_GPS_MSGS)
+void BridgeROS2::callbackOnGpsMsg(
+    const gps_msgs::msg::GPSFix& o, const std::string& outSensorLabel,
+    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
+{
+  MRPT_START
+
+  MRPT_LOG_DEBUG_STREAM(
+      "BridgeROS2::callbackOnGpsMsg: received GpsMsg on topic '" << outSensorLabel << "'.");
+
+  const ProfilerEntry tle(profiler_, "callbackOnGpsMsg");
+
+  // Sensor pose wrt robot base:
+  mrpt::poses::CPose3D sensorPose;
+  if (fixedSensorPose)
+  {
+    // use a fixed, user-provided sensor pose:
+    sensorPose = fixedSensorPose.value();
+  }
+  else
+  {
+    // Get pose from tf:
+    bool ok = waitForTransform(
+        sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
+    if (!ok)
+    {
+      MRPT_LOG_ERROR_FMT(
+          "Could not forward ROS2 observation to MOLA due to timeout "
+          "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
+          params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
+          o.header.stamp.sec + o.header.stamp.nanosec * 1e-9);
+      return;
+    }
+  }
+
+  auto obs = mrpt::obs::CObservationGPS::Create();
+#if MRPT_ROS2_BRIDGE_VERSION >= 0x030300
+  mrpt::ros2bridge::fromROS(o, *obs);
+#else
+  THROW_EXCEPTION("Using gps_msgs requires mrpt_ros_bridge>=3.3.0");
+#endif
+
+  obs->sensorPose  = sensorPose;
+  obs->sensorLabel = outSensorLabel;
+
+  // send it out:
+  this->sendObservationsToFrontEnds(obs);
+
+  MRPT_END
+}
+#endif
 
 void BridgeROS2::onNewObservation(const CObservation::ConstPtr& o)
 {
@@ -1883,6 +1934,13 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& 
           [this, output_sensor_label, fixedSensorPose](const sensor_msgs::msg::NavSatFix& o)
           { this->callbackOnNavSatFix(o, output_sensor_label, fixedSensorPose); }));
     }
+    else if (type == "GpsFix")
+    {
+      subsGPSMsg_.emplace_back(rosNode_->create_subscription<gps_msgs::msg::GPSFix>(
+          topic_name, qos,
+          [this, output_sensor_label, fixedSensorPose](const gps_msgs::msg::GPSFix& o)
+          { this->callbackOnGpsMsg(o, output_sensor_label, fixedSensorPose); }));
+    }
     else if (type == "Odometry")
     {
       subsOdometry_.emplace_back(rosNode_->create_subscription<nav_msgs::msg::Odometry>(
@@ -1938,7 +1996,6 @@ std::string module_name_to_valid_topic(const std::string& s)
 
 void BridgeROS2::publishDiagnostics()
 {
-#if MOLA_VERSION_CHECK(1, 6, 2)
   using namespace std::string_literals;
 
   const auto qos = rclcpp::SystemDefaultsQoS();
@@ -2006,7 +2063,6 @@ void BridgeROS2::publishDiagnostics()
 
     }  // fof each diagnostics message
   }  // end for each module
-#endif
 }
 
 void BridgeROS2::internalPublishGridMap(
