@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -18,12 +18,15 @@
  */
 
 #include <mola_metric_maps/NDT.h>
+#include <mrpt/core/get_env.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
 #include <mrpt/obs/stock_observations.h>
 #include <mrpt/opengl/Scene.h>
 
 #include <iostream>
 
+namespace
+{
 void test_voxelmap_basic_ops()
 {
   mola::NDT map;
@@ -41,12 +44,14 @@ void test_voxelmap_insert_2d_scan()
   mrpt::obs::stock_observations::example2DRangeScan(scan2D);
 
   map.insertObservation(scan2D);
-#if 0
+
+  if (mrpt::get_env<bool>("TEST_GENERATE_3D_SCENES"))
+  {
     mrpt::opengl::Scene scene;
     map.renderOptions.point_size = 5.0f;
     scene.insert(map.getVisualization());
     scene.saveToFile("sparsevoxelmap_scan2d.3Dscene");
-#endif
+  }
 
   {
     size_t nPts = 0;
@@ -93,7 +98,7 @@ void test_voxelmap_insert_2d_scan()
                           << " nn: " << results.at(k) << " ("
                           << std::sqrt(dists_sqr.at(k)) << ") "
                           << " gt: " << gt_results.at(k) << " ("
-                          << std::sqrt(gt_dists_sqr.at(k)) << ")" << std::endl;
+                          << std::sqrt(gt_dists_sqr.at(k)) << ")" << "\n";
             }
 #endif
             for (size_t k = 0; k < results.size(); k++)
@@ -108,6 +113,7 @@ void test_voxelmap_insert_2d_scan()
     }
 #endif
 }
+}  // namespace
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
