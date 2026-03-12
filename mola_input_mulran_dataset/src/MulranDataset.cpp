@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -546,7 +546,7 @@ void MulranDataset::load_lidar(timestep_t step) const
   ASSERT_EQUAL_(nPts, static_cast<size_t>(1024U) * 64U);
 
 #if MRPT_VERSION >= 0x020f04
-  pts->registerField_float(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY);
+  // Intensity already exists.
   pts->registerField_float(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
   pts->registerField_uint16(mrpt::maps::CPointsMap::POINT_FIELD_RING_ID);
 
