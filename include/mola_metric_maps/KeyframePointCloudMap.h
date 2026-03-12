@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -113,27 +113,24 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
       const mrpt::math::TPoint2Df& query, mrpt::math::TPoint2Df& result, float& out_dist_sqr,
       uint64_t& resultIndexOrID) const override;
   void nn_multiple_search(
-      const mrpt::math::TPoint3Df& query, const size_t N,
-      std::vector<mrpt::math::TPoint3Df>& results, std::vector<float>& out_dists_sqr,
-      std::vector<uint64_t>& resultIndicesOrIDs) const override;
+      const mrpt::math::TPoint3Df& query, size_t N, std::vector<mrpt::math::TPoint3Df>& results,
+      std::vector<float>& out_dists_sqr, std::vector<uint64_t>& resultIndicesOrIDs) const override;
   void nn_multiple_search(
-      const mrpt::math::TPoint2Df& query, const size_t N,
-      std::vector<mrpt::math::TPoint2Df>& results, std::vector<float>& out_dists_sqr,
-      std::vector<uint64_t>& resultIndicesOrIDs) const override;
+      const mrpt::math::TPoint2Df& query, size_t N, std::vector<mrpt::math::TPoint2Df>& results,
+      std::vector<float>& out_dists_sqr, std::vector<uint64_t>& resultIndicesOrIDs) const override;
   void nn_radius_search(
-      const mrpt::math::TPoint3Df& query, const float search_radius_sqr,
+      const mrpt::math::TPoint3Df& query, float search_radius_sqr,
       std::vector<mrpt::math::TPoint3Df>& results, std::vector<float>& out_dists_sqr,
       std::vector<uint64_t>& resultIndicesOrIDs, size_t maxPoints) const override;
   void nn_radius_search(
-      const mrpt::math::TPoint2Df& query, const float search_radius_sqr,
+      const mrpt::math::TPoint2Df& query, float search_radius_sqr,
       std::vector<mrpt::math::TPoint2Df>& results, std::vector<float>& out_dists_sqr,
       std::vector<uint64_t>& resultIndicesOrIDs, size_t maxPoints) const override;
 
   template <size_t MAX_KNN>
   void nn_multiple_search_impl(
-      const mrpt::math::TPoint3Df& query, const size_t N,
-      std::vector<mrpt::math::TPoint3Df>& results, std::vector<float>& out_dists_sqr,
-      std::vector<uint64_t>& resultIndicesOrIDs) const;
+      const mrpt::math::TPoint3Df& query, size_t N, std::vector<mrpt::math::TPoint3Df>& results,
+      std::vector<float>& out_dists_sqr, std::vector<uint64_t>& resultIndicesOrIDs) const;
 
   /** @} */
 
@@ -165,8 +162,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
    *  @{ */
   void nn_search_cov2cov(
       const NearestPointWithCovCapable& localMap, const mrpt::poses::CPose3D& localMapPose,
-      const float                        max_search_distance,
-      mp2p_icp::MatchedPointWithCovList& outPairings) const override;
+      float max_search_distance, mp2p_icp::MatchedPointWithCovList& outPairings) const override;
 
   [[nodiscard]] std::size_t point_count() const override;
 
@@ -202,8 +198,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     TInsertionOptions() = default;
 
     void loadFromConfigFile(
-        const mrpt::config::CConfigFileBase& source,
-        const std::string&                   section) override;  // See base docs
+        const mrpt::config::CConfigFileBase& c,
+        const std::string&                   s) override;  // See base docs
     void dumpToTextStream(std::ostream& out) const override;  // See base docs
 
     void writeToStream(mrpt::serialization::CArchive& out) const;
@@ -237,8 +233,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   struct TRenderOptions : public mrpt::config::CLoadableOptions
   {
     void loadFromConfigFile(
-        const mrpt::config::CConfigFileBase& source,
-        const std::string&                   section) override;  // See base docs
+        const mrpt::config::CConfigFileBase& c,
+        const std::string&                   s) override;  // See base docs
     void dumpToTextStream(std::ostream& out) const override;  // See base docs
 
     /** Binary dump to stream - used in derived classes' serialization */
@@ -269,8 +265,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   {
     TCreationOptions() = default;
     void loadFromConfigFile(
-        const mrpt::config::CConfigFileBase& source,
-        const std::string&                   section) override;  // See base docs
+        const mrpt::config::CConfigFileBase& c,
+        const std::string&                   s) override;  // See base docs
     void dumpToTextStream(std::ostream& out) const override;  // See base docs
 
     void writeToStream(mrpt::serialization::CArchive& out) const;
@@ -278,10 +274,43 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
     uint32_t max_search_keyframes      = 3;  //!< Maximum number of key-frames to search for NN
     uint32_t k_correspondences_for_cov = 20;
+
+    /** Weight converting angular distance [rad] to equivalent linear
+     *  distance [m] for keyframe proximity ranking. Higher values favor
+     *  angularly-close (similar orientation) frames. */
+    double rotation_distance_weight = 2.0;
+
+    /** Number of keyframe slots (out of max_search_keyframes) reserved
+     *  for angularly diverse and/or more distant keyframes.
+     *  Must be < max_search_keyframes. */
+    uint32_t num_diverse_keyframes = 1;
+
+    /** If true (default), and if both the reference and query point clouds contain
+     *  per-point view-direction fields ("view_x", "view_y", "view_z" - unit vectors
+     *  pointing FROM the point TOWARD the sensor at acquisition time), then a
+     *  cov-to-cov pairing is accepted only when the angle between the two view
+     *  directions is at most `max_view_angle_deg`.
+     *
+     *  The rationale is that two points on opposite sides of a thin surface (e.g.
+     *  a wall seen from the front vs. the back, or a thin pole) will have nearly
+     *  anti-parallel view vectors.  Pairing them would produce a badly conditioned
+     *  or outright wrong ICP residual.  120° is a reasonable default: it rejects
+     *  pairs whose view directions differ by more than 120° (cos < -0.5) while
+     *  keeping pairs seen from "similar enough" directions.
+     *
+     *  Setting this to `false`, or to a threshold ≥ 180°, effectively disables
+     *  the filter even when view fields are present.
+     */
+    bool use_view_direction_filter = true;
+
+    /** Maximum allowed angle [degrees] between the view-direction vectors of a
+     *  candidate cov-to-cov pair.  Only used when `use_view_direction_filter`
+     *  is `true` and the view fields are present.  Default: 120°.
+     */
+    double max_view_angle_deg = 120.0;
   };
   TCreationOptions creationOptions;
 
- public:
   // Interface for use within a mrpt::maps::CMultiMetricMap:
   MAP_DEFINITION_START(KeyframePointCloudMap)
   mola::KeyframePointCloudMap::TCreationOptions   creationOptions;
@@ -464,22 +493,22 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   double internal_computeObservationLikelihoodPointCloud3D(
       const mrpt::poses::CPose3D& pc_in_map, const float* xs, const float* ys, const float* zs,
-      const std::size_t num_pts) const;
+      std::size_t num_pts) const;
 
   // See docs in base class
   bool internal_canComputeObservationLikelihood(const mrpt::obs::CObservation& obs) const override;
 
   /// Convert a KF index and a local point index into a global index:
-  uint64_t toGlobalIndex(const KeyFrameID kf_idx, const size_t local_pt_idx) const
+  static uint64_t ToGlobalIndex(const KeyFrameID kf_idx, const size_t local_pt_idx)
   {
     // Build 64 bits from 32bit kf_idx and 32bit local_pt_idx:
     return (kf_idx << 32) | static_cast<uint64_t>(local_pt_idx);
   }
-  /// Inverse of toGlobalIndex(), returning kf_idx and local_pt_idx as a tuple:
-  std::tuple<size_t, size_t> fromGlobalIndex(const uint64_t global_idx) const
+  /// Inverse of ToGlobalIndex(), returning kf_idx and local_pt_idx as a tuple:
+  static std::tuple<size_t, size_t> FromGlobalIndex(const uint64_t global_idx)
   {
-    const size_t kf_idx       = static_cast<size_t>(global_idx >> 32);
-    const size_t local_pt_idx = static_cast<size_t>(global_idx & 0xFFFFFFFF);
+    const auto kf_idx       = static_cast<size_t>(global_idx >> 32);
+    const auto local_pt_idx = static_cast<size_t>(global_idx & 0xFFFFFFFF);
     return {kf_idx, local_pt_idx};
   }
 
