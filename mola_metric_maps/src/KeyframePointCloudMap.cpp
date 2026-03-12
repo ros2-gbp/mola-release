@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -19,6 +19,8 @@
 
 #include <mola_metric_maps/KeyframePointCloudMap.h>
 #include <mrpt/config/CConfigFileBase.h>  // MRPT_LOAD_CONFIG_VAR
+#include <mrpt/core/get_env.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/obs/customizable_obs_viz.h>
 #include <mrpt/opengl/CPointCloudColoured.h>
@@ -33,7 +35,6 @@
 #include <mrpt/math/TOrientedBox.h>
 #endif
 
-#include <Eigen/Dense>
 #include <numeric>  // std::accumulate
 
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
@@ -43,7 +44,7 @@
 
 #include <type_traits>
 
-// #define DO_PROFILE_COVS 1
+// #define DO_PROFILE_COV 1
 // #define DO_VIZ_DEBUG 1
 
 #if DO_VIZ_DEBUG
@@ -109,6 +110,7 @@ mrpt::maps::CMetricMap::Ptr KeyframePointCloudMap::internal_CreateFromMapDefinit
   ASSERT_(def);
   auto obj = KeyframePointCloudMap::Create();
 
+  obj->creationOptions   = def->creationOptions;
   obj->insertionOptions  = def->insertionOpts;
   obj->likelihoodOptions = def->likelihoodOpts;
   obj->renderOptions     = def->renderOpts;
@@ -168,10 +170,10 @@ void KeyframePointCloudMap::serializeFrom(mrpt::serialization::CArchive& in, uin
       renderOptions.readFromStream(in);
 
       // data:
-      uint32_t n_kfs = in.ReadAs<uint32_t>();
+      const auto n_kfs = in.ReadAs<uint32_t>();
       for (uint32_t i = 0; i < n_kfs; i++)
       {
-        uint64_t kf_id;
+        uint64_t kf_id = 0;
         in >> kf_id;
 
         auto [it, isNew] = keyframes_.emplace(kf_id, creationOptions.k_correspondences_for_cov);
@@ -182,7 +184,7 @@ void KeyframePointCloudMap::serializeFrom(mrpt::serialization::CArchive& in, uin
         in >> pose;
         kf.pose(pose);
         const auto has_pointcloud = in.ReadAs<uint8_t>();
-        if (has_pointcloud)
+        if (has_pointcloud > 0)
         {
           auto obj = in.ReadObject();
           auto pc  = std::dynamic_pointer_cast<mrpt::maps::CPointsMap>(obj);
@@ -282,7 +284,7 @@ void KeyframePointCloudMap::nn_radius_search(
       query, search_radius_sqr, results, out_dists_sqr, resultIndicesOrIDs, maxPoints);
 }
 
-void KeyframePointCloudMap::icp_get_prepared_as_global(
+void KeyframePointCloudMap::icp_get_prepared_as_global(  // NOLINT
     const mrpt::poses::CPose3D&                                      icp_ref_point,
     [[maybe_unused]] const std::optional<mrpt::math::TBoundingBoxf>& local_map_roi) const
 {
@@ -290,54 +292,146 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(
 
   std::set<KeyFrameID> kfs_to_search_limited;
 
-  //  max_search_keyframes
-  // First, build a list of candidate key-frames to search into:
-  std::map<double, KeyFrameID> kfs_to_search;  // key: distance to KF center
-  for (auto& [kf_id, kf] : keyframes_)
+  // ---------------------------------------------------------------
+  // 1) Score every keyframe with an additive proximity metric
+  // ---------------------------------------------------------------
+  struct KFCandidate
+  {
+    KeyFrameID kfId;
+    double     dist;  // Euclidean distance
+    double     angle;  // SO(3) log-norm (rad)
+    double     metric;  // combined score (lower is better)
+  };
+  std::vector<KFCandidate> candidates;
+  candidates.reserve(keyframes_.size());
+
+  const double rotW = creationOptions.rotation_distance_weight;
+
+  for (const auto& [kf_id, kf] : keyframes_)
   {
     if (!kf.pointcloud())
     {
       continue;
     }
 
-    // convert query to local coordinates of the keyframe:
     const auto query_local = icp_ref_point - kf.pose();
 
-    // Heuristic mix of Euclidean and angular distances, to favor nearby frames, but only if their
-    // orientation is similar:
-    const double sigma_rot = mrpt::DEG2RAD(90.0);
+    const double dist_to_kf  = query_local.norm();
+    const double angle_to_kf = mrpt::poses::Lie::SO<3>::log(query_local.getRotationMatrix()).norm();
 
-    const auto dist_to_kf  = query_local.norm();
-    const auto angle_to_kf = mrpt::poses::Lie::SO<3>::log(query_local.getRotationMatrix()).norm();
+    // Additive metric: prevents the zero-distance degeneracy of multiplicative forms,
+    // and gives a clean meters-equivalent score that is easy to reason about.
+    const double m = dist_to_kf + rotW * angle_to_kf;
 
-    const double metric = dist_to_kf * std::exp(angle_to_kf / sigma_rot);
-
-    kfs_to_search[metric] = kf_id;
+    candidates.push_back({kf_id, dist_to_kf, angle_to_kf, m});
   }
 
-  // TODO: Explore other criteria here so more distant frames are used too?
+  // Sort ascending by metric (best first):
+  std::sort(
+      candidates.begin(), candidates.end(),
+      [](const KFCandidate& a, const KFCandidate& b) { return a.metric < b.metric; });
 
-  for (const auto& [dist, kf_id] : kfs_to_search)
+  // ---------------------------------------------------------------
+  // 2) Fill primary slots (proximity-ranked)
+  // ---------------------------------------------------------------
+  const uint32_t totalSlots = creationOptions.max_search_keyframes;
+  const uint32_t diverseSlots =
+      std::min(creationOptions.num_diverse_keyframes, totalSlots > 1 ? totalSlots - 1 : 0u);
+  const uint32_t primarySlots = totalSlots - diverseSlots;
+
+  // Track which KFs are already selected and their orientations:
+  std::set<KeyFrameID> selectedIds;
+  std::vector<double>  selectedAngles;  // angle_to_kf for diversity calc
+
+  for (const auto& c : candidates)
   {
-    kfs_to_search_limited.insert(kf_id);
-    if (kfs_to_search_limited.size() >= creationOptions.max_search_keyframes)
+    if (selectedIds.size() >= primarySlots)
     {
       break;
     }
+    selectedIds.insert(c.kfId);
+    selectedAngles.push_back(c.angle);
   }
 
-  // For selected KFs, build the submap, if it's different from the previous one:
+  // ---------------------------------------------------------------
+  // 3) Fill diverse slots: pick remaining candidates that maximise
+  //    the minimum angular difference to any already-selected frame,
+  //    while keeping a reasonable distance (within 3× the best
+  //    candidate's distance, or the closest unselected).
+  // ---------------------------------------------------------------
+  if (diverseSlots > 0 && candidates.size() > primarySlots)
+  {
+    // Distance threshold for the diverse pool: at most 3× the
+    // farthest primary KF distance, but never smaller than the
+    // closest unselected candidate.
+    double maxPrimaryDist = 0.0;
+    for (const auto& c : candidates)
+    {
+      if (selectedIds.count(c.kfId) != 0)
+      {
+        maxPrimaryDist = std::max(maxPrimaryDist, c.dist);
+      }
+    }
+    const double diverseDistLimit = std::max(maxPrimaryDist * 3.0, 1.0);
 
+    for (uint32_t d = 0; d < diverseSlots; ++d)
+    {
+      double             bestDiversityScore = -1.0;
+      const KFCandidate* bestCandidate      = nullptr;
+
+      for (const auto& c : candidates)
+      {
+        if (selectedIds.count(c.kfId) != 0)
+        {
+          continue;
+        }
+        if (c.dist > diverseDistLimit)
+        {
+          continue;
+        }
+
+        // Diversity score: minimum angular difference to any
+        // already-selected frame's angle_to_kf.  We actually
+        // want the frame whose *orientation* (kf.pose()) differs
+        // most from the selected set, so compute pairwise SO(3)
+        // differences would be ideal but expensive; as a cheaper
+        // proxy, use the absolute angle_to_kf difference, which
+        // works well because frames at similar positions but
+        // different orientations will have very different
+        // angle_to_kf values.
+        double minAngDiff = std::numeric_limits<double>::max();
+        for (const double selAngle : selectedAngles)
+        {
+          minAngDiff = std::min(minAngDiff, std::abs(c.angle - selAngle));
+        }
+
+        if (minAngDiff > bestDiversityScore)
+        {
+          bestDiversityScore = minAngDiff;
+          bestCandidate      = &c;
+        }
+      }
+
+      if (bestCandidate != nullptr)
+      {
+        selectedIds.insert(bestCandidate->kfId);
+        selectedAngles.push_back(bestCandidate->angle);
+      }
+    }
+  }
+
+  kfs_to_search_limited = selectedIds;
+
+  // ---------------------------------------------------------------
+  // 4) Rebuild merged submap if the selection changed
+  // ---------------------------------------------------------------
   if (cached_.icp_search_kfs && *cached_.icp_search_kfs == kfs_to_search_limited)
   {
-    // We are already up to date.
-    return;
+    return;  // Already up to date.
   }
 
   cached_.icp_search_kfs = kfs_to_search_limited;
   lck.unlock();
-
-  // Rebuild "cached merged KF":
 
   cached_.icp_search_submap.reset();
   cached_.icp_search_submap.emplace(creationOptions.k_correspondences_for_cov);
@@ -348,20 +442,49 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(
 
     if (!kf.pointcloud())
     {
-      continue;  // Should never happen!
+      continue;
     }
+
+    // pointcloud_global() carries view_{x,y,z} in global frame when the
+    // source cloud has those fields (see updatePointsGlobal).
+    const auto& kf_global = kf.pointcloud_global();
 
     if (!cached_.icp_search_submap->pointcloud())
     {
-      cached_.icp_search_submap->pointcloud(mrpt::maps::CSimplePointsMap::Create());
+      // Use CGenericPointsMap for the merged submap when the source carries
+      // view-direction fields, so they are preserved for nn_search_cov2cov.
+      const bool src_has_view = (kf_global->getPointsBufferRef_float_field("view_x") != nullptr) &&
+                                (kf_global->getPointsBufferRef_float_field("view_y") != nullptr) &&
+                                (kf_global->getPointsBufferRef_float_field("view_z") != nullptr);
+
+      if (src_has_view)
+      {
+        auto gpc = mrpt::maps::CGenericPointsMap::Create();
+        // The fact that the map is CGenericPointsMap will make insertAnotherMap() below to
+        // copy the "view_{x,y,z}" fields.
+        // It will also copy all other fields, unless we set the (mrpt>=3.0.0) param
+        // `autoRegisterAllSourceFields` to false.
+        gpc->registerField_float("view_x");
+        gpc->registerField_float("view_y");
+        gpc->registerField_float("view_z");
+        cached_.icp_search_submap->pointcloud(gpc);
+      }
+      else
+      {
+        cached_.icp_search_submap->pointcloud(mrpt::maps::CSimplePointsMap::Create());
+      }
     }
 
-    // Use cached global pointcloud inside KF:
+#if MRPT_VERSION >= 0x030000
     cached_.icp_search_submap->pointcloud()->insertAnotherMap(
-        kf.pointcloud_global().get(), mrpt::poses::CPose3D::Identity());
+        kf_global.get(), mrpt::poses::CPose3D::Identity(), false /*filterOutPointsAtZero*/,
+        false /*autoRegisterAllSourceFields*/);
+#else
+    cached_.icp_search_submap->pointcloud()->insertAnotherMap(
+        kf_global.get(), mrpt::poses::CPose3D::Identity());
+#endif
   }
 
-  // This builds the KD-tree and covariances
   cached_.icp_search_submap->buildCache();
 }
 
@@ -453,9 +576,87 @@ void KeyframePointCloudMap::nn_search_cov2cov(
 
   globalPoints->kdTreeEnsureIndexBuilt3D();
 
-  tbb::enumerable_thread_specific<mp2p_icp::MatchedPointWithCovList> tls;
+  // ------------------------------------------------------------------
+  // View-direction filter setup
+  // ------------------------------------------------------------------
+  // "view_x/y/z" are unit vectors in the *local KF frame* of each cloud,
+  // pointing FROM the point TOWARD the sensor at acquisition time.
+  //
+  // The merged submap (globalPoints) and localPointsTransf are plain
+  // CSimplePointsMap objects that carry only XYZ - custom fields such as
+  // view_x/y/z are not propagated by insertAnotherMap().  We therefore
+  // read view vectors directly from the original local-frame clouds and
+  // rotate them to the global frame on the fly.
+  //
+  // For the global reference submap we need the view vectors from each
+  // contributing KF.  Because the submap was built by sequentially
+  // appending KF point clouds (see icp_get_prepared_as_global), the
+  // global point index `nn_global_idx` maps directly into that merged
+  // buffer - but we cannot recover which KF it came from without extra
+  // bookkeeping.  As a pragmatic solution we instead use the view
+  // vectors stored in the *reference keyframe's global pointcloud*.
+  //
+  // The reference submap is cached_.icp_search_submap, which is itself
+  // a KeyFrame object.  Its `pointcloud()` holds the merged local cloud
+  // (without view fields) while the individual contributing KFs hold the
+  // original clouds.  Since the submap KF is a synthetic merge, the only
+  // robust approach that does not require index-bookkeeping is to obtain
+  // the global-frame view vectors from the *original* KFs stored in
+  // keyframes_.
+  //
+  // For simplicity - and because this filter is a best-effort heuristic -
+  // we only activate the filter when the *local* query cloud carries view
+  // fields AND the global reference submap's merged pointcloud also does.
+  // The merged submap won't have them unless explicitly populated, so the
+  // effective activation path today is:
+  //
+  //   local KF cloud has view_x/y/z   AND
+  //   globalPoints (the icp_search_submap pointcloud_global()) has view_x/y/z
+  //
+  // If only one side has them the filter is silently skipped.
+  const bool try_view_filter = creationOptions.use_view_direction_filter;
+
+  // Local cloud view buffers - in the *local KF frame* of the query map.
+  // We need to rotate these by localMapPose.R to get global-frame vectors.
+  const mrpt::aligned_std_vector<float>* local_view_x = nullptr;
+  const mrpt::aligned_std_vector<float>* local_view_y = nullptr;
+  const mrpt::aligned_std_vector<float>* local_view_z = nullptr;
+
+  // Global (reference submap) view buffers - already in global frame if the
+  // submap pointcloud carries them (currently only if the upstream pipeline
+  // populated them via e.g. insertAnotherMap on a CGenericPointsMap).
+  const mrpt::aligned_std_vector<float>* global_view_x = nullptr;
+  const mrpt::aligned_std_vector<float>* global_view_y = nullptr;
+  const mrpt::aligned_std_vector<float>* global_view_z = nullptr;
+
+  if (try_view_filter)
+  {
+    local_view_x = localPoints->getPointsBufferRef_float_field("view_x");
+    local_view_y = localPoints->getPointsBufferRef_float_field("view_y");
+    local_view_z = localPoints->getPointsBufferRef_float_field("view_z");
+
+    global_view_x = globalPoints->getPointsBufferRef_float_field("view_x");
+    global_view_y = globalPoints->getPointsBufferRef_float_field("view_y");
+    global_view_z = globalPoints->getPointsBufferRef_float_field("view_z");
+  }
+
+  // Both clouds must expose all three channels for the filter to activate.
+  const bool have_view_fields = (local_view_x != nullptr) && (local_view_y != nullptr) &&
+                                (local_view_z != nullptr) && (global_view_x != nullptr) &&
+                                (global_view_y != nullptr) && (global_view_z != nullptr);
+
+  const double max_view_angle_deg = std::clamp(creationOptions.max_view_angle_deg, 0.0, 180.0);
+  const bool   do_view_filter = try_view_filter && have_view_fields && max_view_angle_deg < 180.0;
+
+  // Pre-compute the cosine threshold once (cos is monotonically decreasing
+  // on [0°, 180°], so angle > threshold  <=>  dot < cos(threshold)).
+  const float view_cos_threshold =
+      do_view_filter ? static_cast<float>(std::cos(mrpt::DEG2RAD(max_view_angle_deg)))
+                     : -2.0f;  // sentinel: never reached when filter is disabled
 
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
+  tbb::enumerable_thread_specific<mp2p_icp::MatchedPointWithCovList> tls;
+
   tbb::parallel_for(
       static_cast<size_t>(0), localPointCount,
       [&](size_t local_idx)
@@ -468,26 +669,61 @@ void KeyframePointCloudMap::nn_search_cov2cov(
         const auto nn_global_idx = globalPoints->kdTreeClosestPoint3D(
             xs_tf[local_idx], ys_tf[local_idx], zs_tf[local_idx], nn_dist_sqr);
 
-        if (nn_dist_sqr <= max_sqr_dist)
+        if (nn_dist_sqr > max_sqr_dist)
         {
-      // Add pairing:
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
-          auto& p = tls.local().emplace_back();
+          return;  // exit TBB lambda for this index
 #else
-      auto& p = outPairings.emplace_back();
+      continue;  // skip to next iteration of the for loop
+#endif
+        }
+
+        // ----------------------------------------------------------
+        // View-direction angle filter
+        // ----------------------------------------------------------
+        if (do_view_filter)
+        {
+          // Rotate the local-frame view vector to the global frame.
+          const auto v_local_global =
+              localMapPose
+                  .rotateVector(
+                      {(*local_view_x)[local_idx], (*local_view_y)[local_idx],
+                       (*local_view_z)[local_idx]})
+                  .cast<float>();
+
+          // dot product with the reference cloud's (already global-frame) view vector
+          const float dot = v_local_global.x * (*global_view_x)[nn_global_idx] +
+                            v_local_global.y * (*global_view_y)[nn_global_idx] +
+                            v_local_global.z * (*global_view_z)[nn_global_idx];
+
+          // dot < cos(max_angle)  =>  angle > max_angle  =>  reject
+          if (dot < view_cos_threshold)
+          {
+#if defined(MOLA_METRIC_MAPS_USE_TBB)
+            return;  // exit TBB lambda for this index
+#else
+        continue;  // skip to next iteration of the for loop
+#endif
+          }
+        }
+
+    // Add pairing:
+#if defined(MOLA_METRIC_MAPS_USE_TBB)
+        auto& p = tls.local().emplace_back();
+#else
+    auto& p = outPairings.emplace_back();
 #endif
 
-          p.global_idx = nn_global_idx;
-          p.local_idx  = local_idx;
-          p.local      = {xs[local_idx], ys[local_idx], zs[local_idx]};
-          p.global     = {g_xs[nn_global_idx], g_ys[nn_global_idx], g_zs[nn_global_idx]};
+        p.global_idx = nn_global_idx;
+        p.local_idx  = local_idx;
+        p.local      = {xs[local_idx], ys[local_idx], zs[local_idx]};
+        p.global     = {g_xs[nn_global_idx], g_ys[nn_global_idx], g_zs[nn_global_idx]};
 
-          /* Following GICP \cite segal2009gicp this should be:
-           *  `(COV_{global} + R*COV_{local}*R^T)^{-1}`
-           *  But localKfCov already incorporate R*C*R^T from localKf.pose(p)
-           */
-          p.cov_inv = (globalKfCov.at(nn_global_idx) + localKfCov.at(local_idx)).inverse();
-        }
+        /* Following GICP \cite segal2009gicp this should be:
+         *  `(COV_{global} + R*COV_{local}*R^T)^{-1}`
+         *  But localKfCov already incorporate R*C*R^T from localKf.pose(p)
+         */
+        p.cov_inv = (globalKfCov.at(nn_global_idx) + localKfCov.at(local_idx)).inverse();
       }
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
   );
@@ -546,21 +782,29 @@ void KeyframePointCloudMap::getVisualizationInto(mrpt::opengl::CSetOfObjects& ou
   {
     auto obj = kf.getViz(renderOptions);
 
-#if 0
-    float pointSize = ro.point_size;
-    if (cached_.icp_search_kfs->count(kf_id))
+    const static auto ENV_KEYFRAMES_SHOW_ACTIVE_FRAMES =
+        mrpt::get_env<bool>("MOLA_KEYFRAME_MAP_VIZ_SHOW_ACTIVE_SUBMAP", false);
+
+    if (ENV_KEYFRAMES_SHOW_ACTIVE_FRAMES)
     {
-      pointSize *= 3;
+      float pointSize = renderOptions.point_size;
+      if (cached_.icp_search_kfs && cached_.icp_search_kfs->count(kf_id) != 0)
+      {
+        pointSize *= 4;
+      }
+      obj->setPointSize(pointSize);
     }
-    obj->setPointSize(pointSize);
-#endif
 
     outObj.insert(obj);
 
-    if (renderOptions.keyframes_axes_length > 0)
+    const static auto ENV_KEYFRAMES_AXES_LENGTH =
+        mrpt::get_env<float>("MOLA_KEYFRAME_MAP_VIZ_OVERRIDE_AXES_LENGTH", .0f);
+    const auto activeAxesLength =
+        std::max(renderOptions.keyframes_axes_length, ENV_KEYFRAMES_AXES_LENGTH);
+
+    if (activeAxesLength > 0)
     {
-      auto glAxes =
-          mrpt::opengl::stock_objects::CornerXYZSimple(renderOptions.keyframes_axes_length);
+      auto glAxes = mrpt::opengl::stock_objects::CornerXYZSimple(activeAxesLength);
       glAxes->setPose(kf.pose());
       outObj.insert(glAxes);
     }
@@ -633,17 +877,17 @@ const mrpt::maps::CSimplePointsMap* KeyframePointCloudMap::getAsSimplePointsMap(
       const float final_ratio = std::min(ratio_kf, ratio_overall);
       if (final_ratio < 1.0f)
       {
-        const std::size_t n_points_to_take =
+        const auto n_points_to_take =
             static_cast<std::size_t>(final_ratio * static_cast<float>(kf_pts.size()));
 
         // go by steps to subsample:
         const float step = static_cast<float>(kf_pts.size()) / static_cast<float>(n_points_to_take);
         for (size_t i = 0; i < n_points_to_take; i++)
         {
-          const size_t idx = static_cast<size_t>(static_cast<float>(i) * step);
-          float        x, y, z;
-          kf_pts.getPoint(idx, x, y, z);
-          cached_.cachedPoints->insertPointFast(x, y, z);
+          const auto            idx = static_cast<size_t>(static_cast<float>(i) * step);
+          mrpt::math::TPoint3Df pt;
+          kf_pts.getPoint(idx, pt.x, pt.y, pt.z);
+          cached_.cachedPoints->insertPointFast(pt.x, pt.y, pt.z);
         }
         continue;
       }
@@ -682,7 +926,7 @@ void KeyframePointCloudMap::TInsertionOptions::writeToStream(
 
 void KeyframePointCloudMap::TInsertionOptions::readFromStream(mrpt::serialization::CArchive& in)
 {
-  int8_t version;
+  int8_t version = 0;
   in >> version;
   switch (version)
   {
@@ -708,13 +952,14 @@ void KeyframePointCloudMap::TLikelihoodOptions::dumpToTextStream(
   out << "\n------ [KeyframePointCloudMap::TLikelihoodOptions] ------- \n\n";
 }
 
-void KeyframePointCloudMap::TLikelihoodOptions::writeToStream(
+void KeyframePointCloudMap::TLikelihoodOptions::writeToStream(  // NOLINT
     mrpt::serialization::CArchive& out) const
 {
   out.WriteAs<uint8_t>(0);
 }
 
-void KeyframePointCloudMap::TLikelihoodOptions::readFromStream(mrpt::serialization::CArchive& in)
+void KeyframePointCloudMap::TLikelihoodOptions::readFromStream(  // NOLINT
+    mrpt::serialization::CArchive& in)
 {
   const auto version = in.ReadAs<uint8_t>();
   (void)version;
@@ -763,7 +1008,7 @@ void KeyframePointCloudMap::TRenderOptions::writeToStream(mrpt::serialization::C
 
 void KeyframePointCloudMap::TRenderOptions::readFromStream(mrpt::serialization::CArchive& in)
 {
-  int8_t version;
+  int8_t version = 0;
   in >> version;
   switch (version)
   {
@@ -816,6 +1061,10 @@ void KeyframePointCloudMap::TCreationOptions::loadFromConfigFile(
 {
   MRPT_LOAD_CONFIG_VAR_REQUIRED_CS(max_search_keyframes, uint64_t);
   MRPT_LOAD_CONFIG_VAR_REQUIRED_CS(k_correspondences_for_cov, uint64_t);
+  MRPT_LOAD_CONFIG_VAR_CS(rotation_distance_weight, double);
+  MRPT_LOAD_CONFIG_VAR_CS(num_diverse_keyframes, uint64_t);
+  MRPT_LOAD_CONFIG_VAR_CS(use_view_direction_filter, bool);
+  MRPT_LOAD_CONFIG_VAR_CS(max_view_angle_deg, double);
 }
 
 void KeyframePointCloudMap::TCreationOptions::dumpToTextStream(std::ostream& out) const
@@ -823,23 +1072,41 @@ void KeyframePointCloudMap::TCreationOptions::dumpToTextStream(std::ostream& out
   out << "\n------ [KeyframePointCloudMap::TCreationOptions] ------- \n\n";
   LOADABLEOPTS_DUMP_VAR(max_search_keyframes, int);
   LOADABLEOPTS_DUMP_VAR(k_correspondences_for_cov, int);
+  LOADABLEOPTS_DUMP_VAR(rotation_distance_weight, double);
+  LOADABLEOPTS_DUMP_VAR(num_diverse_keyframes, int);
+  LOADABLEOPTS_DUMP_VAR(use_view_direction_filter, bool);
+  LOADABLEOPTS_DUMP_VAR(max_view_angle_deg, double);
 }
 
 void KeyframePointCloudMap::TCreationOptions::writeToStream(
     mrpt::serialization::CArchive& out) const
 {
-  out.WriteAs<uint8_t>(0);  // version
+  out.WriteAs<uint8_t>(2);  // version
   out << max_search_keyframes << k_correspondences_for_cov;
+  out << rotation_distance_weight << num_diverse_keyframes;  // v1
+  out << use_view_direction_filter << max_view_angle_deg;  // v2
 }
 
 void KeyframePointCloudMap::TCreationOptions::readFromStream(mrpt::serialization::CArchive& in)
 {
+  *this = {};
+
   const auto version = in.ReadAs<uint8_t>();
   switch (version)
   {
     case 0:
+    case 1:
+    case 2:
     {
       in >> max_search_keyframes >> k_correspondences_for_cov;
+      if (version >= 1)
+      {
+        in >> rotation_distance_weight >> num_diverse_keyframes;
+      }
+      if (version >= 2)
+      {
+        in >> use_view_direction_filter >> max_view_angle_deg;
+      }
     }
     break;
     default:
@@ -889,7 +1156,7 @@ bool KeyframePointCloudMap::internal_insertObservation(
   }
 
   // Observation must be a point cloud:
-  if (auto obsPC = dynamic_cast<const mrpt::obs::CObservationPointCloud*>(&obs); obsPC)
+  if (const auto* obsPC = dynamic_cast<const mrpt::obs::CObservationPointCloud*>(&obs); obsPC)
   {
     ASSERT_(obsPC->pointcloud);
 
@@ -919,7 +1186,7 @@ double KeyframePointCloudMap::internal_computeObservationLikelihood(
   return .0;
 }
 
-double KeyframePointCloudMap::internal_computeObservationLikelihoodPointCloud3D(
+double KeyframePointCloudMap::internal_computeObservationLikelihoodPointCloud3D(  // NOLINT
     [[maybe_unused]] const mrpt::poses::CPose3D&   pc_in_map,
     [[maybe_unused]] [[maybe_unused]] const float* xs, [[maybe_unused]] const float* ys,
     [[maybe_unused]] const float* zs, [[maybe_unused]] const std::size_t num_pts) const
@@ -975,12 +1242,62 @@ void KeyframePointCloudMap::KeyFrame::updatePointsGlobal() const
   {
     return;
   }
-  if (!pointcloud_global_)
+
+  // Check whether the source cloud carries view-direction fields.
+  // view_{x,y,z} are unit vectors in the *local KF frame*; they must be
+  // rotated to the global frame alongside the point coordinates.
+  const auto* src_vx   = pointcloud_->getPointsBufferRef_float_field("view_x");
+  const auto* src_vy   = pointcloud_->getPointsBufferRef_float_field("view_y");
+  const auto* src_vz   = pointcloud_->getPointsBufferRef_float_field("view_z");
+  const bool  has_view = (src_vx != nullptr) && (src_vy != nullptr) && (src_vz != nullptr);
+
+  // Choose the global-cloud type: CGenericPointsMap when we need to carry
+  // custom fields, plain CSimplePointsMap otherwise (cheaper).
+  if (!pointcloud_global_ ||
+      (has_view && pointcloud_global_->getPointsBufferRef_float_field("view_x") == nullptr))
   {
-    pointcloud_global_ = mrpt::maps::CSimplePointsMap::Create();
+    if (has_view)
+    {
+      auto gpc = mrpt::maps::CGenericPointsMap::Create();
+      gpc->registerField_float("view_x");
+      gpc->registerField_float("view_y");
+      gpc->registerField_float("view_z");
+      pointcloud_global_ = gpc;
+    }
+    else
+    {
+      pointcloud_global_ = mrpt::maps::CSimplePointsMap::Create();
+    }
   }
-  pointcloud_global_->clear();
+
+  // preserve existing fields but remove their data:
+  pointcloud_global_->resize(0);
+
+  // XYZ coordinates are rotated+translated; custom fields are copied verbatim.
+  // This automatically registers all source fields
   pointcloud_global_->insertAnotherMap(pointcloud_.get(), pose());
+
+  // insertAnotherMap() does not know that view_{x,y,z} are direction vectors,
+  // so it copies local-frame values as-is.  Rotate them to the global frame now.
+  if (has_view)
+  {
+    auto* vx = pointcloud_global_->getPointsBufferRef_float_field("view_x");
+    auto* vy = pointcloud_global_->getPointsBufferRef_float_field("view_y");
+    auto* vz = pointcloud_global_->getPointsBufferRef_float_field("view_z");
+
+    // TODO: Write an AVX2 version of this rotation loop.
+
+    if (vx != nullptr && vy != nullptr && vz != nullptr)
+    {
+      for (size_t i = 0, n = pointcloud_global_->size(); i < n; ++i)
+      {
+        const auto vg = pose_.rotateVector({(*vx)[i], (*vy)[i], (*vz)[i]}).cast<float>();
+        (*vx)[i]      = vg.x;
+        (*vy)[i]      = vg.y;
+        (*vz)[i]      = vg.z;
+      }
+    }
+  }
 }
 
 void KeyframePointCloudMap::KeyFrame::computeCovariancesAndDensity() const
@@ -993,7 +1310,7 @@ void KeyframePointCloudMap::KeyFrame::computeCovariancesAndDensity() const
     return;  // Already computed
   }
 
-#if DO_PROFILE_COVS
+#if DO_PROFILE_COV
   auto start = std::chrono::high_resolution_clock::now();
 #endif
 #if DO_VIZ_DEBUG
@@ -1146,7 +1463,7 @@ void KeyframePointCloudMap::KeyFrame::computeCovariancesAndDensity() const
       static_cast<float>(point_count));
 
   // done.
-#if DO_PROFILE_COVS
+#if DO_PROFILE_COV
   auto end_time = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start);
   std::cout << "Compute covs: N=" << point_count << " in "
