@@ -11,18 +11,20 @@
 */
 
 /**
- * @file   Yaml.h
- * @brief  Tiny header to provide a shortcut in NS `mola::` to MRPT yaml class.
- * @author Jose Luis Blanco Claraco
- * @date   Sep 19, 2021
+ * `@file`   VizInterface.cpp
+ * `@brief`  Virtual visualization interface (see MolaViz)
+ * `@author` Jose Luis Blanco Claraco
+ * `@date`   Feb 15, 2026
  */
-#pragma once
 
-#include <mrpt/containers/yaml.h>
+#include <mola_kernel/interfaces/VizInterface.h>
 
 namespace mola
 {
-/** Convenient typedef to save typing in the MOLA project. */
-using Yaml = mrpt::containers::yaml;
 
-};  // namespace mola
+VizInterface::~VizInterface() = default;
+
+const std::string VizInterface::BACKEND_NANOGUI = "nanogui";
+const std::string VizInterface::BACKEND_IMGUI   = "imgui";
+
+}  // namespace mola
