@@ -2,7 +2,7 @@
 #        A Modular Optimization framework for Localization and mApping
 #                               (MOLA)
 #
-# Copyright (C) 2018-2025, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
+# Copyright (C) 2018-2026, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
 # All rights reserved.
 # Released under GNU GPL v3. See LICENSE file
 # ------------------------------------------------------------------------------
@@ -27,6 +27,7 @@ set(LIB_SRCS
   src/interfaces/FrontEndBase.cpp
   src/interfaces/NavStateFilter.cpp
   src/interfaces/RawDataSourceBase.cpp
+  src/interfaces/VizInterface.cpp
   src/utils/Synchronizer.cpp
   src/MinimalModuleContainer.cpp
   src/pretty_print_exception.cpp
@@ -34,8 +35,9 @@ set(LIB_SRCS
 )
 
 set(LIB_PUBLIC_HDRS
-  include/mola_kernel/Georeferencing.h
   include/mola_kernel/FastAllocator.h
+  include/mola_kernel/Georeferencing.h
+  include/mola_kernel/GuiWidgetDescription.h
   include/mola_kernel/id.h
   include/mola_kernel/interfaces/Dataset_UI.h
   include/mola_kernel/interfaces/ExecutableBase.h
@@ -50,10 +52,10 @@ set(LIB_PUBLIC_HDRS
   include/mola_kernel/interfaces/RawDataSourceBase.h
   include/mola_kernel/interfaces/Relocalization.h
   include/mola_kernel/interfaces/VizInterface.h
-  include/mola_kernel/utils/Synchronizer.h
-  include/mola_kernel/utils/RegexCache.h
   include/mola_kernel/MinimalModuleContainer.h
   include/mola_kernel/pretty_print_exception.h
+  include/mola_kernel/utils/RegexCache.h
+  include/mola_kernel/utils/Synchronizer.h
   include/mola_kernel/variant_helper.h
   include/mola_kernel/Yaml.h
 )
