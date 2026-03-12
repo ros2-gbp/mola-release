@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -49,6 +49,10 @@
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+
+#if defined(HAS_GPS_MSGS)
+#include <gps_msgs/msg/gps_fix.hpp>
+#endif
 
 // MOLA <-> ROS services:
 #include <mola_msgs/srv/map_load.hpp>
@@ -238,15 +242,13 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
     return rosNode_;
   }
   std::vector<rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> subsPointCloud_;
-
-  std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr> subsLaserScan_;
-
-  std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr> subsOdometry_;
-
-  std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr> subsImu_;
-
-  std::vector<rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr> subsGNSS_;
-
+  std::vector<rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr>   subsLaserScan_;
+  std::vector<rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr>       subsOdometry_;
+  std::vector<rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr>         subsImu_;
+  std::vector<rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr>   subsGNSS_;
+#if defined(HAS_GPS_MSGS)
+  std::vector<rclcpp::Subscription<gps_msgs::msg::GPSFix>::SharedPtr> subsGPSMsg_;
+#endif
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr subInitPose_;
 
   void callbackOnPointCloud2(
@@ -264,6 +266,12 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
   void callbackOnNavSatFix(
       const sensor_msgs::msg::NavSatFix& o, const std::string& outSensorLabel,
       const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
+
+#if defined(HAS_GPS_MSGS)
+  void callbackOnGpsMsg(
+      const gps_msgs::msg::GPSFix& o, const std::string& outSensorLabel,
+      const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
+#endif
 
   void callbackOnOdometry(const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel);
 
