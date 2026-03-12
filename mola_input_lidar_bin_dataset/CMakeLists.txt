@@ -2,7 +2,7 @@
 #        A Modular Optimization framework for Localization and mApping
 #                               (MOLA)
 #
-# Copyright (C) 2018-2025, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
+# Copyright (C) 2018-2026, Jose Luis Blanco-Claraco, contributors (AUTHORS.md)
 # All rights reserved.
 # Released under GNU GPL v3. See LICENSE file
 # ------------------------------------------------------------------------------
@@ -22,8 +22,8 @@ find_package(mrpt-obs REQUIRED)     # For CObservationPointCloud
 find_package(mrpt-system REQUIRED)  # For file system utilities
 find_package(mrpt-core REQUIRED)    # For mrpt::Clock
 
-find_mola_package(mola_kernel REQUIRED)
-find_mola_package(mola_yaml REQUIRED) # For parameter parsing
+find_mola_package(mola_kernel)
+find_mola_package(mola_yaml) # For parameter parsing
 
 # -----------------------
 # define lib:
