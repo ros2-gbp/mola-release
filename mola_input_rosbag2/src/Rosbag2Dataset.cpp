@@ -4,7 +4,7 @@
 | | | | | | (_) | | (_| | Localization and mApping (MOLA)
 |_| |_| |_|\___/|_|\__,_| https://github.com/MOLAorg/mola
 
- Copyright (C) 2018-2025 Jose Luis Blanco, University of Almeria,
+ Copyright (C) 2018-2026 Jose Luis Blanco, University of Almeria,
                          and individual contributors.
  SPDX-License-Identifier: GPL-3.0
  See LICENSE for full license information.
@@ -97,7 +97,8 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
       {"sensor_msgs/msg/Image", "CObservationImage"},
       {"sensor_msgs/msg/PointCloud2", "CObservationPointCloud"},
       {"sensor_msgs/msg/LaserScan", "CObservation2DRangeScan"},
-      {"sensor_msgs/msg/NavSatFix", "CObservationGPS"},
+      {"sensor_msgs/msg/NavSatFix", "CObservationGPS_NavSatFix"},
+      {"gps_msgs/msg/GPSFix", "CObservationGPS_GpsFix"},
   };
 
   MRPT_START
@@ -139,11 +140,8 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
       else
       {
         THROW_EXCEPTION_FMT(
-            "Argument 'rosbag_storage_id' was not provided and could "
-            "not "
-            "determine the rosbag2 format from unknown extension of "
-            "file "
-            "'%s'",
+            "Argument 'rosbag_storage_id' was not provided and could not determine the rosbag2 "
+            "format from unknown extension of file '%s'",
             rosbag_filename_.c_str());
       }
     }
@@ -243,9 +241,9 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
   }
 
   // Start creating topic observers for /tf and all sensors:
-  lookup_["/tf"].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
+  lookup_["/tf"].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
                               { return toTf<false>(rosmsg); });
-  lookup_["/tf_static"].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
+  lookup_["/tf_static"].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
                                      { return toTf<true>(rosmsg); });
 
   for (auto& sensorNode : sensorsYaml.asSequence())
@@ -268,22 +266,39 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
     }
     else
     {
-      ASSERTMSG_(
-          topic2type.count(topic), mrpt::format(
-                                       "'sensors' contains topic '%s' which is not found in the "
-                                       "rosbag!",
-                                       topic.c_str()));
-
-      auto itType = mapTopic2Class.find(topic2type.at(topic));
-      if (itType == mapTopic2Class.end())
+      bool topic_is_optional = false;
+      if (sensor.count("is_optional") != 0 && sensor.at("is_optional").as<bool>())
       {
-        THROW_EXCEPTION_FMT(
-            "'sensors' contains topic '%s' without a 'type' entry, but "
-            "could not automatically determine its mapping to "
-            "mrpt::obs classes.",
-            topic.c_str());
+        topic_is_optional = true;
       }
-      sensorType = itType->second;
+
+      if (topic2type.count(topic) == 0)
+      {
+        if (!topic_is_optional)
+        {
+          THROW_EXCEPTION_FMT(
+              "'sensors' contains topic '%s' which is not found in the rosbag and is not marked as "
+              "'is_optional'!",
+              topic.c_str());
+        }
+      }
+      else
+      {
+        auto itType = mapTopic2Class.find(topic2type.at(topic));
+        if (itType == mapTopic2Class.end())
+        {
+          THROW_EXCEPTION_FMT(
+              "'sensors' contains topic '%s' without a 'type' entry, but "
+              "could not automatically determine its mapping to "
+              "mrpt::obs classes.",
+              topic.c_str());
+        }
+        sensorType = itType->second;
+
+        MRPT_LOG_INFO_FMT(
+            "Topic '%s' listed in 'sensors' with automatic mapping, determined to be '%s'",
+            topic.c_str(), sensorType.c_str());
+      }
     }
 
     // Optional: fixed sensorPose (then ignores/don't need "tf" data):
@@ -313,85 +328,63 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
     using rosbag2_storage::SerializedBagMessage;
 
 #if MRPT_ROS2_BRIDGE_VERSION >= 0x030400
-    if (sensorType == "CObservationPointCloud")
+    // Map sensor type → rosbag2 conversion function
+    using ConvFunc = std::function<Obs(
+        std::string_view, const SerializedBagMessage&, tf2::BufferCore&, const std::string&,
+        const std::optional<mrpt::poses::CPose3D>&)>;
+
+    static const std::map<std::string, ConvFunc> converters = {
+        {"CObservationPointCloud", &mrpt::ros2bridge::rosbag2ToPointCloud2},
+        {"CObservationImage", &mrpt::ros2bridge::rosbag2ToImage},
+        {"CObservation2DRangeScan", &mrpt::ros2bridge::rosbag2ToLidar2D},
+        {"CObservationRotatingScan", &mrpt::ros2bridge::rosbag2ToRotatingScan},
+        {"CObservationIMU", &mrpt::ros2bridge::rosbag2ToIMU},
+        {
+            "CObservationGPS_NavSatFix",
+            static_cast<ConvFunc>(
+                [](std::string_view                             sensor_label,
+                   const rosbag2_storage::SerializedBagMessage& rosmsg, tf2::BufferCore& tfBuffer,
+                   const std::string&                         base_link_frame,
+                   const std::optional<mrpt::poses::CPose3D>& fixed_sensor_pose)
+                {
+                  return mrpt::ros2bridge::rosbag2ToGPS(
+                      sensor_label, rosmsg, tfBuffer, base_link_frame, fixed_sensor_pose);
+                }),
+        },
+        {
+            "CObservationGPS_GpsFix",
+            static_cast<ConvFunc>(
+                [](std::string_view                             sensor_label,
+                   const rosbag2_storage::SerializedBagMessage& rosmsg, tf2::BufferCore& tfBuffer,
+                   const std::string&                         base_link_frame,
+                   const std::optional<mrpt::poses::CPose3D>& fixed_sensor_pose) -> Obs
+                {
+#if MRPT_ROS2_BRIDGE_VERSION >= 0x030500
+                  return mrpt::ros2bridge::rosbag2ToGPS(
+                      sensor_label, rosmsg, tfBuffer, base_link_frame, fixed_sensor_pose, true);
+#else
+                  THROW_EXCEPTION("mrpt_ros_bridge >=3.5.0 required for GpsFix messages");
+#endif
+                }),
+        },
+    };
+
+    if (auto it = converters.find(sensorType); it != converters.end())
     {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
+      auto convFn   = it->second;
+      auto callback = [this, sensorLabel, fixedSensorPose,
+                       convFn](const SerializedBagMessage& m) -> Obs
       {
         return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToPointCloud2(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
+            [this, sensorLabel, fixedSensorPose, convFn, m]() -> Obs
+            { return convFn(sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose); });
       };
+      MRPT_LOG_INFO_STREAM("Installing callback for topic '" << topic << "'");
       lookup_[topic].emplace_back(callback);
     }
-    else if (sensorType == "CObservationImage")
-    {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
-      {
-        return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToImage(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
-      };
-      lookup_[topic].emplace_back(callback);
-    }
-    else if (sensorType == "CObservation2DRangeScan")
-    {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
-      {
-        return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToLidar2D(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
-      };
-      lookup_[topic].emplace_back(callback);
-    }
-    else if (sensorType == "CObservationRotatingScan")
-    {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
-      {
-        return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToRotatingScan(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
-      };
-      lookup_[topic].emplace_back(callback);
-    }
-    else if (sensorType == "CObservationIMU")
-    {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
-      {
-        return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToIMU(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
-      };
-      lookup_[topic].emplace_back(callback);
-    }
-    else if (sensorType == "CObservationGPS")
-    {
-      auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
-      {
-        return catchExceptions(
-            [this, sensorLabel, fixedSensorPose, m]() -> Obs
-            {
-              return mrpt::ros2bridge::rosbag2ToGPS(
-                  sensorLabel, m, *tfBuffer_, base_link_frame_id_, fixedSensorPose);
-            });
-      };
-      lookup_[topic].emplace_back(callback);
-    }
-    else if (sensorType == "CObservationOdometry")
+
+    // This one has a different signature has to be handled apart:
+    if (sensorType == "CObservationOdometry")
     {
       auto callback = [this, sensorLabel, fixedSensorPose](const SerializedBagMessage& m) -> Obs
       {
@@ -399,6 +392,7 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
             [sensorLabel, fixedSensorPose, m]() -> Obs
             { return mrpt::ros2bridge::rosbag2ToOdometry(sensorLabel, m); });
       };
+      MRPT_LOG_INFO_STREAM("Installing callback for topic '" << topic << "'");
       lookup_[topic].emplace_back(callback);
     }
 #else
@@ -435,7 +429,7 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
       { return catchExceptions([=]() { return toIMU(sensorLabel, m, fixedSensorPose); }); };
       lookup_[topic].emplace_back(callback);
     }
-    else if (sensorType == "CObservationGPS")
+    else if (sensorType == "CObservationGPS_NavSatFix")
     {
       auto callback = [=](const rosbag2_storage::SerializedBagMessage& m)
       { return catchExceptions([=]() { return toGPS(sensorLabel, m, fixedSensorPose); }); };
@@ -646,7 +640,7 @@ void Rosbag2Dataset::doReadAhead(const std::optional<size_t>& requestedIndex, bo
   ASSERT_GT_(read_ahead_length_, 0);
 
   // End of read segment:
-  size_t endIdx;
+  size_t endIdx = 0;
   if (requestedIndex)
   {
     if (skipBufferAhead)
@@ -788,14 +782,14 @@ Rosbag2Dataset::Obs Rosbag2Dataset::toPointCloud2(
   std::set<std::string> fields = mrpt::ros2bridge::extractFields(pts);
 
   // We need X Y Z:
-  if (!fields.count("x") || !fields.count("y") || !fields.count("z"))
+  if (0 == fields.count("x") || 0 == fields.count("y") || 0 == fields.count("z"))
   {
     return {};
   }
 
   // Generic map:
-  if (fields.count("ring") || fields.count("time") || fields.count("timestamp") ||
-      fields.count("t") || fields.count("intensity"))
+  if (fields.count("ring") != 0 || fields.count("time") != 0 || fields.count("timestamp") != 0 ||
+      fields.count("t") != 0 || fields.count("intensity") != 0)
   {
     auto mrptPts       = mrpt::maps::CGenericPointsMap::Create();
     ptsObs->pointcloud = mrptPts;
@@ -808,7 +802,7 @@ Rosbag2Dataset::Obs Rosbag2Dataset::toPointCloud2(
     // Fix timestamps for Livox driver:
     // It uses doubles for timestamps, but they are actually nanoseconds!
 #if MRPT_VERSION >= 0x020f03  // 2.15.3
-    auto ts =
+    auto* ts =
         mrptPts->getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
 #elif MRPT_VERSION >= 0x020f00  // 2.15.0
     auto ts = mrptPts->getPointsBufferRef_float_field(
