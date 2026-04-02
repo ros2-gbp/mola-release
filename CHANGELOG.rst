@@ -2,6 +2,14 @@
 Changelog for package mola_kernel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.6.1 (2026-04-02)
+------------------
+* Merge pull request `#116 <https://github.com/MOLAorg/mola/issues/116>`_ from MOLAorg/update-rds-gui
+  Update RDS gui creation to new backend agnostic API
+* RDS: Fix parsing initial window pos and width
+* Update RDS gui creation to new backend agnostic API
+* Contributors: Jose Luis Blanco Claraco, Jose Luis Blanco-Claraco
+
 2.6.0 (2026-03-12)
 ------------------
 * Merge pull request `#113 <https://github.com/MOLAorg/mola/issues/113>`_ from MOLAorg/feat/kf-map-view-vectors
