@@ -3,6 +3,9 @@ Changelog for package kitti_metrics_eval
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+2.6.1 (2026-04-02)
+------------------
+
 2.6.0 (2026-03-12)
 ------------------
 * Merge pull request `#107 <https://github.com/MOLAorg/mola/issues/107>`_ from MOLAorg/fix/viz-decay-clouds
