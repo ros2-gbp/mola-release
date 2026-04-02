@@ -21,6 +21,7 @@
 #include <mrpt/config/CConfigFileBase.h>  // MRPT_LOAD_CONFIG_VAR
 #include <mrpt/core/get_env.h>
 #include <mrpt/maps/CGenericPointsMap.h>
+#include <mrpt/math/TOrientedBox.h>
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/obs/customizable_obs_viz.h>
 #include <mrpt/opengl/CPointCloudColoured.h>
@@ -30,10 +31,6 @@
 #include <mrpt/serialization/CArchive.h>  // serialization
 #include <mrpt/system/string_utils.h>  // unitsFormat()
 #include <mrpt/version.h>
-
-#if MRPT_VERSION >= 0x020e0d
-#include <mrpt/math/TOrientedBox.h>
-#endif
 
 #include <numeric>  // std::accumulate
 
@@ -232,6 +229,8 @@ bool KeyframePointCloudMap::nn_single_search(
     const mrpt::math::TPoint3Df& query, mrpt::math::TPoint3Df& result, float& out_dist_sqr,
     uint64_t& resultIndexOrID) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   return cached_.icp_search_submap->pointcloud()->nn_single_search(
       query, result, out_dist_sqr, resultIndexOrID);
@@ -241,6 +240,8 @@ bool KeyframePointCloudMap::nn_single_search(
     const mrpt::math::TPoint2Df& query, mrpt::math::TPoint2Df& result, float& out_dist_sqr,
     uint64_t& resultIndexOrID) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   return cached_.icp_search_submap->pointcloud()->nn_single_search(
       query, result, out_dist_sqr, resultIndexOrID);
@@ -250,6 +251,8 @@ void KeyframePointCloudMap::nn_multiple_search(
     const mrpt::math::TPoint3Df& query, const size_t N, std::vector<mrpt::math::TPoint3Df>& results,
     std::vector<float>& out_dists_sqr, std::vector<uint64_t>& resultIndicesOrIDs) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   cached_.icp_search_submap->pointcloud()->nn_multiple_search(
       query, N, results, out_dists_sqr, resultIndicesOrIDs);
@@ -259,6 +262,8 @@ void KeyframePointCloudMap::nn_multiple_search(
     const mrpt::math::TPoint2Df& query, const size_t N, std::vector<mrpt::math::TPoint2Df>& results,
     std::vector<float>& out_dists_sqr, std::vector<uint64_t>& resultIndicesOrIDs) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   cached_.icp_search_submap->pointcloud()->nn_multiple_search(
       query, N, results, out_dists_sqr, resultIndicesOrIDs);
@@ -269,6 +274,8 @@ void KeyframePointCloudMap::nn_radius_search(
     std::vector<mrpt::math::TPoint3Df>& results, std::vector<float>& out_dists_sqr,
     std::vector<uint64_t>& resultIndicesOrIDs, size_t maxPoints) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   cached_.icp_search_submap->pointcloud()->nn_radius_search(
       query, search_radius_sqr, results, out_dists_sqr, resultIndicesOrIDs, maxPoints);
@@ -279,6 +286,8 @@ void KeyframePointCloudMap::nn_radius_search(
     std::vector<mrpt::math::TPoint2Df>& results, std::vector<float>& out_dists_sqr,
     std::vector<uint64_t>& resultIndicesOrIDs, size_t maxPoints) const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   ASSERT_(cached_.icp_search_submap);
   cached_.icp_search_submap->pointcloud()->nn_radius_search(
       query, search_radius_sqr, results, out_dists_sqr, resultIndicesOrIDs, maxPoints);
@@ -431,7 +440,11 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(  // NOLINT
   }
 
   cached_.icp_search_kfs = kfs_to_search_limited;
-  lck.unlock();
+
+  // NOTE: Do NOT unlock 'lck' here. The mutex must be held for the entire submap
+  // rebuild below, because cached_.icp_search_submap and keyframes_ are both
+  // shared mutable state that can be read concurrently by nn_* methods and
+  // icp_get_prepared_as_global() itself.
 
   cached_.icp_search_submap.reset();
   cached_.icp_search_submap.emplace(creationOptions.k_correspondences_for_cov);
@@ -475,7 +488,7 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(  // NOLINT
       }
     }
 
-#if MRPT_VERSION >= 0x030000
+#if MRPT_VERSION >= 0x020f0b  // 2.15.11
     cached_.icp_search_submap->pointcloud()->insertAnotherMap(
         kf_global.get(), mrpt::poses::CPose3D::Identity(), false /*filterOutPointsAtZero*/,
         false /*autoRegisterAllSourceFields*/);
@@ -525,10 +538,14 @@ void KeyframePointCloudMap::merge_with(
 
 void KeyframePointCloudMap::transform_map_left_multiply(const mrpt::poses::CPose3D& b)
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   for (auto& [id, kf] : keyframes_)
   {
     kf.pose(b + kf.pose());
   }
+
+  cached_.reset();
 }
 
 void KeyframePointCloudMap::nn_search_cov2cov(
@@ -1285,11 +1302,18 @@ void KeyframePointCloudMap::KeyFrame::updatePointsGlobal() const
     auto* vy = pointcloud_global_->getPointsBufferRef_float_field("view_y");
     auto* vz = pointcloud_global_->getPointsBufferRef_float_field("view_z");
 
-    // TODO: Write an AVX2 version of this rotation loop.
-
-    if (vx != nullptr && vy != nullptr && vz != nullptr)
+    if (vx == nullptr || vy == nullptr || vz == nullptr)
     {
-      for (size_t i = 0, n = pointcloud_global_->size(); i < n; ++i)
+      // One or more view fields are missing in the destination map even
+      // though the source had all three.
+      // TODO: log a warning here once a logger is available.
+    }
+    else
+    {
+      const size_t n = pointcloud_global_->size();
+
+      // TODO: Write an AVX2 version of this rotation loop.
+      for (size_t i = 0; i < n; ++i)
       {
         const auto vg = pose_.rotateVector({(*vx)[i], (*vy)[i], (*vz)[i]}).cast<float>();
         (*vx)[i]      = vg.x;
@@ -1510,13 +1534,11 @@ std::shared_ptr<mrpt::opengl::CPointCloudColoured> KeyframePointCloudMap::KeyFra
     obj->setAllPointsAlpha(alpha_u8);
   }
 
-#if MRPT_VERSION >= 0x020f03
   mrpt::obs::PointCloudRecoloringParameters pcdCol;
   pcdCol.colorMap        = ro.colormap;
   pcdCol.colorizeByField = ro.recolorByPointField;
 
   mrpt::obs::recolorize3Dpc(obj, pointcloud().get(), pcdCol);
-#endif
 
   cached_viz_ = obj;
   return cached_viz_;
