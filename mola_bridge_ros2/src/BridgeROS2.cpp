@@ -26,6 +26,7 @@
 #include <mola_bridge_ros2/BridgeROS2.h>
 
 // MOLA/MRPT:
+#include <mola_kernel/interfaces/DiagnosticsProvider.h>
 #include <mola_kernel/pretty_print_exception.h>
 #include <mola_yaml/yaml_helpers.h>
 #include <mrpt/containers/yaml.h>
@@ -50,7 +51,7 @@
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/system/filesystem.h>
 #include <mrpt/topography/conversions.h>
-#include <mrpt/version.h>
+#include <mrpt/version.h>  // For MRPT_VERSION
 
 #if MRPT_ROS2_BRIDGE_VERSION >= 0x030400
 #include <mrpt/ros2bridge/ros_to_mrpt_obs.h>
@@ -65,6 +66,7 @@
 #include <mrpt_nav_interfaces/msg/georeferencing_metadata.hpp>
 
 // ROS 2:
+#include <diagnostic_msgs/msg/diagnostic_array.hpp>
 #include <geographic_msgs/msg/geo_pose_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
@@ -276,6 +278,7 @@ void BridgeROS2::initialize_rds(const Yaml& c)
   YAML_LOAD_OPT(params_, base_footprint_frame, std::string);
 
   YAML_LOAD_OPT(params_, forward_ros_tf_as_mola_odometry_observations, bool);
+  YAML_LOAD_OPT(params_, odometry_as_robot_pose_observation, bool);
   YAML_LOAD_OPT(params_, wait_for_tf_timeout_milliseconds, int);
 
   YAML_LOAD_OPT(params_, georef_map_reference_frame, std::string);
@@ -509,18 +512,44 @@ void BridgeROS2::callbackOnOdometry(
   MRPT_START
   const ProfilerEntry tle(profiler_, "callbackOnOdometry");
 
-  auto obs         = mrpt::obs::CObservationOdometry::Create();
-  obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
-  obs->sensorLabel = outSensorLabel;
-  obs->odometry    = mrpt::poses::CPose2D(mrpt::ros2bridge::fromROS(o.pose.pose));
+  if (params_.odometry_as_robot_pose_observation)
+  {
+    // 3D mode: CObservationRobotPose with full SE(3) pose + 6x6 covariance.
+    // This is suitable for multi-source fusion in the state estimation smoother.
+    auto obs         = mrpt::obs::CObservationRobotPose::Create();
+    obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
+    obs->sensorLabel = outSensorLabel;
+    obs->sensorPose  = mrpt::poses::CPose3D::Identity();
 
-  obs->hasVelocities       = true;
-  obs->velocityLocal.vx    = o.twist.twist.linear.x;
-  obs->velocityLocal.vy    = o.twist.twist.linear.y;
-  obs->velocityLocal.omega = o.twist.twist.angular.z;
+    // Uses mrpt::ros2bridge::fromROS(PoseWithCovariance) which handles the
+    // ROS [x,y,z,rotX,rotY,rotZ] <-> MRPT [x,y,z,yaw,pitch,roll] reordering:
+    obs->pose = mrpt::ros2bridge::fromROS(o.pose);
 
-  // send it out:
-  this->sendObservationsToFrontEnds(obs);
+    // If covariance is all-zero (source doesn't provide it), use a sensible default:
+    if (obs->pose.cov == mrpt::math::CMatrixDouble66::Zero())
+    {
+      obs->pose.cov.setZero();
+      for (int k = 0; k < 3; k++) obs->pose.cov(k, k) = 0.10 * 0.10;  // 10 cm sigma
+      for (int k = 3; k < 6; k++) obs->pose.cov(k, k) = 0.035 * 0.035;  // ~2 deg sigma
+    }
+
+    this->sendObservationsToFrontEnds(obs);
+  }
+  else
+  {
+    // 2D mode: CObservationOdometry (legacy, for 2D SLAM/mapping pipelines).
+    auto obs         = mrpt::obs::CObservationOdometry::Create();
+    obs->timestamp   = mrpt::ros2bridge::fromROS(o.header.stamp);
+    obs->sensorLabel = outSensorLabel;
+    obs->odometry    = mrpt::poses::CPose2D(mrpt::ros2bridge::fromROS(o.pose.pose));
+
+    obs->hasVelocities       = true;
+    obs->velocityLocal.vx    = o.twist.twist.linear.x;
+    obs->velocityLocal.vy    = o.twist.twist.linear.y;
+    obs->velocityLocal.omega = o.twist.twist.angular.z;
+
+    this->sendObservationsToFrontEnds(obs);
+  }
 
   MRPT_END
 }
@@ -1516,53 +1545,61 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
   // Send TF with localization result
   // 1) Direct mode:    reference_frame ("map") -> base_link ("base_link")
   // 2) Indirect mode:  map -> odom  (such as "map -> odom -> base_link" = "map -> base_link")
-  if (params_.publish_tf_from_slam && (params_.publish_tf_from_slam_source.empty() ||
-                                       params_.publish_tf_from_slam_source == l.method))
+  if (!params_.publish_tf_from_slam || (!params_.publish_tf_from_slam_source.empty() &&
+                                        params_.publish_tf_from_slam_source != l.method))
   {
-    tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l.pose);
+    return;
+  }
 
-    geometry_msgs::msg::TransformStamped tf;
-    tf.header.stamp = myNow(l.timestamp);
+  const tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l.pose);
 
-    // Follow REP105 only if we are publishing "map" -> "base_link" poses.
-    if (params_.publish_localization_following_rep105 && l.child_frame == params_.base_link_frame &&
-        l.reference_frame == params_.reference_frame)
+  geometry_msgs::msg::TransformStamped tf;
+  tf.header.stamp = myNow(l.timestamp);
+
+  // Follow REP105 only if we are publishing "map" -> "base_link" poses.
+  const bool useRep105 = params_.publish_localization_following_rep105 &&
+                         l.child_frame == params_.base_link_frame &&
+                         l.reference_frame == params_.reference_frame;
+
+  if (useRep105)
+  {
+    // Compose map -> odom = (map -> base_link) * (base_link -> odom):
+    mrpt::poses::CPose3D T_base_to_odom;
+    const bool           base_to_odom_ok = this->waitForTransform(
+                  T_base_to_odom,
+                  params_.odom_frame,  // Look for this frame
+                  l.child_frame,  // as seen from this frame
+                  true);
+    // Note: this wait above typ takes ~50 μs
+
+    if (!base_to_odom_ok)
     {
-      // Recompute:
-      mrpt::poses::CPose3D T_base_to_odom;
-      bool                 base_to_odom_ok =
-          this->waitForTransform(T_base_to_odom, params_.odom_frame, l.child_frame, true);
-      // Note: this wait above typ takes ~50 us
-
-      if (!base_to_odom_ok)
-      {
-        MRPT_LOG_ERROR_STREAM(
-            "publish_localization_following_rep105=true but could not resolve tf odom -> "
-            "base_link");
-      }
-      else
-      {
-        const tf2::Transform& baseOnMap_tf = transform;
-
-        const tf2::Transform odomOnBase_tf = mrpt::ros2bridge::toROS_tfTransform(T_base_to_odom);
-
-        tf.transform       = tf2::toMsg(baseOnMap_tf * odomOnBase_tf);
-        tf.child_frame_id  = params_.odom_frame;
-        tf.header.frame_id = l.reference_frame;
-      }
-    }
-    else
-    {
-      tf.transform       = tf2::toMsg(transform);
-      tf.child_frame_id  = l.child_frame;
-      tf.header.frame_id = l.reference_frame;
+      // Skip publishing entirely: broadcasting a default-constructed
+      // TransformStamped here would inject empty frame_ids into every
+      // subscriber's tf2 buffer (TF_NO_FRAME_ID / TF_SELF_TRANSFORM spam).
+      MRPT_LOG_THROTTLE_ERROR_STREAM(
+          5.0, "publish_localization_following_rep105=true but could not resolve tf '"
+                   << params_.odom_frame << "' -> '" << l.child_frame << "'; skipping TF publish.");
+      return;
     }
 
-    auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
-    if (tf_bc_)
-    {
-      tf_bc_->sendTransform(tf);
-    }
+    const tf2::Transform odomOnBase_tf = mrpt::ros2bridge::toROS_tfTransform(T_base_to_odom);
+
+    tf.transform       = tf2::toMsg(transform * odomOnBase_tf);
+    tf.child_frame_id  = params_.odom_frame;
+    tf.header.frame_id = l.reference_frame;
+  }
+  else
+  {
+    tf.transform       = tf2::toMsg(transform);
+    tf.child_frame_id  = l.child_frame;
+    tf.header.frame_id = l.reference_frame;
+  }
+
+  auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
+  if (tf_bc_)
+  {
+    tf_bc_->sendTransform(tf);
   }
 }
 
@@ -1894,6 +1931,15 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& 
     const auto type                = topic["msg_type"].as<std::string>();
     const auto output_sensor_label = topic["output_sensor_label"].as<std::string>();
 
+    // Skip entries with empty topic name (allows optional subscribe slots
+    // controlled via env vars, e.g. ${ODOM1_TOPIC|}):
+    if (topic_name.empty())
+    {
+      MRPT_LOG_DEBUG_STREAM(
+          "Skipping subscribe entry with empty topic name (label='" << output_sensor_label << "')");
+      continue;
+    }
+
     MRPT_LOG_DEBUG_STREAM(
         "Creating ros2 subscriber for topic='" << topic_name << "' (" << type << ")");
 
@@ -2063,6 +2109,57 @@ void BridgeROS2::publishDiagnostics()
 
     }  // fof each diagnostics message
   }  // end for each module
+
+  // Additionally, collect REP-107 structured diagnostics from modules
+  // implementing the DiagnosticsProvider interface and publish them on
+  // the standard /diagnostics topic.
+  auto diagProviders = this->findService<mola::DiagnosticsProvider>();
+  if (!diagProviders.empty())
+  {
+    diagnostic_msgs::msg::DiagnosticArray arrMsg;
+    arrMsg.header.stamp = rosNode()->now();
+
+    for (auto& mod : diagProviders)
+    {
+      auto prov = std::dynamic_pointer_cast<mola::DiagnosticsProvider>(mod);
+      if (!prov) continue;
+
+      std::vector<mola::DiagnosticStatusMsg> items;
+      try
+      {
+        prov->getDiagnostics(items);
+      }
+      catch (const std::exception& e)
+      {
+        MRPT_LOG_THROTTLE_WARN_STREAM(
+            5.0, "Exception in DiagnosticsProvider::getDiagnostics(): " << e.what());
+        continue;
+      }
+
+      const std::string defaultHwId = mod->getModuleInstanceName();
+
+      for (const auto& it : items)
+      {
+        diagnostic_msgs::msg::DiagnosticStatus st;
+        st.level       = static_cast<unsigned char>(it.level);
+        st.name        = it.name;
+        st.message     = it.message;
+        st.hardware_id = it.hardware_id.empty() ? defaultHwId : it.hardware_id;
+        st.values.reserve(it.values.size());
+        for (const auto& kv : it.values)
+        {
+          diagnostic_msgs::msg::KeyValue rkv;
+          rkv.key   = kv.key;
+          rkv.value = kv.value;
+          st.values.push_back(rkv);
+        }
+        arrMsg.status.push_back(std::move(st));
+      }
+    }
+
+    auto pubAgg = get_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", qos);
+    pubAgg->publish(arrMsg);
+  }
 }
 
 void BridgeROS2::internalPublishGridMap(
