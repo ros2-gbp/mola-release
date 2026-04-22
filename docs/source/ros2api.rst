@@ -179,6 +179,14 @@ for the different situations listed above:
       - ``enu → {map, utm}``: Published by ``mrpt_map_server`` (`github <https://github.com/mrpt-ros-pkg/mrpt_navigation/tree/ros2/mrpt_map_server/>`_)
         or ``mola_lidar_odometry`` :ref:`map loading service <map_loading_saving>` if fed with a geo-referenced metric map (``.mm``) file.
 
+      .. note::
+
+         Internally, the MOLA localization module (``mola_lidar_odometry`` or a
+         state estimator) always emits ``map → base_link`` updates.
+         :ref:`BridgeROS2 <doxid-classmola_1_1_bridge_r_o_s2>` is what splits
+         that into the REP-105 ``map → odom`` /tf broadcast by querying the
+         current ``odom → base_link`` from /tf and composing it out.
+
    .. tab-item:: (B) LO, no REP105
 
       When using just a LiDAR as single sensor.
@@ -209,6 +217,15 @@ for the different situations listed above:
       - ``enu → {map, utm}``: Published by ``mrpt_map_server`` (`github <https://github.com/mrpt-ros-pkg/mrpt_navigation/tree/ros2/mrpt_map_server/>`_)
         or ``mola_lidar_odometry`` :ref:`map loading service <map_loading_saving>` if fed with a geo-referenced metric map (``.mm``) file.
 
+      .. note::
+
+         External odometry sources must enter MOLA as ``nav_msgs/Odometry``
+         topics (consumed as observations), **not** via /tf. If a wheel
+         driver also broadcasts ``odom → base_link`` to /tf while the
+         state estimator publishes ``map → base_link``, ``base_link``
+         ends up with two parents and tf2 rejects the tree. See the
+         :ref:`cookbook §4.4 <mola_ros2_cookbook_4_4>`.
+
 .. note::
 
    For non geo-referenced maps, all frames remain the same but ``utm`` and ``enu`` will not exist.
@@ -235,9 +252,68 @@ Definition of the frames above:
 
 |
 
+.. _ros2api_subscribed_topics:
+
+5. Subscribed topics (``subscribe`` YAML block)
+---------------------------------------------------
+
+``BridgeROS2`` subscribes to ROS 2 sensor topics listed under the ``subscribe``
+key in its YAML parameters.  Each entry in the sequence must contain at least
+the following fields:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Field
+     - Required
+     - Description
+   * - ``topic``
+     - Yes
+     - ROS 2 topic name (e.g. ``/imu``).  **If empty, the entry is silently
+       skipped**, which allows defining optional subscription slots controlled
+       via environment variables (e.g. ``topic: ${ODOM2_TOPIC|}``).
+   * - ``msg_type``
+     - Yes
+     - One of: ``PointCloud2``, ``LaserScan``, ``Imu``, ``NavSatFix``,
+       ``Odometry``, ``Image``.
+   * - ``output_sensor_label``
+     - Yes
+     - Label assigned to the MOLA observation forwarded to front-ends.
+   * - ``fixed_sensor_pose``
+     - No
+     - ``"x y z yaw pitch roll"`` - if present together with
+       ``use_fixed_sensor_pose: true``, the sensor-on-vehicle pose is taken from
+       this value instead of querying ``/tf``.
+   * - ``use_fixed_sensor_pose``
+     - No
+     - Boolean (default ``false``).  When ``false``, the sensor pose is looked up
+       via ``/tf`` at runtime.
+
+Example:
+
+.. code-block:: yaml
+
+    subscribe:
+      # Slot always active:
+      - topic: /imu
+        msg_type: Imu
+        output_sensor_label: "imu"
+
+      # Optional slot - disabled when ODOM2_TOPIC is unset:
+      - topic: ${ODOM2_TOPIC|}
+        msg_type: Odometry
+        output_sensor_label: "${ODOM2_LABEL|odom2}"
+
+|
+
+----
+
+|
+
 .. _ros2api_topics:
 
-5. Published topics
+6. Published topics
 --------------------------------------
 Write me!
 
@@ -247,7 +323,7 @@ Write me!
 
 |
 
-6. Map publishing
+7. Map publishing
 --------------------------------------
 There are three ways of publishing maps to ROS:
 
@@ -288,7 +364,7 @@ if mapping is enabled and the map has changed since the last publication.
 
 .. _ros2api_runtime_params:
 
-7. Runtime dynamic reconfiguration
+8. Runtime dynamic reconfiguration
 ----------------------------------------
 MOLA modules may expose a subset of their parameters through an interface that allows
 runtime reconfiguration via ROS 2 service requests:
@@ -392,10 +468,10 @@ Documented parameters:
 
 .. _mola_ros2_initial_localization:
 
-8. Initial localization
+9. Initial localization
 --------------------------------------
 
-8.1. Lidar-Odometry (LO)
+9.1. Lidar-Odometry (LO)
 ============================================
 When the LO system is started, there are different situations: 
 
