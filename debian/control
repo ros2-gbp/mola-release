@@ -1,0 +1,12 @@
+Source: ros-lyrical-mola-input-rosbag2
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-lyrical-cv-bridge, ros-lyrical-gps-msgs, ros-lyrical-mola-kernel, ros-lyrical-mrpt-libobs, ros-lyrical-mrpt-libros-bridge, ros-lyrical-rosbag2-cpp, ros-lyrical-sensor-msgs, ros-lyrical-tf2-geometry-msgs, ros-lyrical-tf2-msgs, ros-lyrical-tf2-ros, ros-lyrical-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_input_rosbag2
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-mola-input-rosbag2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-cv-bridge, ros-lyrical-gps-msgs, ros-lyrical-mola-kernel, ros-lyrical-mrpt-libobs, ros-lyrical-mrpt-libros-bridge, ros-lyrical-rosbag2-cpp, ros-lyrical-sensor-msgs, ros-lyrical-tf2-geometry-msgs, ros-lyrical-tf2-msgs, ros-lyrical-tf2-ros, ros-lyrical-ros-workspace
+Description: Offline RawDataSource from rosbag2 datasets
