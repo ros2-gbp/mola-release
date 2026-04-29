@@ -2,9 +2,6 @@
 Changelog for package mola_demos
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-2.8.0 (2026-04-29)
-------------------
-
 2.7.0 (2026-04-22)
 ------------------
 * Merge pull request `#122 <https://github.com/MOLAorg/mola/issues/122>`_ from MOLAorg/feat/ros2-bridge-multiple-odometries
