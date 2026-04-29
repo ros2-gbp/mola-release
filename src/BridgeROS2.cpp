@@ -77,107 +77,6 @@
 
 using namespace mola;
 
-namespace
-{
-// Default subscription queue depth for sensor topics. ROS 2's
-// SensorDataQoS defaults to keep_last(5), which is too shallow for
-// high-rate sensors (e.g. 640 Hz IMU) when the executor is under
-// load: the queue overflows and best-effort drops are silent.
-constexpr size_t kDefaultSubscriptionDepth = 50;
-
-// Build an rclcpp::QoS for a sensor subscription, optionally
-// overridden per-topic via a YAML `qos:` block:
-//
-//   qos:
-//     reliability: best_effort | reliable     (default: best_effort)
-//     history:     keep_last   | keep_all     (default: keep_last)
-//     depth:       <int>                      (default: 50)
-//     durability:  volatile    | transient_local (default: volatile)
-//
-// Defaults match `rclcpp::SensorDataQoS()` (REP-2003) but with a
-// deeper queue (50 instead of 5) to absorb executor stalls.
-rclcpp::QoS buildSubscriptionQoS(const mrpt::containers::yaml& topicCfg)
-{
-  std::string reliability = "best_effort";
-  std::string history     = "keep_last";
-  size_t      depth       = kDefaultSubscriptionDepth;
-  std::string durability  = "volatile";
-
-  bool depthExplicitlySet = false;
-  if (topicCfg.has("qos"))
-  {
-    const auto qosCfg = topicCfg["qos"];
-    if (qosCfg.has("reliability"))
-    {
-      reliability = qosCfg["reliability"].as<std::string>();
-    }
-    if (qosCfg.has("history"))
-    {
-      history = qosCfg["history"].as<std::string>();
-    }
-    if (qosCfg.has("depth"))
-    {
-      depth              = qosCfg["depth"].as<uint64_t>();
-      depthExplicitlySet = true;
-    }
-    if (qosCfg.has("durability"))
-    {
-      durability = qosCfg["durability"].as<std::string>();
-    }
-  }
-
-  rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(kDefaultSubscriptionDepth));
-  if (history == "keep_all")
-  {
-    qos = rclcpp::QoS(rclcpp::KeepAll());
-  }
-  else if (history == "keep_last")
-  {
-    if (depthExplicitlySet && depth == 0)
-    {
-      THROW_EXCEPTION("Invalid qos.depth=0 with history='keep_last' (must be >0)");
-    }
-    qos = rclcpp::QoS(rclcpp::KeepLast(depth));
-  }
-  else
-  {
-    THROW_EXCEPTION_FMT(
-        "Invalid qos.history='%s' (expected 'keep_last' or 'keep_all')", history.c_str());
-  }
-
-  if (reliability == "reliable")
-  {
-    qos.reliable();
-  }
-  else if (reliability == "best_effort")
-  {
-    qos.best_effort();
-  }
-  else
-  {
-    THROW_EXCEPTION_FMT(
-        "Invalid qos.reliability='%s' (expected 'reliable' or 'best_effort')", reliability.c_str());
-  }
-
-  if (durability == "transient_local")
-  {
-    qos.transient_local();
-  }
-  else if (durability == "volatile")
-  {
-    qos.durability_volatile();
-  }
-  else
-  {
-    THROW_EXCEPTION_FMT(
-        "Invalid qos.durability='%s' (expected 'volatile' or 'transient_local')",
-        durability.c_str());
-  }
-
-  return qos;
-}
-}  // namespace
-
 // arguments: class_name, parent_class, class namespace
 IMPLEMENTS_MRPT_OBJECT(BridgeROS2, RawDataSourceBase, mola)
 
@@ -332,30 +231,6 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
           }
         });
 
-    // Re-broadcast the cached localization /tf at a fixed rate so the buffer
-    // stays populated for downstream consumers regardless of localization
-    // update rate. Set to 0 to disable.
-    rclcpp::TimerBase::SharedPtr timerRebroadcastLocTf;
-    if (params_.transform_publish_period > 0.0)
-    {
-      timerRebroadcastLocTf = rosNode_->create_wall_timer(
-          std::chrono::microseconds(
-              static_cast<unsigned int>(1e6 * params_.transform_publish_period)),
-          [this]()
-          {
-            try
-            {
-              // onlyIfRep105=true: direct-mode (map -> base_link) is not
-              // rebroadcast periodically -- see CachedLocalizationTf docs.
-              broadcastCachedLocalizationTf(/*onlyIfRep105=*/true);
-            }
-            catch (const std::exception& e)
-            {
-              MRPT_LOG_ERROR(e.what());
-            }
-          });
-    }
-
     //
     if (!params_.relocalize_from_topic.empty())
     {
@@ -441,8 +316,6 @@ void BridgeROS2::initialize_rds(const Yaml& c)
   YAML_LOAD_OPT(params_, publish_geo_referenced_poses_from_slam, bool);
 
   YAML_LOAD_OPT(params_, publish_in_sim_time, bool);
-  YAML_LOAD_OPT(params_, transform_tolerance, double);
-  YAML_LOAD_OPT(params_, transform_publish_period, double);
   YAML_LOAD_OPT(params_, period_publish_new_map, double);
   YAML_LOAD_OPT(params_, period_publish_static_tfs, double);
   YAML_LOAD_OPT(params_, period_publish_diagnostics, double);
@@ -496,8 +369,8 @@ void BridgeROS2::callbackOnPointCloud2(
     if (!mrpt::ros2bridge::lookupSensorPose(
             obs_pc->sensorPose, *tf_buffer_, o.header.frame_id, params_.base_link_frame))
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0, "Could not get /tf '%s'->'%s'", params_.base_link_frame.c_str(),
+      MRPT_LOG_ERROR_FMT(
+          "Could not get /tf '%s'->'%s'", params_.base_link_frame.c_str(),
           o.header.frame_id.c_str());
       return;
     }
@@ -583,12 +456,12 @@ void BridgeROS2::callbackOnPointCloud2(
   else
   {
     // Get pose from tf:
-    bool ok = waitForTransform(obs_pc->sensorPose, o.header.frame_id, params_.base_link_frame);
+    bool ok = waitForTransform(
+        obs_pc->sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
 
     if (!ok)
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0,
+      MRPT_LOG_ERROR_FMT(
           "Could not forward ROS2 observation to MOLA due to timeout "
           "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
           params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
@@ -605,7 +478,8 @@ void BridgeROS2::callbackOnPointCloud2(
 #endif
 
 bool BridgeROS2::waitForTransform(
-    mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame)
+    mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame,
+    bool printErrors)
 {
   try
   {
@@ -624,8 +498,10 @@ bool BridgeROS2::waitForTransform(
   }
   catch (const tf2::TransformException& ex)
   {
-    // Callers log a contextual, throttled error; keep the raw tf2 reason at DEBUG.
-    MRPT_LOG_DEBUG(ex.what());
+    if (printErrors)
+    {
+      MRPT_LOG_ERROR(ex.what());
+    }
     return false;
   }
 }
@@ -697,7 +573,8 @@ void BridgeROS2::importRosOdometryToMOLA()
   // Get pose from tf:
   mrpt::poses::CPose3D odomPose;
 
-  bool odom_tf_ok = waitForTransform(odomPose, params_.base_link_frame, params_.odom_frame);
+  bool odom_tf_ok = waitForTransform(
+      odomPose, params_.base_link_frame, params_.odom_frame, false /*dont print errors*/);
   if (!odom_tf_ok)
   {
     MRPT_LOG_THROTTLE_WARN_FMT(
@@ -740,12 +617,12 @@ void BridgeROS2::callbackOnLaserScan(
   else
   {
     // Get pose from tf:
-    bool ok = waitForTransform(sensorPose, o.header.frame_id, params_.base_link_frame);
+    bool ok = waitForTransform(
+        sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
 
     if (!ok)
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0,
+      MRPT_LOG_ERROR_FMT(
           "Could not forward ROS2 observation to MOLA due to timeout "
           "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
           params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
@@ -786,11 +663,11 @@ void BridgeROS2::callbackOnImu(
   else
   {
     // Get pose from tf:
-    bool ok = waitForTransform(sensorPose, o.header.frame_id, params_.base_link_frame);
+    bool ok = waitForTransform(
+        sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
     if (!ok)
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0,
+      MRPT_LOG_ERROR_FMT(
           "Could not forward ROS2 observation to MOLA due to timeout "
           "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
           params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
@@ -832,11 +709,11 @@ void BridgeROS2::callbackOnNavSatFix(
   else
   {
     // Get pose from tf:
-    bool ok = waitForTransform(sensorPose, o.header.frame_id, params_.base_link_frame);
+    bool ok = waitForTransform(
+        sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
     if (!ok)
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0,
+      MRPT_LOG_ERROR_FMT(
           "Could not forward ROS2 observation to MOLA due to timeout "
           "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
           params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
@@ -879,11 +756,11 @@ void BridgeROS2::callbackOnGpsMsg(
   else
   {
     // Get pose from tf:
-    bool ok = waitForTransform(sensorPose, o.header.frame_id, params_.base_link_frame);
+    bool ok = waitForTransform(
+        sensorPose, o.header.frame_id, params_.base_link_frame, true /*print errors*/);
     if (!ok)
     {
-      MRPT_LOG_THROTTLE_ERROR_FMT(
-          5.0,
+      MRPT_LOG_ERROR_FMT(
           "Could not forward ROS2 observation to MOLA due to timeout "
           "waiting for /tf transform '%s'->'%s' for timestamp=%f.",
           params_.base_link_frame.c_str(), o.header.frame_id.c_str(),
@@ -1677,6 +1554,7 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
   const tf2::Transform transform = mrpt::ros2bridge::toROS_tfTransform(l.pose);
 
   geometry_msgs::msg::TransformStamped tf;
+  tf.header.stamp = myNow(l.timestamp);
 
   // Follow REP105 only if we are publishing "map" -> "base_link" poses.
   const bool useRep105 = params_.publish_localization_following_rep105 &&
@@ -1685,32 +1563,27 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
 
   if (useRep105)
   {
-    // Compose map -> odom = (map -> base_link)(t_scan) * (base_link -> odom)(t_scan).
-    // Both factors must be sampled at the same instant for the result to be a
-    // mathematically exact REP-105 correction, so look up base_link -> odom at
-    // l.timestamp (the data acquisition time the localizer just processed),
-    // not at "latest" -- otherwise the published correction is biased by the
-    // odom-frame motion accumulated during the localizer's processing latency.
-    tf2::Transform odomOnBase_tf;
-    try
-    {
-      const rclcpp::Time   scan_stamp = mrpt::ros2bridge::toROS(l.timestamp);
-      const tf2::TimePoint scan_tp{std::chrono::nanoseconds(scan_stamp.nanoseconds())};
-      const auto           ref_to_trgFrame =
-          tf_buffer_->lookupTransform(l.child_frame, params_.odom_frame, scan_tp);
-      tf2::fromMsg(ref_to_trgFrame.transform, odomOnBase_tf);
-    }
-    catch (const tf2::TransformException& ex)
+    // Compose map -> odom = (map -> base_link) * (base_link -> odom):
+    mrpt::poses::CPose3D T_base_to_odom;
+    const bool           base_to_odom_ok = this->waitForTransform(
+                  T_base_to_odom,
+                  params_.odom_frame,  // Look for this frame
+                  l.child_frame,  // as seen from this frame
+                  true);
+    // Note: this wait above typ takes ~50 μs
+
+    if (!base_to_odom_ok)
     {
       // Skip publishing entirely: broadcasting a default-constructed
       // TransformStamped here would inject empty frame_ids into every
       // subscriber's tf2 buffer (TF_NO_FRAME_ID / TF_SELF_TRANSFORM spam).
       MRPT_LOG_THROTTLE_ERROR_STREAM(
           5.0, "publish_localization_following_rep105=true but could not resolve tf '"
-                   << params_.odom_frame << "' -> '" << l.child_frame << "' at scan stamp ("
-                   << ex.what() << "); skipping TF publish.");
+                   << params_.odom_frame << "' -> '" << l.child_frame << "'; skipping TF publish.");
       return;
     }
+
+    const tf2::Transform odomOnBase_tf = mrpt::ros2bridge::toROS_tfTransform(T_base_to_odom);
 
     tf.transform       = tf2::toMsg(transform * odomOnBase_tf);
     tf.child_frame_id  = params_.odom_frame;
@@ -1723,57 +1596,10 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
     tf.header.frame_id = l.reference_frame;
   }
 
-  // Cache the latest computed TF so the rebroadcast timer (and any future
-  // calls) can re-emit it with a fresh stamp; the stamp itself is set at
-  // broadcast time inside broadcastCachedLocalizationTf().
-  {
-    auto lck              = mrpt::lockHelper(cachedLocalizationTfMtx_);
-    cachedLocalizationTf_ = CachedLocalizationTf{tf, useRep105, l.timestamp};
-  }
-
-  // Immediate broadcast so consumers see the new pose without waiting for the
-  // next rebroadcast tick (matters when transform_publish_period is large).
-  // onlyIfRep105=false: always broadcast on new updates, in both modes.
-  broadcastCachedLocalizationTf(/*onlyIfRep105=*/false);
-}
-
-void BridgeROS2::broadcastCachedLocalizationTf(bool onlyIfRep105)
-{
-  CachedLocalizationTf entry;
-  {
-    auto lck = mrpt::lockHelper(cachedLocalizationTfMtx_);
-    if (!cachedLocalizationTf_) return;
-    if (onlyIfRep105 && !cachedLocalizationTf_->useRep105) return;
-    entry = *cachedLocalizationTf_;
-  }
-
-  if (entry.useRep105)
-  {
-    // REP-105 (map -> odom): stamp at "now + tolerance" so consumers can
-    // lookupTransform(map, base, now()) without ExtrapolationException.
-    // Safe to rebroadcast with advancing stamps because odom -> base_link
-    // carries the real motion; the correction staying constant just means
-    // "no new localization update yet", which is the expected semantics.
-    auto node = rosNode();
-    if (!node) return;
-    entry.tf.header.stamp =
-        node->now() + rclcpp::Duration::from_seconds(params_.transform_tolerance);
-  }
-  else
-  {
-    // Direct mode (map -> base_link): stamp at the scan acquisition time
-    // (honors publish_in_sim_time) so downstream consumers can correlate
-    // the pose with the sensor data that produced it. We do NOT future-date
-    // here, and the periodic timer skips this branch entirely, so a stalled
-    // localizer produces stale-looking TFs (correct) rather than a frozen
-    // pose silently re-stamped as "current".
-    entry.tf.header.stamp = myNow(entry.scan_timestamp);
-  }
-
   auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
   if (tf_bc_)
   {
-    tf_bc_->sendTransform(entry.tf);
+    tf_bc_->sendTransform(tf);
   }
 }
 
@@ -2089,10 +1915,9 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& 
 {
   using namespace std::string_literals;
 
-  // Default subscription QoS follows REP-2003 (best-effort, volatile)
-  // but with a deeper queue. Each topic entry may override it via an
-  // optional `qos:` block; see buildSubscriptionQoS().
+  // Should be used to subscribe to sensor topics, per REP-2003:
   // https://ros.org/reps/rep-2003.html
+  const rclcpp::QoS qos = rclcpp::SensorDataQoS();
 
   for (const auto& topicItem : ds_subscribe.asSequence())
   {
@@ -2117,8 +1942,6 @@ void BridgeROS2::internalAnalyzeTopicsToSubscribe(const mrpt::containers::yaml& 
 
     MRPT_LOG_DEBUG_STREAM(
         "Creating ros2 subscriber for topic='" << topic_name << "' (" << type << ")");
-
-    const rclcpp::QoS qos = buildSubscriptionQoS(topic);
 
     // Optional: fixed sensorPose (then ignores/don't need "tf" data):
     std::optional<mrpt::poses::CPose3D> fixedSensorPose;
