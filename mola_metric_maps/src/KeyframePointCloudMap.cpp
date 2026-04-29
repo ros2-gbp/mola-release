@@ -195,10 +195,6 @@ void KeyframePointCloudMap::serializeFrom(mrpt::serialization::CArchive& in, uin
       MRPT_THROW_UNKNOWN_SERIALIZATION_VERSION(version);
   };
 
-  // Restore the monotonic id counter so future insertions don't collide
-  // with already-loaded ids.
-  next_free_kf_id_ = keyframes_.empty() ? 0 : (keyframes_.rbegin()->first + 1);
-
   // cache reset:
   cached_.reset();
 }
@@ -503,24 +499,6 @@ void KeyframePointCloudMap::icp_get_prepared_as_global(  // NOLINT
   }
 
   cached_.icp_search_submap->buildCache();
-
-  // Pre-warm the *global-frame* structures used by NearestPointWithCovCapable
-  // matchers (nn_search_cov2cov).  buildCache() above only builds:
-  //   - bbox, KD-tree on pointcloud_  (local frame)
-  //   - per-point covariances in local frame
-  //
-  // But the matcher accesses, on the submap, all of these instead:
-  //   - pointcloud_global()      -> deep copy of pointcloud_ rotated to global
-  //   - kdTreeEnsureIndexBuilt3D -> KD-tree on the *global* cloud
-  //   - covariancesGlobal()      -> rotated covariances
-  //
-  // Without warming these here, the first ICP align() pays the cost on the
-  // lidar worker thread, which can stall the very first scan for several
-  // seconds on large maps - even when icp_get_prepared_as_global() has
-  // already been called.
-  const auto& globalPoints = cached_.icp_search_submap->pointcloud_global();
-  globalPoints->kdTreeEnsureIndexBuilt3D();
-  cached_.icp_search_submap->covariancesGlobal();
 }
 
 void KeyframePointCloudMap::icp_cleanup() const
@@ -537,10 +515,6 @@ void KeyframePointCloudMap::merge_with(
   ASSERTMSG_(
       sourceMapKF, "Implementation expects source map to be also of type KeyframePointCloudMap");
 
-  ASSERT_(sourceMapKF != this);
-
-  auto lck = mrpt::lockHelper(*state_mtx_);
-
   for (const auto& [srcKfId, srcKf] : sourceMapKF->keyframes_)
   {
     const auto& srcPc = srcKf.pointcloud();
@@ -549,7 +523,7 @@ void KeyframePointCloudMap::merge_with(
       continue;
     }
     auto [it, isNew] =
-        keyframes_.emplace(next_free_kf_id_++, creationOptions.k_correspondences_for_cov);
+        keyframes_.emplace(nextFreeKeyFrameID(), creationOptions.k_correspondences_for_cov);
     auto& new_kf = it->second;
 
     // copy
@@ -559,7 +533,6 @@ void KeyframePointCloudMap::merge_with(
     {
       new_kf.pose(*otherRelativePose + new_kf.pose());
     }
-    last_inserted_kf_id_ = it->first;
   }
 }
 
@@ -1167,51 +1140,7 @@ void KeyframePointCloudMap::internal_clear()
   auto lck = mrpt::lockHelper(*state_mtx_);
 
   keyframes_.clear();
-  last_inserted_kf_id_.reset();
-  evicted_kf_ids_.clear();
-  next_free_kf_id_ = 0;
   cached_.reset();
-}
-
-KeyframePointCloudMap::KeyFrameID KeyframePointCloudMap::nextFreeKeyFrameID_public() const
-{
-  auto lck = mrpt::lockHelper(*state_mtx_);
-  return nextFreeKeyFrameID();
-}
-
-std::map<KeyframePointCloudMap::KeyFrameID, mrpt::poses::CPose3D>
-    KeyframePointCloudMap::cloneKFPoses() const
-{
-  auto                                       lck = mrpt::lockHelper(*state_mtx_);
-  std::map<KeyFrameID, mrpt::poses::CPose3D> out;
-  for (const auto& [id, kf] : keyframes_) out.emplace(id, kf.pose());
-  return out;
-}
-
-void KeyframePointCloudMap::setKeyframePose(KeyFrameID id, const mrpt::poses::CPose3D& new_pose)
-{
-  auto lck = mrpt::lockHelper(*state_mtx_);
-  auto it  = keyframes_.find(id);
-  if (it == keyframes_.end()) return;
-  it->second.pose(new_pose);
-  // KF-local caches are invalidated by KeyFrame::pose(). Top-level caches
-  // (bounding box, icp submap) also depend on KF poses, so invalidate them:
-  cached_.reset();
-}
-
-std::optional<KeyframePointCloudMap::KeyFrameID> KeyframePointCloudMap::lastInsertedKeyFrameID()
-    const
-{
-  auto lck = mrpt::lockHelper(*state_mtx_);
-  return last_inserted_kf_id_;
-}
-
-std::vector<KeyframePointCloudMap::KeyFrameID> KeyframePointCloudMap::drainEvictedKeyFrameIDs()
-{
-  auto                    lck = mrpt::lockHelper(*state_mtx_);
-  std::vector<KeyFrameID> out;
-  out.swap(evicted_kf_ids_);
-  return out;
 }
 
 bool KeyframePointCloudMap::internal_insertObservation(
@@ -1234,7 +1163,6 @@ bool KeyframePointCloudMap::internal_insertObservation(
       const double dist = pc_in_map.distanceTo(it->second.pose());
       if (dist > insertionOptions.remove_frames_farther_than)
       {
-        evicted_kf_ids_.push_back(it->first);
         it = keyframes_.erase(it);
       }
       else
@@ -1249,9 +1177,9 @@ bool KeyframePointCloudMap::internal_insertObservation(
   {
     ASSERT_(obsPC->pointcloud);
 
-    // Add KF: allocate a fresh monotonic id (never reused, even after eviction).
+    // Add KF:
     auto [it, isNew] =
-        keyframes_.emplace(next_free_kf_id_++, creationOptions.k_correspondences_for_cov);
+        keyframes_.emplace(nextFreeKeyFrameID(), creationOptions.k_correspondences_for_cov);
     auto& new_kf = it->second;
 
     new_kf.timestamp = obs.timestamp;
@@ -1260,8 +1188,6 @@ bool KeyframePointCloudMap::internal_insertObservation(
 
     new_kf.buildCache();
     cached_.reset();
-
-    last_inserted_kf_id_ = it->first;
 
     return true;
   }
