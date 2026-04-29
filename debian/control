@@ -1,0 +1,12 @@
+Source: ros-lyrical-mola-msgs
+Section: misc
+Priority: optional
+Maintainer: Jose Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), ros-lyrical-action-msgs, ros-lyrical-ament-cmake, ros-lyrical-mrpt-msgs, ros-lyrical-nav-msgs, ros-lyrical-rosidl-default-generators, ros-lyrical-ros-workspace, ros-lyrical-rosidl-typesupport-fastrtps-c, ros-lyrical-rosidl-typesupport-fastrtps-cpp
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_msgs
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-mola-msgs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-action-msgs, ros-lyrical-mrpt-msgs, ros-lyrical-nav-msgs, ros-lyrical-rosidl-default-runtime, ros-lyrical-ros-workspace
+Description: ROS message, services, and actions used in other MOLA packages.
