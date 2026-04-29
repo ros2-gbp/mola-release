@@ -1,0 +1,107 @@
+ros-lyrical-mola-input-video (2.7.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 22 Apr 2026 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.6.1-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 02 Apr 2026 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.6.0-3trixie) trixie; urgency=high
+
+  * Merge pull request #107 <https://github.com/MOLAorg/mola/issues/107> from MOLAorg/fix/viz-decay-clouds
+    Fix/viz-decay-clouds
+  * Update coyright notes
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Thu, 12 Mar 2026 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.5.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 14 Feb 2026 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.4.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 28 Dec 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.3.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 15 Dec 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.2.1-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sat, 08 Nov 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.2.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 28 Oct 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.1.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 20 Oct 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (2.0.0-3trixie) trixie; urgency=high
+
+  * Modernize copyright notice
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 13 Oct 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.9.1-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Mon, 07 Jul 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.9.0-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Fri, 06 Jun 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.8.1-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 28 May 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.8.0-3trixie) trixie; urgency=high
+
+  * Update copyright year
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Sun, 25 May 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.7.0-3trixie) trixie; urgency=high
+
+  * Implement live camera mode too
+  * video input from video files also implemented now
+  * Merge pull request #85 <https://github.com/MOLAorg/mola/issues/85> from MOLAorg/feat/video-input-module
+    Feature: new video input MOLA module
+  * Feature: new video input MOLA module. For now, implements "image directory" input.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Tue, 06 May 2025 00:00:00 -0000
+
+ros-lyrical-mola-input-video (1.6.4-3trixie) trixie; urgency=high
+
+
+
+ -- Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>  Wed, 23 Apr 2025 00:00:00 -0000
+
+
