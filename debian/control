@@ -1,0 +1,12 @@
+Source: ros-lyrical-mola
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <jlblanco@ual.es>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-lyrical-kitti-metrics-eval, ros-lyrical-mola-bridge-ros2, ros-lyrical-mola-demos, ros-lyrical-mola-input-euroc-dataset, ros-lyrical-mola-input-kitti-dataset, ros-lyrical-mola-input-kitti360-dataset, ros-lyrical-mola-input-mulran-dataset, ros-lyrical-mola-input-paris-luco-dataset, ros-lyrical-mola-input-rawlog, ros-lyrical-mola-input-rosbag2, ros-lyrical-mola-input-video, ros-lyrical-mola-kernel, ros-lyrical-mola-launcher, ros-lyrical-mola-metric-maps, ros-lyrical-mola-pose-list, ros-lyrical-mola-relocalization, ros-lyrical-mola-traj-tools, ros-lyrical-mola-viz, ros-lyrical-mola-yaml, ros-lyrical-ros-workspace
+Homepage: https://index.ros.org/p/mola/#lyrical
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-mola
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-kitti-metrics-eval, ros-lyrical-mola-bridge-ros2, ros-lyrical-mola-demos, ros-lyrical-mola-input-euroc-dataset, ros-lyrical-mola-input-kitti-dataset, ros-lyrical-mola-input-kitti360-dataset, ros-lyrical-mola-input-mulran-dataset, ros-lyrical-mola-input-paris-luco-dataset, ros-lyrical-mola-input-rawlog, ros-lyrical-mola-input-rosbag2, ros-lyrical-mola-input-video, ros-lyrical-mola-kernel, ros-lyrical-mola-launcher, ros-lyrical-mola-metric-maps, ros-lyrical-mola-pose-list, ros-lyrical-mola-relocalization, ros-lyrical-mola-traj-tools, ros-lyrical-mola-viz, ros-lyrical-mola-yaml, ros-lyrical-ros-workspace
+Description: Metapackage with all core open-sourced MOLA packages.
