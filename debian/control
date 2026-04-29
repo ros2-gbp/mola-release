@@ -1,0 +1,12 @@
+Source: ros-lyrical-mola-viz
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-lyrical-mola-kernel, ros-lyrical-mrpt-libgui, ros-lyrical-mrpt-libmaps, ros-lyrical-mrpt-libopengl, ros-lyrical-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_viz
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-mola-viz
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-mola-kernel, ros-lyrical-mrpt-libgui, ros-lyrical-mrpt-libmaps, ros-lyrical-mrpt-libopengl, ros-lyrical-ros-workspace
+Description: GUI for MOLA
