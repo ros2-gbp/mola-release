@@ -1,0 +1,12 @@
+Source: ros-lyrical-mola-relocalization
+Section: misc
+Priority: optional
+Maintainer: Jose-Luis Blanco-Claraco <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, ros-lyrical-mola-common, ros-lyrical-mola-pose-list, ros-lyrical-mola-test-datasets <!nocheck>, ros-lyrical-mp2p-icp, ros-lyrical-mrpt-libmaps, ros-lyrical-mrpt-libobs, ros-lyrical-mrpt-libslam, ros-lyrical-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_relocalization
+Standards-Version: 3.9.2
+
+Package: ros-lyrical-mola-relocalization
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-lyrical-mola-common, ros-lyrical-mola-pose-list, ros-lyrical-mp2p-icp, ros-lyrical-mrpt-libmaps, ros-lyrical-mrpt-libobs, ros-lyrical-mrpt-libslam, ros-lyrical-ros-workspace
+Description: C++ library with algorithms for relocalization, global localization, or pose estimation given a large initial uncertainty
