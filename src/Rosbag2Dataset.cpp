@@ -114,6 +114,13 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
   YAML_LOAD_MEMBER_OPT(rosbag_storage_id, std::string);
   YAML_LOAD_MEMBER_OPT(rosbag_serialization, std::string);
   YAML_LOAD_MEMBER_OPT(base_link_frame_id, std::string);
+  YAML_LOAD_MEMBER_OPT(tf_topic, std::string);
+  YAML_LOAD_MEMBER_OPT(tf_static_topic, std::string);
+
+  ASSERTMSG_(!tf_topic_.empty(), "'tf_topic' must not be empty");
+  ASSERTMSG_(!tf_static_topic_.empty(), "'tf_static_topic' must not be empty");
+  ASSERTMSG_(tf_topic_ != tf_static_topic_, "'tf_topic' and 'tf_static_topic' must differ");
+
   YAML_LOAD_MEMBER_OPT(read_ahead_length, size_t);
   paused_ = cfg.getOrDefault<bool>("start_paused", paused_);
 
@@ -240,11 +247,13 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
     }
   }
 
-  // Start creating topic observers for /tf and all sensors:
-  lookup_["/tf"].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
-                              { return toTf<false>(rosmsg); });
-  lookup_["/tf_static"].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
-                                     { return toTf<true>(rosmsg); });
+  // Start creating topic observers for /tf and all sensors.
+  // Topic names are configurable (default /tf and /tf_static) so bags recorded
+  // under a ROS namespace (e.g. /robot1/tf) can be read too.
+  lookup_[tf_topic_].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
+                                  { return toTf<false>(rosmsg); });
+  lookup_[tf_static_topic_].emplace_back([this](const rosbag2_storage::SerializedBagMessage& rosmsg)
+                                         { return toTf<true>(rosmsg); });
 
   for (auto& sensorNode : sensorsYaml.asSequence())
   {
@@ -801,15 +810,8 @@ Rosbag2Dataset::Obs Rosbag2Dataset::toPointCloud2(
 
     // Fix timestamps for Livox driver:
     // It uses doubles for timestamps, but they are actually nanoseconds!
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
     auto* ts =
         mrptPts->getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
-#elif MRPT_VERSION >= 0x020f00  // 2.15.0
-    auto ts = mrptPts->getPointsBufferRef_float_field(
-        mrpt::maps::CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
-#else
-    auto ts = mrptPts->getPointsBufferRef_timestamp();
-#endif
     if (ts && !ts->empty())
     {
       const auto [minIt, maxIt] = std::minmax_element(ts->begin(), ts->end());
