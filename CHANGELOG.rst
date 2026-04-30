@@ -2,6 +2,9 @@
 Changelog for package mola_viz
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.7.0 (2026-04-22)
+------------------
+
 2.6.1 (2026-04-02)
 ------------------
 * Merge pull request `#116 <https://github.com/MOLAorg/mola/issues/116>`_ from MOLAorg/update-rds-gui
