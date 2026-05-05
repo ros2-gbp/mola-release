@@ -1,1 +1,1 @@
-{"base": "1903aa34c222", "parent": "release/rolling/mola_input_rosbag2/2.7.0-1", "previous": "81ef47473004", "trim": "", "trimbase": ""}
+{"base": "00ed049db8f2", "parent": "release/rolling/mola_input_rosbag2", "previous": "d5e8abf65a5c", "trim": "", "trimbase": ""}
