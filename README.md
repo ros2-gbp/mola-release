@@ -1,3 +1,43 @@
+## mola (jazzy) - 2.9.0-1
+
+The packages in the `mola` repository were released into the `jazzy` distro by running `/home/jlblanco/code/bloom-venv/bin/bloom-release -y -r jazzy mola` on `Mon, 11 May 2026 21:15:53 -0000`
+
+These packages were released:
+- `mola`
+- `mola_bridge_ros2`
+- `mola_demos`
+- `mola_input_lidar_bin_dataset`
+- `mola_input_rawlog`
+- `mola_input_rosbag2`
+- `mola_input_video`
+- `mola_kernel`
+- `mola_launcher`
+- `mola_metric_maps`
+- `mola_msgs`
+- `mola_pose_list`
+- `mola_relocalization`
+- `mola_traj_tools`
+- `mola_viz`
+- `mola_viz_imgui`
+- `mola_yaml`
+
+Version of package(s) in repository `mola`:
+
+- upstream repository: https://github.com/MOLAorg/mola.git
+- release repository: https://github.com/ros2-gbp/mola-release.git
+- rosdistro version: `2.8.0-1`
+- old version: `2.8.0-1`
+- new version: `2.9.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.14.3`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.22.2`
+- rosdistro version: `0.9.0`
+- vcstools version: `0.1.42`
+
+
 ## mola (humble) - 2.9.0-1
 
 The packages in the `mola` repository were released into the `humble` distro by running `/home/jlblanco/code/bloom-venv/bin/bloom-release -y -r humble mola` on `Mon, 11 May 2026 20:59:22 -0000`
