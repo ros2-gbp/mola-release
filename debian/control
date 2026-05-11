@@ -1,0 +1,12 @@
+Source: ros-jazzy-mola-viz-imgui
+Section: misc
+Priority: optional
+Maintainer: "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, freeglut3-dev, libgl1-mesa-dev, libglfw3-dev, libglu1-mesa-dev, ros-jazzy-mola-kernel, ros-jazzy-mrpt-libgui, ros-jazzy-mrpt-libmaps, ros-jazzy-mrpt-libobs, ros-jazzy-mrpt-libopengl, ros-jazzy-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_viz_imgui
+Standards-Version: 3.9.2
+
+Package: ros-jazzy-mola-viz-imgui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, freeglut3-dev, libgl1-mesa-dev, libglfw3-dev, libglu1-mesa-dev, ros-jazzy-mola-kernel, ros-jazzy-mrpt-libgui, ros-jazzy-mrpt-libmaps, ros-jazzy-mrpt-libobs, ros-jazzy-mrpt-libopengl, ros-jazzy-ros-workspace
+Description: Dear ImGui (docking branch) GUI backend for MOLA
