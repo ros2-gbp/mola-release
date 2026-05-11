@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <mola_kernel/interfaces/KeyframeMapCapable.h>
 #include <mp2p_icp/IcpPrepareCapable.h>
 #include <mp2p_icp/MetricMapMergeCapable.h>
 #include <mp2p_icp/NearestPointWithCovCapable.h>
@@ -32,6 +33,7 @@
 
 #include <map>
 #include <optional>
+#include <vector>
 
 namespace mola
 {
@@ -50,7 +52,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
                               public mrpt::maps::NearestNeighborsCapable,
                               public mp2p_icp::IcpPrepareCapable,
                               public mp2p_icp::NearestPointWithCovCapable,
-                              public mp2p_icp::MetricMapMergeCapable
+                              public mp2p_icp::MetricMapMergeCapable,
+                              public mola::KeyframeMapCapable
 {
   DEFINE_SERIALIZABLE(KeyframePointCloudMap, mola)
  public:
@@ -71,6 +74,34 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   KeyframePointCloudMap() = default;
 
   ~KeyframePointCloudMap();
+
+  /** The KF id that will be assigned to the next inserted key-frame. */
+  [[nodiscard]] KeyFrameID nextFreeKeyFrameID_public() const;
+
+  /** Snapshot of all key-frame poses, keyed by KF id. Cheap. Thread-safe. */
+  [[nodiscard]] std::map<KeyFrameID, mrpt::poses::CPose3D> cloneKFPoses() const;
+
+  /** Overwrites the pose of one KF in the map, invalidating its caches.
+   *  No-op if `id` is not present. Thread-safe.
+   */
+  void setKeyframePose(KeyFrameID id, const mrpt::poses::CPose3D& new_pose) override;
+
+  // mola::KeyframeMapCapable overrides:
+  [[nodiscard]] std::map<KeyFrameID, mrpt::poses::CPose3D> keyframePoses() const override;
+  [[nodiscard]] std::optional<KeyFrameID>                  oldestActiveKeyframeID() const override;
+  void                                                     applyPivotTransform(
+                                                          KeyFrameID pivot_id, const mrpt::poses::CPose3D& delta_at_pivot) override;
+
+  /** The id of the last key-frame successfully inserted, or nullopt if none
+   *  has been inserted since the map was created/cleared.
+   */
+  [[nodiscard]] std::optional<KeyFrameID> lastInsertedKeyFrameID() const;
+
+  /** Returns and clears the list of KF ids evicted since the last call (or
+   *  since map construction). Used by callers that maintain per-KF
+   *  auxiliary state and need to drop it on eviction.
+   */
+  [[nodiscard]] std::vector<KeyFrameID> drainEvictedKeyFrameIDs();
 
   /** @} */
 
@@ -159,6 +190,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
       const MetricMapMergeCapable&               source,
       const std::optional<mrpt::poses::CPose3D>& otherRelativePose = std::nullopt) override;
 
+  /** Transform all KF poses left-multiplying with this transform. Thread safe. */
   void transform_map_left_multiply(const mrpt::poses::CPose3D& b) override;
 
   /** @} */
@@ -457,6 +489,18 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   std::map<KeyFrameID, KeyFrame> keyframes_;
 
+  /// Last key-frame id successfully inserted (nullopt if none since creation/clear).
+  std::optional<KeyFrameID> last_inserted_kf_id_;
+
+  /// KF ids evicted since the last call to drainEvictedKeyFrameIDs().
+  std::vector<KeyFrameID> evicted_kf_ids_;
+
+  /// Monotonically increasing KF id allocator. Incremented on every
+  /// insertion, never decremented on eviction, so ids are never reused.
+  /// Reset to 0 on internal_clear(); restored to max-loaded-id+1 in
+  /// serializeFrom().
+  KeyFrameID next_free_kf_id_ = 0;
+
   /// for cached_ and _keyframes
   mutable mrpt::containers::NonCopiableData<std::recursive_mutex> state_mtx_;
 
@@ -517,15 +561,25 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     return {kf_idx, local_pt_idx};
   }
 
-  /// Return the next key-frame ID, which is the size of the map:
-  [[nodiscard]] KeyFrameID nextFreeKeyFrameID() const
-  {
-    if (keyframes_.empty())
-    {
-      return 0;  // First key-frame
-    }
-    return keyframes_.rbegin()->first + 1;  // Next ID
-  }
+  /// Returns the next monotonically-allocated key-frame ID. The id is NOT
+  /// consumed by this call; callers must use it as the key for the new KF
+  /// and then bump `next_free_kf_id_`.
+  [[nodiscard]] KeyFrameID nextFreeKeyFrameID() const { return next_free_kf_id_; }
+
+  /** Non-thread safe version of transform_map_left_multiply() */
+  void transform_map_left_multiply_impl(const mrpt::poses::CPose3D& b);
 };
 
 }  // namespace mola
+
+/** Feature macro: KeyframePointCloudMap exposes the per-KF pose plumbing
+ *  (`cloneKFPoses`, `setKeyframePose`, `lastInsertedKeyFrameID`,
+ *  `drainEvictedKeyFrameIDs`, `nextFreeKeyFrameID_public`) and inherits
+ *  from `mola::KeyframeMapCapable` (providing `keyframePoses()`,
+ *  `oldestActiveKeyframeID()`, `setKeyframePose()`, `applyPivotTransform()`).
+ *  Downstream packages should guard usage with
+ *  `#if defined(MOLA_METRIC_MAPS_HAS_KFM_POSE_PLUMBING)` (combined with
+ *  `__has_include(<mola_metric_maps/KeyframePointCloudMap.h>)`) to remain
+ *  buildable against older `mola_metric_maps` checkouts.
+ */
+#define MOLA_METRIC_MAPS_HAS_KFM_POSE_PLUMBING 1
