@@ -567,6 +567,11 @@ void KeyframePointCloudMap::transform_map_left_multiply(const mrpt::poses::CPose
 {
   auto lck = mrpt::lockHelper(*state_mtx_);
 
+  transform_map_left_multiply_impl(b);
+}
+
+void KeyframePointCloudMap::transform_map_left_multiply_impl(const mrpt::poses::CPose3D& b)
+{
   for (auto& [id, kf] : keyframes_)
   {
     kf.pose(b + kf.pose());
@@ -829,15 +834,15 @@ void KeyframePointCloudMap::getVisualizationInto(mrpt::opengl::CSetOfObjects& ou
     const static auto ENV_KEYFRAMES_SHOW_ACTIVE_FRAMES =
         mrpt::get_env<bool>("MOLA_KEYFRAME_MAP_VIZ_SHOW_ACTIVE_SUBMAP", false);
 
+    float pointSize = renderOptions.point_size;
     if (ENV_KEYFRAMES_SHOW_ACTIVE_FRAMES)
     {
-      float pointSize = renderOptions.point_size;
       if (cached_.icp_search_kfs && cached_.icp_search_kfs->count(kf_id) != 0)
       {
         pointSize *= 4;
       }
-      obj->setPointSize(pointSize);
     }
+    obj->setPointSize(pointSize);
 
     outObj.insert(obj);
 
@@ -1212,6 +1217,40 @@ std::vector<KeyframePointCloudMap::KeyFrameID> KeyframePointCloudMap::drainEvict
   std::vector<KeyFrameID> out;
   out.swap(evicted_kf_ids_);
   return out;
+}
+
+// mola::KeyframeMapCapable overrides:
+
+std::map<KeyframePointCloudMap::KeyFrameID, mrpt::poses::CPose3D>
+    KeyframePointCloudMap::keyframePoses() const
+{
+  return cloneKFPoses();
+}
+
+std::optional<KeyframePointCloudMap::KeyFrameID> KeyframePointCloudMap::oldestActiveKeyframeID()
+    const
+{
+  auto lck = mrpt::lockHelper(*state_mtx_);
+  if (keyframes_.empty())
+  {
+    return std::nullopt;
+  }
+  return keyframes_.begin()->first;
+}
+
+void KeyframePointCloudMap::applyPivotTransform(
+    KeyFrameID pivot_id, const mrpt::poses::CPose3D& delta_at_pivot)
+{
+  auto lck = mrpt::lockHelper(*state_mtx_);
+  auto it  = keyframes_.find(pivot_id);
+  if (it == keyframes_.end())
+  {
+    return;
+  }
+  const mrpt::poses::CPose3D T_pivot   = it->second.pose();
+  const mrpt::poses::CPose3D T_correct = T_pivot + delta_at_pivot + (-T_pivot);
+
+  transform_map_left_multiply_impl(T_correct);
 }
 
 bool KeyframePointCloudMap::internal_insertObservation(
