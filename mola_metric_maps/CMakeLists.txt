@@ -8,7 +8,7 @@
 # ------------------------------------------------------------------------------
 
 # Minimum CMake vesion: limited by CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.22...3.31)  # Ubuntu 22.04+
 
 if("$ENV{ROS_VERSION}" STREQUAL "2")
   set(DETECTED_ROS2 TRUE)
@@ -21,6 +21,7 @@ project(mola_metric_maps LANGUAGES CXX)
 find_package(mola_common REQUIRED)
 
 # find CMake dependencies:
+find_package(mola_kernel REQUIRED)
 find_package(mrpt-maps REQUIRED)
 find_package(mp2p_icp_map REQUIRED)
 
@@ -62,8 +63,10 @@ mola_add_library(
   PUBLIC_LINK_LIBRARIES
     mrpt::maps
     tsl::robin_map
+    mola::mola_kernel
     mola::mp2p_icp_map
   CMAKE_DEPENDENCIES
+    mola_kernel
     mrpt-maps
     mp2p_icp_map
     robin_map
