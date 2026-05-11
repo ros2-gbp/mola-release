@@ -1,0 +1,21 @@
+ros-humble-mola-viz-imgui (2.9.0-1jammy) jammy; urgency=high
+
+  * fix: Imgui background scene color was washed out
+  * Merge pull request #144 <https://github.com/MOLAorg/mola/issues/144> from MOLAorg/imgui-improvements
+    fix: background scene doesn't respond to mouse
+  * fix: background scene doesn't respond to mouse
+  * Merge pull request #112 <https://github.com/MOLAorg/mola/issues/112> from MOLAorg/feat/dear-imgui-viz
+    Introduce Dear ImGui alternative viz module
+  * Cleaner shutdown order
+  * Introduce Dear ImGui alternative viz module
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 10 May 2026 22:00:00 -0000
+
+ros-humble-mola-viz-imgui (2.8.0-1jammy) jammy; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 28 Apr 2026 22:00:00 -0000
+
+

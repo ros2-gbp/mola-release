@@ -1,0 +1,12 @@
+Source: ros-humble-mola-viz-imgui
+Section: misc
+Priority: optional
+Maintainer: "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, freeglut3-dev, libgl1-mesa-dev, libglfw3-dev, libglu1-mesa-dev, ros-humble-mola-kernel, ros-humble-mrpt-libgui, ros-humble-mrpt-libmaps, ros-humble-mrpt-libobs, ros-humble-mrpt-libopengl, ros-humble-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_viz_imgui
+Standards-Version: 3.9.2
+
+Package: ros-humble-mola-viz-imgui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, freeglut3-dev, libgl1-mesa-dev, libglfw3-dev, libglu1-mesa-dev, ros-humble-mola-kernel, ros-humble-mrpt-libgui, ros-humble-mrpt-libmaps, ros-humble-mrpt-libobs, ros-humble-mrpt-libopengl, ros-humble-ros-workspace
+Description: Dear ImGui (docking branch) GUI backend for MOLA
