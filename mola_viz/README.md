@@ -1,7 +1,7 @@
 # mola_viz
-GUI for MOLA
+GUI for MOLA based on nanogui (for the Dear ImGui alternative see `mola_viz_imgui`)
 
-Provides the C++ library `libmola-viz` with a flexible API for any other module
+Provides the C++ library `libmola_viz` with a flexible API for any other module
 to display windows, controls, etc. 
 
 ## Build and install
