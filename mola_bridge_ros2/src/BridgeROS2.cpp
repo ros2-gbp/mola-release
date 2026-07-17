@@ -70,6 +70,7 @@
 #include <geographic_msgs/msg/geo_pose_stamped.hpp>
 #include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/node.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -200,12 +201,11 @@ BridgeROS2::~BridgeROS2()
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 
-    if (rclcpp::ok())
+    if (owned_rclcpp_ && rclcpp::ok())
     {
       rclcpp::shutdown();
     }
 
-    rclcpp::shutdown();
     if (rosNodeThread_.joinable())
     {
       rosNodeThread_.join();
@@ -248,10 +248,13 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
     const int    argc = static_cast<int>(rosArgs.size());
     const char** argv = rosArgsC.data();
 
-    // Initialize ROS (only once):
+    // Initialize ROS only if not already initialized by the host application.
+    // Track ownership so the destructor and spin thread only call shutdown()
+    // when this instance was the one that called init().
     if (!rclcpp::ok())
     {
       rclcpp::init(argc, argv);
+      owned_rclcpp_ = true;
     }
 
     auto lckNode = mrpt::lockHelper(rosNodeMtx_);
@@ -264,10 +267,12 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
       ros_clock_ = rosNode_->get_clock();
     }
 
-    // TF buffer:
-    tf_buffer_ = std::make_shared<tf2::BufferCore>();  // ros_clock_
-    // tf_buffer_->setUsingDedicatedThread(true);
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    // TF buffer + listener -- pass rosNode_ so the listener's /tf and
+    // /tf_static subscriptions share the same DDS participant, clock, and
+    // use_sim_time setting as the bridge.  spin_thread=false: rosNode_ is
+    // already spun by the loop below; a second spinner would be redundant.
+    tf_buffer_   = std::make_shared<tf2::BufferCore>();
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, rosNode_, false);
 
     // TF broadcaster:
     auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
@@ -366,13 +371,22 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
     }
 
     // Spin:
+    // Note: the free function rclcpp::spin_some(node) was removed upstream in
+    // favor of an explicit executor, since it used to build a brand new
+    // executor on every single call.
+    rclcpp::executors::SingleThreadedExecutor executor;
+    executor.add_node(rosNode_);
+
     isSpinning_ = true;
     while (rclcpp::ok() && !shouldExit_)
     {
-      rclcpp::spin_some(rosNode_);
+      executor.spin_some();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    rclcpp::shutdown();
+    if (owned_rclcpp_ && rclcpp::ok())
+    {
+      rclcpp::shutdown();
+    }
   }
   catch (const std::exception& e)
   {
@@ -1443,9 +1457,15 @@ void BridgeROS2::service_relocalize_near_pose(
     return;
   }
 
+  mrpt::poses::CPose3DPDFGaussian p;
+  if (!relocalizationPoseInReferenceFrame(request->pose, p))
+  {
+    response->accepted = false;
+    return;
+  }
+
   for (const auto& m : molaSubs_.relocalization)
   {
-    const mrpt::poses::CPose3DPDFGaussian p = mrpt::ros2bridge::fromROS(request->pose.pose);
     m->relocalize_near_pose_pdf(p);
   }
 
@@ -1456,11 +1476,43 @@ void BridgeROS2::callbackOnRelocalizeTopic(const geometry_msgs::msg::PoseWithCov
 {
   auto lck = mrpt::lockHelper(rosPubsMtx_);
 
+  mrpt::poses::CPose3DPDFGaussian p;
+  if (!relocalizationPoseInReferenceFrame(o, p))
+  {
+    MRPT_LOG_THROTTLE_ERROR_FMT(
+        5.0, "Ignoring relocalization request: no /tf transform '%s' -> '%s'.",
+        o.header.frame_id.c_str(), params_.reference_frame.c_str());
+    return;
+  }
+
   for (const auto& m : molaSubs_.relocalization)
   {
-    const mrpt::poses::CPose3DPDFGaussian p = mrpt::ros2bridge::fromROS(o.pose);
     m->relocalize_near_pose_pdf(p);
   }
+}
+
+bool BridgeROS2::relocalizationPoseInReferenceFrame(
+    const geometry_msgs::msg::PoseWithCovarianceStamped& o, mrpt::poses::CPose3DPDFGaussian& out)
+{
+  out = mrpt::ros2bridge::fromROS(o.pose);
+
+  // The pose may arrive in any tf frame (e.g. RViz publishes the "2D Pose
+  // Estimate" in its fixed frame), but MOLA relocalization interprets it in the
+  // localization reference_frame. Compose reference_frame <- header.frame_id so
+  // the request is not silently misread when the two frames differ.
+  if (o.header.frame_id.empty() || o.header.frame_id == params_.reference_frame)
+  {
+    return true;
+  }
+
+  mrpt::poses::CPose3D reference_T_msg;
+  if (!waitForTransform(reference_T_msg, o.header.frame_id, params_.reference_frame))
+  {
+    return false;
+  }
+
+  out.changeCoordinatesReference(reference_T_msg);
+  return true;
 }
 
 void BridgeROS2::service_map_load(
@@ -1702,14 +1754,32 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
     }
     catch (const tf2::TransformException& ex)
     {
-      // Skip publishing entirely: broadcasting a default-constructed
-      // TransformStamped here would inject empty frame_ids into every
-      // subscriber's tf2 buffer (TF_NO_FRAME_ID / TF_SELF_TRANSFORM spam).
-      MRPT_LOG_THROTTLE_ERROR_STREAM(
-          5.0, "publish_localization_following_rep105=true but could not resolve tf '"
-                   << params_.odom_frame << "' -> '" << l.child_frame << "' at scan stamp ("
-                   << ex.what() << "); skipping TF publish.");
-      return;
+      // The exact scan-stamp odom->base_link may not be available (e.g. the
+      // odometry TF lags the scan stamp, common under wall-clock stamping in
+      // simulation). Rather than dropping the localization output entirely,
+      // fall back to the latest available transform: the small temporal bias
+      // is acceptable and far better than never publishing map->odom.
+      try
+      {
+        const auto ref_to_trgFrame_latest =
+            tf_buffer_->lookupTransform(l.child_frame, params_.odom_frame, tf2::TimePointZero);
+        tf2::fromMsg(ref_to_trgFrame_latest.transform, odomOnBase_tf);
+        MRPT_LOG_THROTTLE_WARN_STREAM(
+            60.0, "publish_localization_following_rep105: exact sensor-stamp tf '"
+                      << params_.odom_frame << "' -> '" << l.child_frame << "' unavailable ("
+                      << ex.what() << "); using latest available transform instead.");
+      }
+      catch (const tf2::TransformException& ex2)
+      {
+        // Skip publishing entirely: broadcasting a default-constructed
+        // TransformStamped here would inject empty frame_ids into every
+        // subscriber's tf2 buffer (TF_NO_FRAME_ID / TF_SELF_TRANSFORM spam).
+        MRPT_LOG_THROTTLE_ERROR_STREAM(
+            5.0, "publish_localization_following_rep105=true but could not resolve tf '"
+                     << params_.odom_frame << "' -> '" << l.child_frame << "' (" << ex2.what()
+                     << "); skipping TF publish.");
+        return;
+      }
     }
 
     tf.transform       = tf2::toMsg(transform * odomOnBase_tf);
