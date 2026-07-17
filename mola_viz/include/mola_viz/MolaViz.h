@@ -103,6 +103,14 @@ class MolaViz : public ExecutableBase, public VizInterface
       const mola::gui::MenuBar& bar,
       const std::string&        parentWindow = DEFAULT_WINDOW_NAME) override;
 
+  /** Metrics plotting is an ImGui-backend feature. Returns a no-op handle
+   *  whose push() does nothing. */
+  MetricChannel::Ptr register_metric(
+      const std::string& name, const std::string& unit = "") override;
+
+  /** Does nothing in nanogui backend. */
+  void push_metric(const std::string& name, double t, double value) override;
+
   /** @} */
 
   // =========================================================================
@@ -112,12 +120,19 @@ class MolaViz : public ExecutableBase, public VizInterface
   std::future<bool> update_3d_object(
       const std::string& objName, const std::shared_ptr<mrpt::opengl::CSetOfObjects>& obj,
       const std::string& viewportName = "main",
+      const std::string& parentWindow = DEFAULT_WINDOW_NAME,
+      const std::string& parentFrame  = "") override;
+
+  std::future<bool> update_3d_object_frame(
+      const std::string& frameName, const mrpt::math::TPose3D& pose,
+      const std::string& viewportName = "main",
       const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
 
   std::future<bool> insert_point_cloud_with_decay(
       const std::shared_ptr<mrpt::opengl::CPointCloudColoured>& cloud, double decay_time_seconds,
       const std::string& viewportName = "main",
-      const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
+      const std::string& parentWindow = DEFAULT_WINDOW_NAME,
+      const std::string& parentFrame  = "") override;
 
   std::future<bool> clear_all_point_clouds_with_decay(
       const std::string& viewportName = "main",
@@ -125,7 +140,8 @@ class MolaViz : public ExecutableBase, public VizInterface
 
   std::future<bool> update_viewport_look_at(
       const mrpt::math::TPoint3Df& lookAt, const std::string& viewportName = "main",
-      const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
+      const std::string& parentWindow = DEFAULT_WINDOW_NAME,
+      const std::string& parentFrame  = "") override;
 
   std::future<bool> update_viewport_camera_azimuth(
       double azimuth, bool absolute_falseForRelative = true,
@@ -159,38 +175,6 @@ class MolaViz : public ExecutableBase, public VizInterface
 
   std::future<bool> output_console_message(
       const std::string& message, const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
-
-  /** @} */
-
-  // =========================================================================
-  /** @name VizInterface - deprecated nanogui-specific API
-   *
-   * All three methods delegate to their replacements above.
-   * They will be removed in a future release.
-   * @{ */
-
-  /// \deprecated Use create_subwindow_from_description() instead.
-  [[deprecated("Use create_subwindow_from_description() instead")]] std::future<nanogui::Window*>
-      create_subwindow(
-          const std::string& subWindowTitle,
-          const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
-
-  /// \deprecated Use enqueue_custom_gui_code() instead.
-  [[deprecated("Use enqueue_custom_gui_code() instead")]] std::future<void>
-      enqueue_custom_nanogui_code(const std::function<void()>& userCode) override;
-
-  /// \deprecated Encode layout in WindowDescription instead.
-  [[deprecated("Encode layout in WindowDescription instead")]] std::future<void>
-      subwindow_grid_layout(
-          const std::string& subWindowTitle, bool orientationVertical, int resolution,
-          const std::string& parentWindow = DEFAULT_WINDOW_NAME) override;
-
-  /// \deprecated Encode position/size in WindowDescription instead.
-  [[deprecated("Encode position/size in WindowDescription instead")]] std::future<void>
-      subwindow_move_resize(
-          const std::string& subWindowTitle, const mrpt::math::TPoint2D_<int>& location,
-          const mrpt::math::TPoint2D_<int>& size,
-          const std::string&                parentWindow = DEFAULT_WINDOW_NAME) override;
 
   /** @} */
 
@@ -254,7 +238,8 @@ class MolaViz : public ExecutableBase, public VizInterface
 
     std::string                                        opengl_viewport_name;
     std::shared_ptr<mrpt::opengl::CPointCloudColoured> cloud;
-    float                                              initial_alpha = 1.0f;
+    mrpt::opengl::CSetOfObjects::Ptr container;  // owning container at insert time
+    float                            initial_alpha = 1.0f;
   };
 
   struct PerWindowData
@@ -269,6 +254,11 @@ class MolaViz : public ExecutableBase, public VizInterface
   std::map<window_name_t, std::map<subwindow_name_t, nanogui::Window*>> subWindows_;
 
   mrpt::gui::CDisplayWindowGUI::Ptr create_and_add_window(const window_name_t& name);
+
+  /** Get-or-create a movable reference-frame node (a named CSetOfObjects at
+   *  the viewport root). GUI-thread only. \sa update_3d_object_frame() */
+  static std::shared_ptr<mrpt::opengl::CSetOfObjects> get_or_create_frame_node_(
+      mrpt::opengl::Scene& scene, const std::string& frameName, const std::string& viewportName);
 
   mutable std::shared_mutex subWindowsMtx_;
 
