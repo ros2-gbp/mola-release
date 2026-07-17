@@ -264,6 +264,7 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
   std::atomic<bool> shouldExit_{false};
   std::atomic<bool> isSpinning_{false};
+  std::atomic<bool> owned_rclcpp_{false};  ///< true iff this instance called rclcpp::init()
 
   /// Returns a copy of the shared_ptr to the ROS 2 node, or empty if not
   /// initialized yet.
@@ -307,6 +308,13 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
   void callbackOnOdometry(const nav_msgs::msg::Odometry& o, const std::string& outSensorLabel);
 
   void callbackOnRelocalizeTopic(const geometry_msgs::msg::PoseWithCovarianceStamped& o);
+
+  /// Converts an incoming relocalization pose into the localization
+  /// reference_frame, composing reference_frame <- header.frame_id via /tf when
+  /// they differ. Returns false (and leaves \a out unspecified) if the required
+  /// transform is not available.
+  bool relocalizationPoseInReferenceFrame(
+      const geometry_msgs::msg::PoseWithCovarianceStamped& o, mrpt::poses::CPose3DPDFGaussian& out);
 
   bool waitForTransform(
       mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame);
