@@ -19,6 +19,7 @@
 #pragma once
 
 #include <mola_kernel/interfaces/KeyframeMapCapable.h>
+#include <mola_metric_maps/OptionsCapable.h>
 #include <mp2p_icp/IcpPrepareCapable.h>
 #include <mp2p_icp/MetricMapMergeCapable.h>
 #include <mp2p_icp/NearestPointWithCovCapable.h>
@@ -31,29 +32,60 @@
 #include <mrpt/math/TBoundingBox.h>
 #include <mrpt/opengl/opengl_frwds.h>
 
+#include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <vector>
 
 namespace mola
 {
-/** An efficient storage class for large point clouds built as keyframes, each having an associated
- * local cloud.
+/** Keyframe-based map: a collection of local point clouds, each anchored to a
+ * known SE(3) pose (the keyframe pose).
  *
- * The user of the class is responsible for processing raw observations into
- * mrpt::obs::CObservationPointCloud observations, the only ones allowed as input to the insert*()
- * methods, with points already transformed from the sensor frame to the vehicle (`base_link`)
- * frame. This can be easily done with mp2p_icp::Generator, plus an optional filtering pipeline.
+ * Unlike voxel maps that merge all points into a single global grid, this class
+ * keeps each keyframe's point cloud in its **local coordinate frame**. Only the
+ * SE(3) pose of each keyframe is stored globally, so correcting the map after a
+ * loop closure only requires updating poses, not re-inserting any points.
  *
- * Each key-frame is responsible of keeping its own KD-tree for NN searches and keeping up-to-date
- * covariances for each point local vicinity.
+ * ## Input
+ * The caller inserts `mrpt::obs::CObservationPointCloud` observations, with
+ * points already expressed in the vehicle `base_link` frame and already motion
+ * compensated (deskewed). This is typically produced by an `mp2p_icp::Generator`
+ * plus optional filter pipeline.
+ *
+ * ## Per-keyframe data
+ * Each `KeyFrame` holds:
+ * - A multi-layer point cloud (`mp2p_icp::metric_map_t`) in local coordinates.
+ * - The global SE(3) pose (`mrpt::poses::CPose3D`).
+ * - A KD-tree (built lazily) for nearest-neighbor searches within that KF.
+ * - Per-point local covariance estimates (used by point-to-plane ICP).
+ * - A cached local AABB for fast global bounding-box queries.
+ *
+ * ## ICP integration
+ * For registration queries the class assembles a "search submap" from the
+ * keyframes nearest to the current pose (`IcpPrepareCapable`). The
+ * `NearestPointWithCovCapable` interface exposes per-point covariances to
+ * plane-aware ICP solvers.
+ *
+ * ## Interfaces implemented
+ * - `mrpt::maps::CMetricMap` — standard MRPT map (serialization, visualization).
+ * - `mrpt::maps::NearestNeighborsCapable` — KNN queries over the active submap.
+ * - `mp2p_icp::IcpPrepareCapable` — prepare a local submap for ICP.
+ * - `mp2p_icp::NearestPointWithCovCapable` — NN with local covariance.
+ * - `mp2p_icp::MetricMapMergeCapable` — merge another map into this one.
+ * - `mola::KeyframeMapCapable` — keyframe pose management (add, update, query).
+ *
+ * @note For single-frame global voxel maps, see `mola::SparseVoxelPointCloud`,
+ *       `mola::HashedVoxelPointCloud`, or `mola::NDT`.
  */
 class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
                               public mrpt::maps::NearestNeighborsCapable,
                               public mp2p_icp::IcpPrepareCapable,
                               public mp2p_icp::NearestPointWithCovCapable,
                               public mp2p_icp::MetricMapMergeCapable,
-                              public mola::KeyframeMapCapable
+                              public mola::KeyframeMapCapable,
+                              public mola::OptionsCapable
 {
   DEFINE_SERIALIZABLE(KeyframePointCloudMap, mola)
  public:
@@ -228,6 +260,77 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   /** @} */
 
+  /** @name Offline keyframe regrouping (localization-oriented map optimization)
+   *  @{ */
+
+  /** Parameters for regroupKeyframes(). */
+  struct RegroupParams
+  {
+    /** Voxel resolution [m] used to compute pairwise cloud overlaps. If <=0, it
+     *  is auto-derived from the median per-keyframe sensing radius. */
+    double voxel_size = 0;
+
+    /** Minimum pairwise voxel-overlap (Jaccard-min, in [0,1]) required to create
+     *  an edge in the keyframe adjacency graph, i.e. for two keyframes to be
+     *  candidates for merging into the same super-keyframe. */
+    double edge_overlap = 0.75;
+
+    /** Inner-core fraction, in (0,1], of a super-keyframe's spatial extent. A member
+     *  keyframe whose center lies within `core_fraction * extent` of the seed is
+     *  marked "covered" (deep inside, single-KF localization is reliable there).
+     *  Members in the outer band stay available to seed/join neighboring
+     *  super-keyframes, which is what produces the deliberate inter-group overlap.
+     *  The outer (overlap) band is `(1 - core_fraction)` of the extent, so the
+     *  default of 0.85 yields ~15% overlap between neighboring super-keyframes. */
+    double core_fraction = 0.85;
+
+    /** Spatial extent cap of a super-keyframe, as a multiple of the seed keyframe's
+     *  own sensing radius (half its cloud bounding-box diagonal). This auto-sizes
+     *  groups non-uniformly: large outdoors (long range), small indoors. */
+    double extent_factor = 2.0;
+
+    /** If >0, voxel-downsample each merged super-keyframe cloud at this resolution
+     *  [m] to bound the point-count blow-up from the deliberate overlap. This is
+     *  strongly recommended for large maps. Per-point view-direction fields, when
+     *  present, are carried over (first point kept per voxel). */
+    double merge_decimate_voxel = 0;
+
+    /** Any cluster whose total point count falls below this fraction of the
+     *  largest cluster's point count is treated as an "island": too small to
+     *  usefully stand on its own as a super-keyframe (it would mislead
+     *  proximity-based nearest-keyframe search at runtime -- see
+     *  `TCreationOptions::density_penalty_min_points` -- while contributing
+     *  little real geometry). Islands are absorbed into their nearest
+     *  neighboring cluster (by center distance) instead of being emitted as
+     *  their own super-keyframe. Set to 0 to disable (old behavior: every
+     *  cluster becomes its own super-keyframe, however small). Default 0.025 = 2.5%. */
+    double island_merge_fraction = 0.025;
+
+    /** If `true`, bypass the overlap-graph clustering entirely and merge ALL
+     *  keyframes into a single super-keyframe, anchored at the pose of the
+     *  first (oldest) keyframe. Useful to turn a whole session's keyframe map
+     *  into one wide, self-contained keyframe -- e.g. so a subsequent
+     *  session's localization always sees the full previous map instead of
+     *  only the `max_search_keyframes` nearest of many small keyframes, which
+     *  under-covers stop-and-rotate scanning patterns. `merge_decimate_voxel`
+     *  still applies to bound the resulting cloud size; all other clustering
+     *  parameters above are ignored. Default `false`. */
+    bool unify_all = false;
+  };
+
+  /** Builds a NEW map whose keyframes are "super-keyframes": spatially coherent
+   *  groups of the original keyframes, merged into single larger clouds with
+   *  deliberate overlap, so that localization only needs ONE active keyframe at a
+   *  time (see \ref RegroupParams and the graph-theoretic grouping in the .cpp).
+   *  All options (creation/insertion/likelihood/render) are copied from `*this`.
+   *  Thread-safe (reads `*this` under its lock). `logCb`, if set, receives
+   *  human-readable progress lines.
+   */
+  [[nodiscard]] std::shared_ptr<KeyframePointCloudMap> regroupKeyframes(
+      const RegroupParams& params, const std::function<void(const std::string&)>& logCb = {}) const;
+
+  /** @} */
+
   /** Options for insertObservation()
    */
   struct TInsertionOptions : public mrpt::config::CLoadableOptions
@@ -295,6 +398,10 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     uint64_t max_overall_points = 1000000;  //!< Max points to render in global maps
 
     float keyframes_axes_length = .0f;  //!< If >0, draw XYZ frames per key-frame in the map
+
+    bool show_covariances = false;  //!< If true, draw per-point covariances as ellipsoids
+    mrpt::img::TColorf cov_color{.0f, 1.0f, .0f};
+    uint32_t           show_cov_decimation = 100;
   };
   TRenderOptions renderOptions;
 
@@ -311,6 +418,25 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
     uint32_t max_search_keyframes      = 3;  //!< Maximum number of key-frames to search for NN
     uint32_t k_correspondences_for_cov = 20;
+
+    /** Minimum number of neighbors (including the query point itself) that must
+     *  actually be found to compute a per-point covariance via plane regularization.
+     *  Points whose key-frame has fewer than this many neighbors available fall back
+     *  to an isotropic (unregularized) covariance, since a plane/line fit from too
+     *  few samples is unreliable and noise-sensitive. Must be >= 3 and
+     *  <= k_correspondences_for_cov.
+     */
+    uint32_t min_correspondences_for_cov = 5;
+
+    /** Maximum distance [meters] allowed between a query point and a
+     *  candidate neighbor for it to be used in the per-point covariance
+     *  estimation. Without this bound, sparse/low-density regions would pull
+     *  in far-away "neighbors" that do not represent the local surface,
+     *  producing meaningless covariance ellipsoids. Points with fewer than
+     *  `min_correspondences_for_cov` neighbors within this radius fall back
+     *  to an isotropic covariance (see above).
+     */
+    double max_distance_for_cov = 1.0;
 
     /** Weight converting angular distance [rad] to equivalent linear
      *  distance [m] for keyframe proximity ranking. Higher values favor
@@ -337,6 +463,16 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *
      *  Setting this to `false`, or to a threshold ≥ 180°, effectively disables
      *  the filter even when view fields are present.
+     *
+     *  Contract: the "view_x/y/z" fields stored in a keyframe's point cloud
+     *  (`KeyFrame::pointcloud_`) MUST be expressed in the *local KF frame*,
+     *  not in the global/map frame. `KeyFrame::updatePointsGlobal()` rotates
+     *  them to the global frame using `mp2p_icp::rotateViewDirectionFields()`
+     *  (see `mp2p_icp/pointcloud_field_utils.h`). Any code that inserts
+     *  points carrying these fields into a keyframe (e.g.
+     *  `mp2p_icp_filters::FilterMerge`) must call the same helper to rotate
+     *  the fields alongside the point coordinates, or this filter will
+     *  silently compare vectors expressed in inconsistent frames.
      */
     bool use_view_direction_filter = true;
 
@@ -345,8 +481,79 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  is `true` and the view fields are present.  Default: 120°.
      */
     double max_view_angle_deg = 120.0;
+
+    /** If `true`, each keyframe's per-cloud 3D KD-tree index is serialized
+     *  alongside its points (see `KeyframePointCloudMap` serialization), so it
+     *  does NOT have to be rebuilt when the map is loaded. This trades a larger
+     *  `.mm` file for faster startup in localization-only use. Requires an MRPT
+     *  build providing the KD-tree save/load API (feature-detected at compile
+     *  time); when unavailable this option is silently a no-op on write. Default
+     *  `false`. Typically enabled offline by the `mm-kf-bake-kdtrees` tool.
+     */
+    bool serialize_kdtrees = false;
+
+    /** If `true`, each keyframe's per-point covariances (the `cached_cov_local_`
+     *  produced by the plane-regularized SVD in `computeCovariancesAndDensity()`)
+     *  are serialized alongside its points, so they do NOT have to be recomputed
+     *  when the map is loaded. Covariance computation (one K-NN query + 3×3 SVD
+     *  per point) is the single most expensive part of warming a freshly-loaded
+     *  keyframe for ICP, so persisting it removes the multi-second stall paid the
+     *  first time each keyframe becomes active in localization-only operation.
+     *
+     *  Unlike `serialize_kdtrees`, this needs no special MRPT API and works on
+     *  any build. The stored covariances are the *local-frame* ones; the cheap
+     *  per-pose global rotation (`updateCovariancesGlobal()`) is still done at
+     *  runtime. Trades a larger `.mm` file (one 3×3 float matrix per point) for
+     *  faster startup. Default `false`. Typically enabled offline by the
+     *  `mm-kf-bake-kdtrees` tool.
+     */
+    bool serialize_covariances = false;
+
+    /** If `true`, `nn_search_cov2cov()` (used by `mp2p_icp::Matcher_Cov2Cov`, i.e.
+     *  GICP-style pipelines) skips building the merged, multi-keyframe submap that
+     *  `icp_get_prepared_as_global()` otherwise assembles for the active KF set.
+     *  Instead, each active keyframe's own already-built KD-tree and per-point
+     *  covariances (both cached at insertion time, in the KF's *local* neighborhood
+     *  only) are queried directly: for every query point, one KD-tree lookup is done
+     *  per active keyframe ("N" lookups instead of 1 on a merged cloud), and the
+     *  overall closest one is kept, together with that keyframe's own cached
+     *  covariance at that point.
+     *
+     *  This trades exactness for speed: the reference covariance at the matched point
+     *  is estimated only from neighbors *within the same source keyframe*, whereas the
+     *  exact (default) mode computes it from neighbors in the merged cloud, which may
+     *  include points contributed by other active keyframes. It also avoids the
+     *  merged-cloud allocation, copy and KD-tree (re)build entirely, which can be a
+     *  significant fraction of `icp_get_prepared_as_global()`'s cost when the active
+     *  set has several sizeable keyframes.
+     *
+     *  Only affects `nn_search_cov2cov()`. The generic `NearestNeighborsCapable`
+     *  entry points (`nn_single_search()`, `nn_multiple_search()`, `nn_radius_search()`)
+     *  still require the merged submap and are not supported in this mode. Default
+     *  `false` (exact, merged-cloud behavior, unchanged).
+     */
+    bool approximate_cov = false;
+
+    /** Below this point count, a keyframe candidate is considered "sparse" for
+     *  proximity ranking in `icp_get_prepared_as_global()`, and gets a distance
+     *  penalty (see `density_penalty_max_m`) linearly scaled by how far below
+     *  this floor its point count is (0 penalty at/above this count, maximum
+     *  penalty at 0 points). Guards against small/leftover keyframes (e.g. an
+     *  under-merged cluster from `regroupKeyframes()`) outranking a much
+     *  better-populated keyframe merely because their pose happens to be
+     *  closer to the query. Default 200000; set to 0 to disable. */
+    uint32_t density_penalty_min_points = 200000;
+
+    /** Maximum proximity-ranking penalty [m] added for a keyframe with (close
+     *  to) zero points; see `density_penalty_min_points`. Default 20.0. */
+    double density_penalty_max_m = 20.0;
   };
   TCreationOptions creationOptions;
+
+  // mola::OptionsCapable interface:
+  [[nodiscard]] std::map<std::string, mrpt::config::CLoadableOptions*> optionsByName() override;
+  bool                                                                 trySetCreationOptions(
+                                                                      const mrpt::config::CConfigFileBase& cfg, const std::string& section) override;
 
   // Interface for use within a mrpt::maps::CMultiMetricMap:
   MAP_DEFINITION_START(KeyframePointCloudMap)
@@ -361,8 +568,12 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   class KeyFrame
   {
    public:
-    KeyFrame(std::size_t k_correspondences_for_cov)
-        : k_correspondences_for_cov_(k_correspondences_for_cov)
+    KeyFrame(
+        std::size_t k_correspondences_for_cov, std::size_t min_correspondences_for_cov,
+        double max_distance_for_cov)
+        : k_correspondences_for_cov_(k_correspondences_for_cov),
+          min_correspondences_for_cov_(min_correspondences_for_cov),
+          max_distance_for_cov_(max_distance_for_cov)
     {
     }
 
@@ -370,6 +581,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     KeyFrame(const KeyFrame& other)
         : timestamp(other.timestamp),
           k_correspondences_for_cov_(other.k_correspondences_for_cov_),
+          min_correspondences_for_cov_(other.min_correspondences_for_cov_),
+          max_distance_for_cov_(other.max_distance_for_cov_),
           pointcloud_(other.pointcloud_),
           pose_(other.pose_)
     {
@@ -382,10 +595,12 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     {
       if (this != &other)
       {
-        k_correspondences_for_cov_ = other.k_correspondences_for_cov_;
-        pointcloud_                = other.pointcloud_;
-        pose_                      = other.pose_;
-        timestamp                  = other.timestamp;
+        k_correspondences_for_cov_   = other.k_correspondences_for_cov_;
+        min_correspondences_for_cov_ = other.min_correspondences_for_cov_;
+        max_distance_for_cov_        = other.max_distance_for_cov_;
+        pointcloud_                  = other.pointcloud_;
+        pose_                        = other.pose_;
+        timestamp                    = other.timestamp;
 
         invalidateCache();
       }
@@ -444,6 +659,20 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
       pointcloud_global_.reset();
     }
 
+    /** Updates the per-point covariance estimation parameters (normally frozen at construction
+     *  time from `TCreationOptions`) and invalidates any cached covariance, so it gets
+     *  recomputed with the new parameters next time it is queried.
+     */
+    void updateCovarianceParams(
+        std::size_t k_correspondences_for_cov, std::size_t min_correspondences_for_cov,
+        double max_distance_for_cov)
+    {
+      k_correspondences_for_cov_   = k_correspondences_for_cov;
+      min_correspondences_for_cov_ = min_correspondences_for_cov;
+      max_distance_for_cov_        = max_distance_for_cov;
+      invalidateCache();
+    }
+
     const auto& covariancesGlobal() const
     {
       computeCovariancesAndDensity();  // will reuse cached if possible
@@ -451,13 +680,50 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
       return cached_cov_global_;
     }
 
+    /** Ensures the per-point *local-frame* covariances are computed and returns
+     *  them. Used to bake them into the serialized map (see
+     *  `TCreationOptions::serialize_covariances`). */
+    const std::vector<mrpt::math::CMatrixFloat33>& covariancesLocal() const
+    {
+      computeCovariancesAndDensity();
+      return cached_cov_local_;
+    }
+
+    /** Installs precomputed per-point *local-frame* covariances loaded from a
+     *  baked `.mm`, so `computeCovariancesAndDensity()` becomes a no-op (it
+     *  early-returns when `cached_cov_local_.size() == pointcloud size`). The
+     *  global-frame rotation is invalidated so it is recomputed for the current
+     *  pose. No-op (covariances left to be computed lazily) if `covs` does not
+     *  match the current point count. Must be called after `pointcloud()`, which
+     *  clears all caches. */
+    void installCovariancesLocal(std::vector<mrpt::math::CMatrixFloat33>&& covs) const
+    {
+      if (!pointcloud_ || covs.size() != pointcloud_->size())
+      {
+        return;  // size mismatch: fall back to lazy recomputation
+      }
+      cached_cov_local_ = std::move(covs);
+      cached_cov_global_.clear();  // invalidate: rotated lazily for current pose
+    }
+
     /** Builds (or get cached) visualization of the cloud in this KF, already transformed to its
      * global pose.
+     *
+     * If `overrideColor` is set, ALL points are painted that single color instead of the
+     * normal per-field colormap, and the result is NOT cached (used by the per-keyframe
+     * debug coloring, see `MOLA_KEYFRAME_MAP_VIZ_COLOR_BY_KF`).
      */
-    std::shared_ptr<mrpt::opengl::CPointCloudColoured> getViz(const TRenderOptions& ro) const;
+    std::shared_ptr<mrpt::opengl::CPointCloudColoured> getViz(
+        const TRenderOptions&                   ro,
+        const std::optional<mrpt::img::TColor>& overrideColor = std::nullopt) const;
+
+    std::shared_ptr<mrpt::opengl::CSetOfObjects> getCovarianceEllipsoidViz(
+        const TRenderOptions& ro) const;
 
    private:
     std::size_t k_correspondences_for_cov_;
+    std::size_t min_correspondences_for_cov_;
+    double      max_distance_for_cov_;
 
     void updateBBox() const;
     void computeCovariancesAndDensity() const;
@@ -470,6 +736,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     /// Bounding box in local KF coordinates. Filled by updateBBox()
     mutable std::optional<mrpt::math::TBoundingBoxf> cached_bbox_local_;
     mutable std::optional<float>                     cloud_density_;
+
     /** One cov per point in local KF coordinates (empty: not computed). Filled by
      * computeCovariancesAndDensity()
      */
@@ -485,6 +752,9 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
     /** Cached visualization, created/getted by getViz() */
     mutable std::shared_ptr<mrpt::opengl::CPointCloudColoured> cached_viz_;
+
+    /** Cached cov visualization, created/getted by getCovarianceEllipsoidViz() */
+    mutable std::shared_ptr<mrpt::opengl::CSetOfObjects> cachez_viz_covs_;
   };
 
   std::map<KeyFrameID, KeyFrame> keyframes_;
@@ -513,6 +783,12 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     mutable std::optional<mrpt::math::TBoundingBoxf> boundingBox;
     mutable std::optional<std::set<KeyFrameID>>      icp_search_kfs;
     mutable std::optional<KeyFrame>                  icp_search_submap;
+
+    /// Value of creationOptions.approximate_cov used to build the cache above. Compared
+    /// against the live option in icp_get_prepared_as_global() so that toggling the flag
+    /// (even with an unchanged active KF set) forces a rebuild instead of silently reusing
+    /// a cache built under the other mode.
+    mutable bool icp_search_built_approximate = false;
 
     /// Used for getAsSimplePointsMap only.
     mutable mrpt::maps::CSimplePointsMap::Ptr cachedPoints;
@@ -568,18 +844,15 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   /** Non-thread safe version of transform_map_left_multiply() */
   void transform_map_left_multiply_impl(const mrpt::poses::CPose3D& b);
+
+  /** Implements `nn_search_cov2cov()` for `creationOptions.approximate_cov == true`: queries
+   *  each keyframe in `activeKfs` with its own cached KD-tree instead of a merged submap.
+   *  `localKf`'s pose must already have been set to the query pose by the caller.
+   *  \sa TCreationOptions::approximate_cov
+   */
+  void nn_search_cov2cov_approximate(
+      const KeyFrame& localKf, const std::set<KeyFrameID>& activeKfs, float max_search_distance,
+      mp2p_icp::MatchedPointWithCovList& outPairings) const;
 };
 
 }  // namespace mola
-
-/** Feature macro: KeyframePointCloudMap exposes the per-KF pose plumbing
- *  (`cloneKFPoses`, `setKeyframePose`, `lastInsertedKeyFrameID`,
- *  `drainEvictedKeyFrameIDs`, `nextFreeKeyFrameID_public`) and inherits
- *  from `mola::KeyframeMapCapable` (providing `keyframePoses()`,
- *  `oldestActiveKeyframeID()`, `setKeyframePose()`, `applyPivotTransform()`).
- *  Downstream packages should guard usage with
- *  `#if defined(MOLA_METRIC_MAPS_HAS_KFM_POSE_PLUMBING)` (combined with
- *  `__has_include(<mola_metric_maps/KeyframePointCloudMap.h>)`) to remain
- *  buildable against older `mola_metric_maps` checkouts.
- */
-#define MOLA_METRIC_MAPS_HAS_KFM_POSE_PLUMBING 1
