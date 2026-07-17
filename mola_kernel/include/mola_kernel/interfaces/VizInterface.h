@@ -20,16 +20,19 @@
  * ---------
  * 2026: Added create_subwindow_from_description() and
  *       enqueue_custom_gui_code() as backend-agnostic replacements for the
- *       nanogui-specific create_subwindow() / enqueue_custom_nanogui_code()
- *       APIs.  The old methods are retained but deprecated so that existing
- *       callers continue to compile; they will be removed in a future release.
+ *       old nanogui-specific create_subwindow() / enqueue_custom_nanogui_code()
+ *       APIs (removed).
+ * 2026: Added register_metric() / push_metric() for streaming time-series
+ *       metrics to live plot windows (ImGui backend only; no-op on nanogui).
  */
 #pragma once
 
 #include <mola_kernel/GuiWidgetDescription.h>
+#include <mola_kernel/interfaces/MetricChannel.h>
 #include <mrpt/containers/yaml_frwd.h>
 #include <mrpt/math/TPoint2D.h>
 #include <mrpt/math/TPoint3D.h>
+#include <mrpt/math/TPose3D.h>
 #include <mrpt/opengl/opengl_frwds.h>
 #include <mrpt/rtti/CObject.h>
 
@@ -37,13 +40,13 @@
 #include <memory>
 #include <optional>
 
-// ---------------------------------------------------------------------------
-// Forward declaration kept ONLY for the deprecated create_subwindow() API.
-// New code must not depend on nanogui::Window* through this interface.
-// clang-format off
-namespace nanogui { class Window; }
-// clang-format on
-// ---------------------------------------------------------------------------
+/** Feature macro: when defined, VizInterface offers update_3d_object_frame()
+ *  and the `parentFrame` argument of update_3d_object(),
+ *  insert_point_cloud_with_decay(), and update_viewport_look_at(), i.e. named
+ *  movable reference-frame nodes that child objects / camera targets can be
+ *  resolved against.  Lets out-of-repo modules (e.g. an older
+ *  mola_lidar_odometry checkout) detect the feature at compile time. */
+#define MOLA_KERNEL_VIZ_HAS_MOVABLE_FRAMES 1
 
 namespace mola
 {
@@ -208,10 +211,43 @@ class VizInterface
    * \param obj            Object to display.
    * \param viewportName   Viewport inside the parent window.
    * \param parentWindow   Host window name.
+   * \param parentFrame    Optional name of a movable reference-frame node
+   *                       previously created via update_3d_object_frame().
+   *                       When non-empty, the object is attached as a child of
+   *                       that frame (so moving the frame moves the object
+   *                       without re-rendering it); the frame node is
+   *                       auto-created at the identity pose if it does not
+   *                       exist yet.  Empty (default) attaches to the viewport
+   *                       root, as before.
    * \return               future<bool>; resolves to true when executed.
    */
   virtual std::future<bool> update_3d_object(
       const std::string& objName, const std::shared_ptr<mrpt::opengl::CSetOfObjects>& obj,
+      const std::string& viewportName = "main", const std::string& parentWindow = "main",
+      const std::string& parentFrame = "") = 0;
+
+  /**
+   * \brief Creates or repositions a named movable "reference frame" node.
+   *
+   * A frame node is an (initially empty) container placed at the viewport
+   * root.  Objects can be attached to it via the `parentFrame` argument of
+   * update_3d_object(); moving the frame then relocates all attached objects
+   * at once, without re-uploading their geometry.  This is how a back end such
+   * as mola_mapper_3d keeps a front end's dense clouds / local map (drawn once
+   * in its own `{odom_i}` frame) correctly placed in `{map}` as it estimates
+   * the `T_map_to_odom_i` transform online.
+   *
+   * Idempotent: the first call creates the node; later calls only update its
+   * pose, preserving any already-attached children.
+   *
+   * \param frameName    Name of the frame node (upsert key). Must be non-empty.
+   * \param pose         Pose of the frame in the viewport (i.e. in `{map}`).
+   * \param viewportName Viewport inside the parent window.
+   * \param parentWindow Host window name.
+   * \return             future<bool>; resolves to true when executed.
+   */
+  virtual std::future<bool> update_3d_object_frame(
+      const std::string& frameName, const mrpt::math::TPose3D& pose,
       const std::string& viewportName = "main", const std::string& parentWindow = "main") = 0;
 
   /**
@@ -221,11 +257,15 @@ class VizInterface
    * \param decay_time_seconds Lifetime in seconds before the cloud fades out.
    * \param viewportName       Target viewport.
    * \param parentWindow       Host window name.
+   * \param parentFrame        If non-empty, the cloud is attached as a child of
+   *                           the named movable frame node (same semantics as
+   *                           the parentFrame argument of update_3d_object()).
    * \return                   future<bool> resolving to true when executed.
    */
   virtual std::future<bool> insert_point_cloud_with_decay(
       const std::shared_ptr<mrpt::opengl::CPointCloudColoured>& cloud, double decay_time_seconds,
-      const std::string& viewportName = "main", const std::string& parentWindow = "main") = 0;
+      const std::string& viewportName = "main", const std::string& parentWindow = "main",
+      const std::string& parentFrame = "") = 0;
 
   /**
    * \brief Removes all clouds previously inserted with
@@ -234,10 +274,20 @@ class VizInterface
   virtual std::future<bool> clear_all_point_clouds_with_decay(
       const std::string& viewportName = "main", const std::string& parentWindow = "main") = 0;
 
-  /** Moves the viewport camera look-at point. */
+  /**
+   * \brief Moves the viewport camera look-at point.
+   *
+   * \param lookAt       Target point in the local coordinate frame of
+   *                     `parentFrame` (if given) or in world/scene space.
+   * \param parentFrame  If non-empty, the backend looks up the named movable
+   *                     frame node, applies its current scene pose to `lookAt`,
+   *                     and uses the resulting world-space point as the target.
+   *                     This makes the camera follow a vehicle rendered under
+   *                     a frame node rather than chasing its odom-frame coords.
+   */
   virtual std::future<bool> update_viewport_look_at(
       const mrpt::math::TPoint3Df& lookAt, const std::string& viewportName = "main",
-      const std::string& parentWindow = "main") = 0;
+      const std::string& parentWindow = "main", const std::string& parentFrame = "") = 0;
 
   /**
    * \brief Rotates the viewport camera around the vertical axis.
@@ -348,62 +398,40 @@ class VizInterface
   /** @} */
 
   // =========================================================================
-  /** @name Deprecated nanogui-specific API
+  /** @name Metrics / time-series plotting
    *
-   * These methods are kept so that existing callers continue to compile
-   * against either backend.  They will be removed in a future release.
+   * Generic mechanism for any module to stream timestamped scalar values
+   * ("metrics": CPU %, per-frame delay, ICP uncertainties, residuals, queue
+   * depth, temperatures, ...) to the visualizer for display in live,
+   * autoscrolling plot windows.
    *
-   * Migration guide
-   * ---------------
-   * | Old call                          | New call                              |
-   * |-----------------------------------|---------------------------------------|
-   * | create_subwindow(title)           | create_subwindow_from_description()   |
-   * | enqueue_custom_nanogui_code(fn)   | enqueue_custom_gui_code(fn)           |
-   * | subwindow_grid_layout(...)        | encode layout in WindowDescription    |
-   * | subwindow_move_resize(...)        | encode position/size in WindowDescription |
-   *
+   * This is an ImGui-backend feature (rendered via ImPlot). The nanogui
+   * `MolaViz` backend implements both methods as no-ops: `register_metric()`
+   * returns a live handle whose `push()` is a no-op, so callers can use the
+   * API unconditionally without checking `gui_backend()`.
    * @{ */
 
   /**
-   * \deprecated Use create_subwindow_from_description() instead.
+   * \brief Registers (or returns the existing) metric channel by unique name.
    *
-   * Returns a nanogui::Window* through a future.  On non-nanogui backends
-   * this returns a future containing nullptr; callers must guard against this.
-   * The returned pointer must not be deleted by the caller.
+   * Idempotent: repeated calls with the same name return the same channel.
+   *
+   * \param name Unique id, also the default legend label. Use a namespaced
+   *             form like "lidar_odom/icp_delay_ms" to avoid collisions.
+   * \param unit Optional unit string shown on axis/legend (e.g. "ms", "%").
+   * \return     A channel handle; never null (no-op handle on backends
+   *             without plotting).
    */
-  [[deprecated(
-      "Use create_subwindow_from_description() instead")]] virtual std::future<nanogui::Window*>
-      create_subwindow(const std::string& title, const std::string& parentWindow = "main") = 0;
+  virtual MetricChannel::Ptr register_metric(
+      const std::string& name, const std::string& unit = "") = 0;
 
   /**
-   * \deprecated Use enqueue_custom_gui_code() instead.
+   * \brief One-shot convenience: register-if-needed then push.
    *
-   * Retained for source compatibility; both names dispatch to the same
-   * internal queue.
+   * For rarely-updated metrics; prefer holding the handle returned by
+   * register_metric() on hot paths to avoid a name lookup per sample.
    */
-  [[deprecated("Use enqueue_custom_gui_code() instead")]] virtual std::future<void>
-      enqueue_custom_nanogui_code(const std::function<void()>& userCode) = 0;
-
-  /**
-   * \deprecated Encode layout in WindowDescription::tabs instead.
-   *
-   * On ImGui backends this is a no-op (ImGui manages layout automatically).
-   */
-  [[deprecated("Encode layout in WindowDescription instead")]] virtual std::future<void>
-      subwindow_grid_layout(
-          const std::string& subWindowTitle, bool orientationVertical, int resolution,
-          const std::string& parentWindow = "main") = 0;
-
-  /**
-   * \deprecated Encode position and size in WindowDescription instead.
-   *
-   * On ImGui backends position/size are first-use hints only; the dock
-   * manager overrides them freely.
-   */
-  [[deprecated("Encode position/size in WindowDescription instead")]] virtual std::future<void>
-      subwindow_move_resize(
-          const std::string& subWindowTitle, const mrpt::math::TPoint2D_<int>& location,
-          const mrpt::math::TPoint2D_<int>& size, const std::string& parentWindow = "main") = 0;
+  virtual void push_metric(const std::string& name, double t, double value) = 0;
 
   /** @} */
 };
