@@ -20,12 +20,12 @@
  * C++ library for main MOLA GUI
  */
 
+#include <mola_kernel/assets/mola_icon_64x64.h>
 #include <mola_viz/MolaViz.h>
 #include <mola_yaml/yaml_helpers.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/core/initializer.h>
 #include <mrpt/core/lock_helper.h>
-#include <mrpt/maps/CColouredPointsMap.h>
 #include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
@@ -44,8 +44,6 @@
 
 #include <array>
 #include <cinttypes>
-
-#include "mola_icon_64x64.h"
 
 using namespace mola;
 
@@ -431,8 +429,10 @@ void populate_from_3d_range_scan(
     pp.takeIntoAccountSensorPoseOnRobot = true;
     if (obj3D.hasRangeImage && obj3D.hasIntensityImage)
     {
-      auto pointMapCol                = mrpt::maps::CColouredPointsMap::Create();
-      pointMapCol->colorScheme.scheme = mrpt::maps::CColouredPointsMap::cmFromIntensityImage;
+      auto pointMapCol = mrpt::maps::CGenericPointsMap::Create();
+      pointMapCol->registerField_uint8(mrpt::maps::CPointsMap::POINT_FIELD_COLOR_Ru8);
+      pointMapCol->registerField_uint8(mrpt::maps::CPointsMap::POINT_FIELD_COLOR_Gu8);
+      pointMapCol->registerField_uint8(mrpt::maps::CPointsMap::POINT_FIELD_COLOR_Bu8);
       obj3DMut.unprojectInto(*pointMapCol, pp);
       glPc->loadFromPointsMap(pointMapCol.get());
       color_from_z = false;
@@ -1124,7 +1124,7 @@ void MolaViz::dataset_ui_check_new_modules()
             mod->datasetUI_teleport(static_cast<size_t>(pos));
           }
         },
-        270});
+        270, nullptr});
 
     row.widgets.emplace_back(
         mola::gui::Label{std::make_shared<mola::gui::LiveString>("Playback rate:")});
@@ -1538,95 +1538,6 @@ std::future<std::optional<std::string>> MolaViz::open_file_dialog(
 }
 
 // ---------------------------------------------------------------------------
-// VizInterface - deprecated shims (delegate to new API, one line each)
-// ---------------------------------------------------------------------------
-
-std::future<nanogui::Window*> MolaViz::create_subwindow(
-    const std::string& subWindowTitle, const std::string& parentWindow)
-{
-  // Build a minimal description that matches the legacy behaviour:
-  // bare window, no tabs, no widgets - caller populates it via
-  // enqueue_custom_nanogui_code() as before.
-  mola::gui::WindowDescription desc;
-  desc.title         = subWindowTitle;
-  desc.starts_hidden = false;
-
-  // Schedule creation and then return the raw pointer via a chained task.
-  // We use a shared promise so the inner lambda can set its value after
-  // create_subwindow_from_description has run.
-  auto promise = std::make_shared<std::promise<nanogui::Window*>>();
-  auto future  = promise->get_future();
-
-  auto descFut = create_subwindow_from_description(desc, parentWindow);
-
-  // Chain: once the description task completes, extract the raw pointer.
-  enqueue_custom_gui_code(
-      [this, subWindowTitle, parentWindow, p = std::move(promise)]() mutable
-      {
-        std::shared_lock<std::shared_mutex> lck(subWindowsMtx_);
-
-        auto itParent = subWindows_.find(parentWindow);
-        if (itParent != subWindows_.end())
-        {
-          auto itSub = itParent->second.find(subWindowTitle);
-          if (itSub != itParent->second.end())
-          {
-            p->set_value(itSub->second);
-            return;
-          }
-        }
-        p->set_value(nullptr);
-      });
-
-  (void)descFut;
-  return future;
-}
-
-std::future<void> MolaViz::enqueue_custom_nanogui_code(const std::function<void()>& userCode)
-{
-  return enqueue_custom_gui_code(userCode);
-}
-
-std::future<void> MolaViz::subwindow_grid_layout(
-    const std::string& subWindowTitle, const bool orientationVertical, int resolution,
-    const std::string& parentWindow)
-{
-  return enqueue_custom_gui_code(
-      [this, subWindowTitle, orientationVertical, resolution, parentWindow]()
-      {
-        std::shared_lock<std::shared_mutex> lck(subWindowsMtx_);
-
-        auto itWin = subWindows_.find(parentWindow);
-        ASSERTMSG_(itWin != subWindows_.end(), "Unknown GUI top-level window");
-        auto itSubWin = itWin->second.find(subWindowTitle);
-        ASSERTMSG_(itSubWin != itWin->second.end(), "Unknown subwindow");
-
-        itSubWin->second->setLayout(new nanogui::GridLayout(
-            orientationVertical ? nanogui::Orientation::Vertical : nanogui::Orientation::Horizontal,
-            resolution, nanogui::Alignment::Fill, 2, 2));
-      });
-}
-
-std::future<void> MolaViz::subwindow_move_resize(
-    const std::string& subWindowTitle, const mrpt::math::TPoint2D_<int>& location,
-    const mrpt::math::TPoint2D_<int>& size, const std::string& parentWindow)
-{
-  return enqueue_custom_gui_code(
-      [this, subWindowTitle, location, size, parentWindow]()
-      {
-        std::shared_lock<std::shared_mutex> lck(subWindowsMtx_);
-
-        auto itWin = subWindows_.find(parentWindow);
-        ASSERTMSG_(itWin != subWindows_.end(), "Unknown GUI top-level window");
-        auto itSubWin = itWin->second.find(subWindowTitle);
-        ASSERTMSG_(itSubWin != itWin->second.end(), "Unknown subwindow");
-
-        itSubWin->second->setPosition({location.x, location.y});
-        itSubWin->second->setSize({size.x, size.y});
-      });
-}
-
-// ---------------------------------------------------------------------------
 // Observation / RTTI handler dispatch
 // ---------------------------------------------------------------------------
 
@@ -1693,12 +1604,13 @@ std::future<bool> MolaViz::subwindow_update_visualization(
 
 std::future<bool> MolaViz::update_3d_object(
     const std::string& objName, const std::shared_ptr<mrpt::opengl::CSetOfObjects>& obj,
-    const std::string& viewportName, const std::string& parentWindow)
+    const std::string& viewportName, const std::string& parentWindow,
+    const std::string& parentFrame)
 {
   using return_type = bool;
 
   auto task = std::make_shared<std::packaged_task<return_type()>>(
-      [this, objName, obj, viewportName, parentWindow]()
+      [this, objName, obj, viewportName, parentWindow, parentFrame]()
       {
         MRPT_LOG_DEBUG_STREAM("update_3d_object() objName='" << objName << "'");
 
@@ -1708,15 +1620,54 @@ std::future<bool> MolaViz::update_3d_object(
         ASSERT_(topWin->background_scene);
 
         mrpt::opengl::CSetOfObjects::Ptr glContainer;
-        if (auto o = topWin->background_scene->getByName(objName, viewportName); o)
+        auto&                            scene = *topWin->background_scene;
+        if (parentFrame.empty())
         {
-          glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
-          ASSERT_(glContainer);
+          // Non-recursive search: only direct children of the viewport root,
+          // so objects nested inside frame nodes are not falsely matched.
+          if (auto vp = scene.getViewport(viewportName); vp)
+          {
+            for (const auto& o : *vp)
+            {
+              if (o->getName() == objName)
+              {
+                glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
+                break;
+              }
+            }
+          }
+          if (!glContainer)
+          {
+            // Not at root. Evict from any frame node it may live in, then
+            // create a fresh container at the viewport root.
+            if (auto o = scene.getByName(objName, viewportName); o)
+            {
+              scene.removeObject(o, viewportName);
+            }
+            glContainer = mrpt::opengl::CSetOfObjects::Create();
+            scene.insert(glContainer, viewportName);
+          }
         }
         else
         {
-          glContainer = mrpt::opengl::CSetOfObjects::Create();
-          topWin->background_scene->insert(glContainer, viewportName);
+          // Attach as a child of the named movable frame node, auto-creating
+          // the frame at the identity pose if it does not exist yet:
+          auto frameNode = get_or_create_frame_node_(scene, parentFrame, viewportName);
+          if (auto o = frameNode->getByName(objName); o)
+          {
+            glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
+          }
+          if (!glContainer)
+          {
+            // Not in this frame. Evict from root or another frame before
+            // inserting here (removeObject searches recursively).
+            if (auto o = scene.getByName(objName, viewportName); o)
+            {
+              scene.removeObject(o, viewportName);
+            }
+            glContainer = mrpt::opengl::CSetOfObjects::Create();
+            frameNode->insert(glContainer);
+          }
         }
 
         *glContainer = *obj;
@@ -1730,15 +1681,61 @@ std::future<bool> MolaViz::update_3d_object(
   return task->get_future();
 }
 
-std::future<bool> MolaViz::insert_point_cloud_with_decay(
-    const std::shared_ptr<mrpt::opengl::CPointCloudColoured>& cloud,
-    const double decay_time_seconds, const std::string& viewportName,
+mrpt::opengl::CSetOfObjects::Ptr MolaViz::get_or_create_frame_node_(
+    mrpt::opengl::Scene& scene, const std::string& frameName, const std::string& viewportName)
+{
+  // Called from the GUI thread only.
+  mrpt::opengl::CSetOfObjects::Ptr frameNode;
+  if (auto o = scene.getByName(frameName, viewportName); o)
+  {
+    frameNode = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
+    ASSERT_(frameNode);
+  }
+  else
+  {
+    frameNode = mrpt::opengl::CSetOfObjects::Create();
+    frameNode->setName(frameName);
+    scene.insert(frameNode, viewportName);
+  }
+  return frameNode;
+}
+
+std::future<bool> MolaViz::update_3d_object_frame(
+    const std::string& frameName, const mrpt::math::TPose3D& pose, const std::string& viewportName,
     const std::string& parentWindow)
 {
   using return_type = bool;
 
   auto task = std::make_shared<std::packaged_task<return_type()>>(
-      [this, cloud, decay_time_seconds, viewportName, parentWindow]()
+      [this, frameName, pose, viewportName, parentWindow]()
+      {
+        ASSERT_(!frameName.empty());
+        ASSERT_(windows_.count(parentWindow));
+        auto topWin = windows_.at(parentWindow).win;
+        ASSERT_(topWin);
+        ASSERT_(topWin->background_scene);
+
+        auto frameNode =
+            get_or_create_frame_node_(*topWin->background_scene, frameName, viewportName);
+        frameNode->setPose(pose);
+        return true;
+      });
+
+  auto lck = mrpt::lockHelper(guiThreadPendingTasksMtx_);
+  guiThreadPendingTasks_.emplace_back([=]() { (*task)(); });
+  guiThreadMustReLayoutTheseWindows_.insert(parentWindow);
+  return task->get_future();
+}
+
+std::future<bool> MolaViz::insert_point_cloud_with_decay(
+    const std::shared_ptr<mrpt::opengl::CPointCloudColoured>& cloud,
+    const double decay_time_seconds, const std::string& viewportName,
+    const std::string& parentWindow, const std::string& parentFrame)
+{
+  using return_type = bool;
+
+  auto task = std::make_shared<std::packaged_task<return_type()>>(
+      [this, cloud, decay_time_seconds, viewportName, parentWindow, parentFrame]()
       {
         if (!cloud || cloud->empty())
         {
@@ -1752,16 +1749,35 @@ std::future<bool> MolaViz::insert_point_cloud_with_decay(
         ASSERT_(topWin->background_scene);
 
         mrpt::opengl::CSetOfObjects::Ptr glContainer;
-        if (auto o = topWin->background_scene->getByName(DECAY_CLOUDS_NAME, viewportName); o)
+        if (parentFrame.empty())
         {
-          glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
-          ASSERT_(glContainer);
+          if (auto o = topWin->background_scene->getByName(DECAY_CLOUDS_NAME, viewportName); o)
+          {
+            glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
+            ASSERT_(glContainer);
+          }
+          else
+          {
+            glContainer = mrpt::opengl::CSetOfObjects::Create();
+            topWin->background_scene->insert(glContainer, viewportName);
+            glContainer->setName(DECAY_CLOUDS_NAME);
+          }
         }
         else
         {
-          glContainer = mrpt::opengl::CSetOfObjects::Create();
-          topWin->background_scene->insert(glContainer, viewportName);
-          glContainer->setName(DECAY_CLOUDS_NAME);
+          auto frameNode =
+              get_or_create_frame_node_(*topWin->background_scene, parentFrame, viewportName);
+          if (auto o = frameNode->getByName(DECAY_CLOUDS_NAME); o)
+          {
+            glContainer = std::dynamic_pointer_cast<mrpt::opengl::CSetOfObjects>(o);
+            ASSERT_(glContainer);
+          }
+          else
+          {
+            glContainer = mrpt::opengl::CSetOfObjects::Create();
+            glContainer->setName(DECAY_CLOUDS_NAME);
+            frameNode->insert(glContainer);
+          }
         }
 
         glContainer->insert(cloud);
@@ -1772,11 +1788,15 @@ std::future<bool> MolaViz::insert_point_cloud_with_decay(
 
         const float initial_alpha = mrpt::u8tof(cloud->shaderPointsVertexColorBuffer().at(0).A);
         winData.decaying_clouds.emplace_back(viewportName, cloud, initial_alpha);
+        winData.decaying_clouds.back().container = glContainer;
 
         while (winData.decaying_clouds.size() > maxScans)
         {
           auto& oldest = winData.decaying_clouds.front();
-          glContainer->removeObject(oldest.cloud);
+          if (oldest.container)
+          {
+            oldest.container->removeObject(oldest.cloud);
+          }
           winData.decaying_clouds.pop_front();
         }
         return true;
@@ -1830,20 +1850,38 @@ std::future<bool> MolaViz::clear_all_point_clouds_with_decay(
 // ---------------------------------------------------------------------------
 
 std::future<bool> MolaViz::update_viewport_look_at(
-    const mrpt::math::TPoint3Df& lookAt, [[maybe_unused]] const std::string& viewportName,
-    const std::string& parentWindow)
+    const mrpt::math::TPoint3Df& lookAt, const std::string& viewportName,
+    const std::string& parentWindow, const std::string& parentFrame)
 {
   using return_type = bool;
 
   auto task = std::make_shared<std::packaged_task<return_type()>>(
-      [this, lookAt, parentWindow]()
+      [this, lookAt, viewportName, parentWindow, parentFrame]()
       {
-        MRPT_LOG_DEBUG_STREAM("update_viewport_look_at() lookAt=" << lookAt.asString());
         ASSERT_(windows_.count(parentWindow));
         auto topWin = windows_.at(parentWindow).win;
         ASSERT_(topWin);
         ASSERT_(topWin->background_scene);
-        topWin->camera().setCameraPointing(lookAt.x, lookAt.y, lookAt.z);
+
+        mrpt::math::TPoint3Df worldLookAt = lookAt;
+        if (!parentFrame.empty())
+        {
+          if (auto o = topWin->background_scene->getByName(parentFrame, viewportName); o)
+          {
+            const auto worldPt =
+                mrpt::poses::CPose3D(o->getPose())
+                    .composePoint(mrpt::math::TPoint3D(lookAt.x, lookAt.y, lookAt.z));
+            worldLookAt = {
+                static_cast<float>(worldPt.x), static_cast<float>(worldPt.y),
+                static_cast<float>(worldPt.z)};
+          }
+          else
+          {
+            return false;  // frame node not in scene yet; skip camera update
+          }
+        }
+        MRPT_LOG_DEBUG_STREAM("update_viewport_look_at() lookAt=" << worldLookAt.asString());
+        topWin->camera().setCameraPointing(worldLookAt.x, worldLookAt.y, worldLookAt.z);
         return true;
       });
 
@@ -2048,4 +2086,28 @@ std::future<void> MolaViz::set_menu_bar(
   std::promise<void> p;
   p.set_value();
   return p.get_future();
+}
+
+namespace
+{
+/** No-op metric channel handle for the nanogui backend, which does not
+ *  implement metric plotting. */
+class NoOpMetricChannel : public MetricChannel
+{
+ public:
+  void push(double /*t*/, double /*value*/) override {}
+};
+}  // namespace
+
+MetricChannel::Ptr MolaViz::register_metric(
+    const std::string& /*name*/, const std::string& /*unit*/)
+{
+  // Note: nanogui backend does not support metric plotting.
+  static const MetricChannel::Ptr noOpChannel = std::make_shared<NoOpMetricChannel>();
+  return noOpChannel;
+}
+
+void MolaViz::push_metric(const std::string& /*name*/, double /*t*/, double /*value*/)
+{
+  // Note: nanogui backend does not support metric plotting.
 }
