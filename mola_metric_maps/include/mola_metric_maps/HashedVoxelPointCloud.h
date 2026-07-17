@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <mola_metric_maps/OptionsCapable.h>
 #include <mola_metric_maps/index3d_t.h>
 #include <mrpt/core/round.h>
 #include <mrpt/img/TColor.h>
@@ -37,12 +38,31 @@
 
 namespace mola
 {
-/** HashedVoxelPointCloud: a pointcloud stored as a sparse set of cubic voxels,
- * indexed by a hash map. Efficient for storing point clouds, decimating them,
- *  and running nearest nearest-neighbor search.
+/** HashedVoxelPointCloud: a point cloud stored as a flat sparse hash map of
+ * cubic voxels. Each voxel holds up to SSO_MAX_POINTS_PER_VOXEL points in a
+ * fixed-size array (no heap allocation per voxel). The hash map backend is
+ * `tsl::robin_map`, which gives O(1) average-case insert and lookup.
+ *
+ * Typical uses:
+ * - Efficient voxel-based decimation during LiDAR scan insertion.
+ * - Nearest-neighbor queries for ICP and localization (via the
+ *   `mrpt::maps::NearestNeighborsCapable` interface).
+ *
+ * Each occupied voxel can hold up to SSO_MAX_POINTS_PER_VOXEL (32) points
+ * stored directly inside the `VoxelData` object, avoiding per-point heap
+ * allocations. Points beyond that limit are silently dropped.
+ *
+ * Global point identifiers (`global_plain_index_t`) pack the 3D voxel
+ * indices and the sub-voxel point index into a single `uint64_t` for use
+ * with the MRPT NN API.
+ *
+ * @note For a two-level (outer sparse + inner dense) voxel map, see
+ *       `mola::SparseVoxelPointCloud`.
+ * @note For a Normal Distributions Transform map, see `mola::NDT`.
  */
 class HashedVoxelPointCloud : public mrpt::maps::CMetricMap,
-                              public mrpt::maps::NearestNeighborsCapable
+                              public mrpt::maps::NearestNeighborsCapable,
+                              public mola::OptionsCapable
 {
   DEFINE_SERIALIZABLE(HashedVoxelPointCloud, mola)
  public:
@@ -332,6 +352,23 @@ class HashedVoxelPointCloud : public mrpt::maps::CMetricMap,
 
   /** @} */
 
+  /** Options that configure the map's internal structure. Unlike the other option groups,
+   *  changing `voxel_size` after the map already holds data requires discarding its contents
+   *  (see `setVoxelProperties()`); use `trySetCreationOptions()` to apply it safely.
+   */
+  struct TCreationOptions : public mrpt::config::CLoadableOptions
+  {
+    TCreationOptions() = default;
+
+    void loadFromConfigFile(
+        const mrpt::config::CConfigFileBase& source,
+        const std::string&                   section) override;  // See base docs
+    void dumpToTextStream(std::ostream& out) const override;  // See base docs
+
+    float voxel_size = 1.00f;
+  };
+  TCreationOptions creationOptions;
+
   /** Options for insertObservation()
    */
   struct TInsertionOptions : public mrpt::config::CLoadableOptions
@@ -417,6 +454,11 @@ class HashedVoxelPointCloud : public mrpt::maps::CMetricMap,
     std::string recolorByPointField = "intensity";
   };
   TRenderOptions renderOptions;
+
+  // mola::OptionsCapable interface:
+  [[nodiscard]] std::map<std::string, mrpt::config::CLoadableOptions*> optionsByName() override;
+  bool                                                                 trySetCreationOptions(
+                                                                      const mrpt::config::CConfigFileBase& cfg, const std::string& section) override;
 
  public:
   // Interface for use within a mrpt::maps::CMultiMetricMap:
