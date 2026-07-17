@@ -110,9 +110,24 @@ class Rosbag2Dataset : public RawDataSourceBase, public OfflineDatasetSource, pu
   void initialize_rds(const Yaml& cfg) override;
 
  private:
-  bool        initialized_ = false;
-  std::string rosbag_filename_;
-  std::string rosbag_storage_id_;  // (sqlite3|mcap) Empty = auto guess
+  bool initialized_ = false;
+
+  /// Ordered list of bag paths (directories or .db3/.mcap files).
+  /// Populated from a scalar or sequence `rosbag_filename` YAML entry.
+  std::vector<std::string> rosbag_filenames_;
+
+  /// Per-bag storage identifier ("sqlite3" or "mcap"), auto-detected or
+  /// overridden by the YAML `rosbag_storage_id` key (applied to all bags).
+  std::vector<std::string> rosbag_storage_ids_;
+
+  /// User-supplied storage ID override ("" = auto-detect per bag).
+  std::string rosbag_storage_id_override_;
+
+  /// Index into rosbag_filenames_ of the bag the reader is currently on.
+  size_t current_bag_idx_ = 0;
+
+  /// Message count per bag; sum == bagMessageCount_.
+  std::vector<size_t> per_bag_msg_counts_;
 
   std::string rosbag_serialization_ = "cdr";
   std::string base_link_frame_id_   = "base_link";
@@ -127,11 +142,24 @@ class Rosbag2Dataset : public RawDataSourceBase, public OfflineDatasetSource, pu
   std::optional<mrpt::Clock::time_point> rosbag_begin_time_;
   size_t                                 read_ahead_length_ = 15;
 
+  /// Optional limit on dataset replay duration, counted from the first
+  /// published message [seconds]. 0 (default) means unlimited (play the
+  /// whole bag). Useful for quick validation runs on long bags.
+  double max_duration_sec_ = 0;
+
   std::optional<mrpt::Clock::time_point> last_play_wallclock_time_;
   double                                 last_dataset_time_ = 0;
 
   std::shared_ptr<rosbag2_cpp::readers::SequentialReader> reader_;
   size_t                                                  bagMessageCount_ = 0;
+
+  /// Opens the bag at rosbag_filenames_[bag_idx], sets reader_ and
+  /// current_bag_idx_. Called from initialize_rds() and doReadAhead().
+  void openBag(size_t bag_idx);
+
+  /// Returns the auto-detected or user-overridden storage identifier for
+  /// the bag at the given path (used in openBag()).
+  static std::string detectStorageId(const std::string& path, const std::string& user_override);
 
   using SF = mrpt::obs::CSensoryFrame;
 
