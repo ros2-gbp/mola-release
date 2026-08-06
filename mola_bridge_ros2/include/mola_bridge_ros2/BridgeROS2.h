@@ -27,6 +27,7 @@
 #include <mola_kernel/interfaces/RawDataConsumer.h>
 #include <mola_kernel/interfaces/RawDataSourceBase.h>
 #include <mola_kernel/interfaces/Relocalization.h>
+#include <mola_kernel/interfaces/TransformTreeSource.h>
 
 // MRPT:
 #include <mrpt/maps/COccupancyGridMap2D.h>
@@ -44,6 +45,7 @@
 #include <atomic>
 #include <nav_msgs/msg/odometry.hpp>
 #include <optional>
+#include <rclcpp/node.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
@@ -104,13 +106,22 @@ namespace mola
  *
  * \ingroup mola_bridge_ros2_grp
  */
-class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
+class BridgeROS2 : public RawDataSourceBase,
+                   public mola::RawDataConsumer,
+                   public mola::TransformTreeSource
 {
   DEFINE_MRPT_OBJECT(BridgeROS2, mola)
 
  public:
   BridgeROS2();
   ~BridgeROS2() override;
+
+  // Virtual interface of TransformTreeSource (see docs in base class)
+  std::optional<TransformTree> transform_tree(
+      const std::string&                            root,
+      const std::optional<mrpt::Clock::time_point>& timestamp = std::nullopt) const override;
+
+  std::string transform_tree_default_root() const override { return params_.base_link_frame; }
 
   // disabled copy & move ctors:
   BridgeROS2(const BridgeROS2&)            = delete;
@@ -248,6 +259,12 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
   // Yaml is NOT a reference on purpose.
   void ros_node_thread_main(Yaml cfg);
 
+  // Declared before the members below that hold a reference to *rosNode_
+  // (TransformListener/TransformBroadcaster take rclcpp::Node&, not a
+  // shared_ptr, see ros_node_thread_main()), so rosNode_ outlives them.
+  std::shared_ptr<rclcpp::Node> rosNode_;
+  std::mutex                    rosNodeMtx_;
+
   // std::shared_ptr<tf2_ros::Buffer>            tf_buffer_;
   std::shared_ptr<tf2::BufferCore>            tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -258,9 +275,6 @@ class BridgeROS2 : public RawDataSourceBase, public mola::RawDataConsumer
 
   rclcpp::Clock::SharedPtr ros_clock_;
   std::mutex               ros_clock_mtx_;
-
-  std::shared_ptr<rclcpp::Node> rosNode_;
-  std::mutex                    rosNodeMtx_;
 
   std::atomic<bool> shouldExit_{false};
   std::atomic<bool> isSpinning_{false};
