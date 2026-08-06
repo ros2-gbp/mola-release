@@ -1,0 +1,381 @@
+ros-jazzy-mola-yaml (3.1.0-1noble) noble; urgency=high
+
+  * Merge pull request #187 <https://github.com/MOLAorg/mola/issues/187> from MOLAorg/feat/incremental-point-cloud-kdtree-bake
+    Bake IncrementalPointCloud's k-d tree index (mm-ipc-bake-kdtree)
+  * changelog
+  * Merge pull request #182 <https://github.com/MOLAorg/mola/issues/182> from MOLAorg/fix/yaml-define-outer-wins
+    fix(mola_yaml): outer $define wins over a more deeply imported file's own $define
+  * style: apply clang-format-14 to the outer-wins $define fix
+  * fix(mola_yaml): outer $define wins over a more deeply imported file's own $define
+    Nested $define blocks for the same variable name did not compose the way
+    $import sibling overrides do: the more deeply imported file's own $define
+    silently won, discarding an outer file's override for that same name. This
+    made it impossible for a launcher to retune a hook that a reusable imported
+    fragment also $defines its own default for, short of restating the whole
+    target key as a literal sibling value.
+    consumeDefineBlock() now skips a $define entry whose name is already present
+    in the inherited scope, so the scope closest to the document root (or the
+    caller's initial variables) has final say, mirroring "environment > $define >
+    inline default" one level up. Updated the existing nested-$define test to the
+    new (opposite) contract and added a dedicated multi-level $import regression
+    test for the exact reusable-fragment shape that surfaced this.
+  * Merge pull request #181 <https://github.com/MOLAorg/mola/issues/181> from MOLAorg/feat/yaml-define-directive
+    mola_yaml: new $define directive to set variables for a subtree
+  * docs: clarify outer scope only is used to expand vars
+  * mola_yaml: new $define directive to set variables for a subtree
+    Shared pipeline files already expose their tunable settings as
+    ${VAR|default} hooks, but until now a launcher had no way to drive them
+    from the YAML itself: the value had to come from the real environment.
+    Working around that meant duplicating whole blocks after an $import just
+    to change one nested field, which is especially painful for values inside a
+    YAML sequence, since $import's deep-merge replaces sequences wholesale.
+    $define is a map key holding NAME: VALUE pairs that are bound as
+    ${NAME} variables for the subtree of the map it appears in, including the
+    files pulled in by a sibling $import / $include{}:
+    $define:
+    MOLA_DESKEW_METHOD: "MotionCompensationMethod::IMU"
+    $import: lidar3d-default.yaml
+    The bindings go into YAMLParseOptions::variables, so the resolution order
+    in parseVars() is unchanged and the effective priority is
+    environment > $define > inline |default: a variable exported on the
+    command line still overrides the file. This is deliberately not a setenv:
+    the scope is the YAML subtree, so nothing leaks into the process
+    environment, into $() sub-processes, or into a sibling module's import.
+    Since the variable pass runs later over the whole document with the outer
+    options, a subtree carrying a $define is expanded eagerly so the
+    definitions reach the plain sibling keys too, not only the imported files.
+    Includes unit tests and user documentation.
+  * Contributors: Jose Luis Blanco-Claraco
+  * feat: new $define YAML directive to bind variables for a subtree
+    (including imported files), letting launchers tune shared pipeline
+    settings without duplicating blocks.
+  * fix(mola_yaml): an outer file's $define now correctly wins over a more
+    deeply imported file's own $define.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 05 Aug 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (3.0.0-1noble) noble; urgency=high
+
+  * docs: list all debug/trace env variables
+  * Merge pull request #161 <https://github.com/MOLAorg/mola/issues/161> from MOLAorg/feat/yaml-import-override
+    feat(mola_yaml): $import map directive for base-file + overrides
+  * feat(mola_yaml): add $import map directive for base-file + overrides
+    A map with an $import key (a path, or a sequence of paths) is replaced by
+    the deep-merge of the imported file(s) with the map's remaining keys overlaid
+    on top, so sibling entries OVERRIDE the imported base (nested maps merge
+    deeply; scalars/sequences replace). This complements $include{} (which
+    replaces a whole node) and lets near-identical launch files share a common
+    params block while tweaking just a few values, instead of duplicating it.
+    - Resolved in the same first pass as $include{}, reusing its path
+    pre-processing, relative-path resolution and circular-reference detection.
+    - Unit tests: single import, multi-file sequence (later file wins), sibling
+    override including deep-nested, load_yaml_file path, and missing-file throw.
+    - Docs: new section + processing-order table row in the SLAM config format.
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 16 Jul 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.9.0-1noble) noble; urgency=high
+
+  * Merge pull request #143 <https://github.com/MOLAorg/mola/issues/143> from MOLAorg/bump-cmake-version
+    bump min req cmake version to 3.22
+  * bump min req cmake version to 3.22
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 10 May 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.8.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 28 Apr 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.7.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 21 Apr 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.6.1-1noble) noble; urgency=high
+
+  * Merge pull request #114 <https://github.com/MOLAorg/mola/issues/114> from MOLAorg/feat/refactor-yaml-parser
+    Refactor mola_yaml parser (faster, less memory usage, non recursive)
+  * Refactor mola_yaml parser (faster, less memory usage, non recursive)
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 01 Apr 2026 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.6.0-1noble) noble; urgency=high
+
+  * Merge pull request #107 <https://github.com/MOLAorg/mola/issues/107> from MOLAorg/fix/viz-decay-clouds
+    Fix/viz-decay-clouds
+  * fix clang-tidy warning: avoid std::endl
+  * Update coyright notes
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 11 Mar 2026 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.5.0-1noble) noble; urgency=high
+
+  * Merge pull request #100 <https://github.com/MOLAorg/mola/issues/100> from MOLAorg/fix/remove-mrpt-deprecated-maps
+    Remove use of mrpt deprecated maps
+  * Avoid use of deprecated mrpt::maps classes
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Fri, 13 Feb 2026 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.4.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sat, 27 Dec 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.3.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 14 Dec 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.2.1-1noble) noble; urgency=high
+
+  * Fix embedded FindFilesystem.cmake to avoid cmake warnings
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Fri, 07 Nov 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.2.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 27 Oct 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (2.1.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 19 Oct 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (2.0.0-1noble) noble; urgency=high
+
+  * Modernize copyright notice
+  * Use ament linters
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 12 Oct 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.9.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 06 Jul 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.9.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 05 Jun 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.8.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 27 May 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.8.0-1noble) noble; urgency=high
+
+  * Update license tag to "BSD-3-Clause"
+  * Update copyright year
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sat, 24 May 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.7.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 05 May 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.6.4-1noble) noble; urgency=high
+
+  * modernize clang-format
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 22 Apr 2025 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.6.3-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Fri, 14 Mar 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.6.2-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Fri, 21 Feb 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.6.1-1noble) noble; urgency=high
+
+  * FIX: parser bug; it should not try to parse commented-out env variables
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 12 Feb 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.6.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 20 Jan 2025 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.5.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sat, 28 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.5.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 25 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.4.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 19 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.4.0-1noble) noble; urgency=high
+
+  * Parser now supports replacing custom variables
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 17 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.3.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 10 Dec 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.2.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sat, 28 Sep 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.2.0-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 15 Sep 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.1.3-1noble) noble; urgency=high
+
+  * Depend on new mrpt_lib packages (deprecate mrpt2)
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 27 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.1.2-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 25 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.1.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 22 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.1.0-1noble) noble; urgency=high
+
+  * Update clang-format style; add reformat bash script
+  * Merge pull request #62 <https://github.com/MOLAorg/mola/issues/62> from MOLAorg/docs-fixes
+    Docs fixes
+  * Fix ament_xmllint warnings in package.xml
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sat, 17 Aug 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.8-1noble) noble; urgency=high
+
+  * ament_lint_cmake: clean warnings
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 28 Jul 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.7-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Tue, 23 Jul 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.6-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 20 Jun 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.5-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 27 May 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.4-1noble) noble; urgency=high
+
+  * bump cmake_minimum_required to 3.5
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 13 May 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.3-1noble) noble; urgency=high
+
+  * Fix package.xml website URL
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Sun, 21 Apr 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.2-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 03 Apr 2024 22:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 27 Mar 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (1.0.0-1noble) noble; urgency=high
+
+  * copyright update
+  * reorganize as monorepo
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Mon, 18 Mar 2024 23:00:00 -0000
+
+ros-jazzy-mola-yaml (0.2.2-1noble) noble; urgency=high
+
+  * Fix package name in docs
+  * Contributors: Jose Luis Blanco-Claraco
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Thu, 07 Sep 2023 22:00:00 -0000
+
+ros-jazzy-mola-yaml (0.2.1-1noble) noble; urgency=high
+
+
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Fri, 01 Sep 2023 22:00:00 -0000
+
+ros-jazzy-mola-yaml (0.2.0-1noble) noble; urgency=high
+
+  * First public release as ROS 2 package.
+
+ -- "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>  Wed, 23 Aug 2023 22:00:00 -0000
+
+
