@@ -33,6 +33,7 @@
 #include <mrpt/obs/CObservation2DRangeScan.h>
 #include <mrpt/obs/CObservation3DRangeScan.h>
 #include <mrpt/obs/CObservationIMU.h>
+#include <mrpt/obs/CObservationImage.h>
 #include <mrpt/obs/CObservationOdometry.h>
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
@@ -45,6 +46,7 @@
 #include <mrpt/system/filesystem.h>
 #include <mrpt/version.h>
 
+#include <set>
 #include <tf2/buffer_core.hpp>
 #include <tf2/convert.hpp>
 #include <tf2/exceptions.hpp>
@@ -66,6 +68,7 @@
 #include <rosbag2_cpp/converter_options.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
@@ -126,6 +129,7 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
   const std::map<std::string, std::string> mapTopic2Class = {
       {"sensor_msgs/msg/Imu", "CObservationIMU"},
       {"sensor_msgs/msg/Image", "CObservationImage"},
+      {"sensor_msgs/msg/CompressedImage", "CObservationImage"},
       {"sensor_msgs/msg/PointCloud2", "CObservationPointCloud"},
       {"sensor_msgs/msg/LaserScan", "CObservation2DRangeScan"},
       {"sensor_msgs/msg/NavSatFix", "CObservationGPS_NavSatFix"},
@@ -405,6 +409,43 @@ void Rosbag2Dataset::initialize_rds(const Yaml& c)
     // TODO: Remove the #else branch once mrpt_ros2_bridge > 3.4.0 is generally available
 
     using rosbag2_storage::SerializedBagMessage;
+
+    // Compressed images (sensor_msgs/msg/CompressedImage, e.g. an
+    // "image/compressed" topic) need their own decoder: mrpt_ros_bridge's
+    // rosbag2ToImage() only understands the raw, uncompressed
+    // sensor_msgs/msg/Image wire format. Dispatch on the topic's actual
+    // wire type, independently of the mrpt_ros_bridge version available.
+    const bool isCompressedImageTopic =
+        topic2type.count(topic) != 0 && topic2type.at(topic) == "sensor_msgs/msg/CompressedImage";
+
+    if (sensorType == "CObservationImage" && isCompressedImageTopic)
+    {
+      auto callback = [this, sensorLabel, fixedSensorPose,
+                       useBagRecvTimeAsTimestamp](const SerializedBagMessage& m) -> Obs
+      {
+        return catchExceptions(
+            [this, sensorLabel, fixedSensorPose, useBagRecvTimeAsTimestamp, m]() -> Obs
+            {
+              Obs obs = toCompressedImage(sensorLabel, m, fixedSensorPose);
+              if (useBagRecvTimeAsTimestamp)
+              {
+                const auto recvTimestamp = mrpt::Clock::fromDouble(
+                    1e-9 * static_cast<double>(bagMessageRecvTimestampNs(m)));
+                for (auto& o : obs)
+                {
+                  if (o)
+                  {
+                    o->timestamp = recvTimestamp;
+                  }
+                }
+              }
+              return obs;
+            });
+      };
+      MRPT_LOG_INFO_STREAM("Installing callback for topic '" << topic << "' (compressed image)");
+      lookup_[topic].emplace_back(callback);
+      continue;
+    }
 
 #if MRPT_ROS2_BRIDGE_VERSION >= 0x030400
     // Map sensor type → rosbag2 conversion function
@@ -917,6 +958,100 @@ mrpt::obs::CSensoryFrame::Ptr Rosbag2Dataset::datasetGetObservations(size_t time
   return read_ahead_.at(timestep)->obs;
 }
 
+std::optional<mola::TransformTree> Rosbag2Dataset::transform_tree(
+    const std::string& root, const std::optional<mrpt::Clock::time_point>& timestamp) const
+{
+  // No external locking is needed here: tf2::BufferCore guards its own
+  // internals, so this walk may run concurrently with the thread feeding /tf.
+  if (!tfBuffer_ || !tfBuffer_->_frameExists(root))
+  {
+    return {};
+  }
+
+  // Build the parent -> children adjacency of the whole buffer first, so the
+  // subtree below 'root' can then be walked depth-first. Each node is emitted
+  // before its own children are queued, which is what gives the "parents
+  // before children" order the interface promises.
+  std::vector<std::string> allFrames;
+  tfBuffer_->_getFrameStrings(allFrames);
+
+  const tf2::TimePoint queryTime =
+      timestamp ? tf2::TimePoint(timestamp->time_since_epoch()) : tf2::TimePoint();
+
+  std::map<std::string, std::vector<std::string>> children;
+  for (const auto& f : allFrames)
+  {
+    std::string parent;
+    if (tfBuffer_->_getParent(f, queryTime, parent) ||
+        tfBuffer_->_getParent(f, tf2::TimePoint(), parent))
+    {
+      children[parent].push_back(f);
+    }
+  }
+
+  mola::TransformTree tree;
+  tree.root      = root;
+  tree.timestamp = timestamp.value_or(mrpt::Clock::now());
+  tree.nodes.push_back({root, {}, mrpt::poses::CPose3D::Identity()});
+
+  // 'visited' guards against a cyclic parent chain: tf2 reassigns a frame's
+  // parent on every setTransform(), so malformed input can produce one, and
+  // the walk would otherwise never terminate.
+  std::set<std::string>    visited = {root};
+  std::vector<std::string> pending = {root};
+  while (!pending.empty())
+  {
+    const std::string frame = pending.back();
+    pending.pop_back();
+
+    const auto itChildren = children.find(frame);
+    if (itChildren == children.end())
+    {
+      continue;
+    }
+
+    for (const auto& child : itChildren->second)
+    {
+      mrpt::poses::CPose3D childInRoot;
+      try
+      {
+        // Prefer the requested time, but fall back to the latest available
+        // transform: /tf is streamed as the bag plays, so a consumer asking
+        // about "now" can easily be slightly ahead of the buffered data.
+        geometry_msgs::msg::TransformStamped tfMsg;
+        try
+        {
+          tfMsg = tfBuffer_->lookupTransform(root, child, queryTime);
+        }
+        catch (const tf2::TransformException&)
+        {
+          tfMsg = tfBuffer_->lookupTransform(root, child, tf2::TimePoint());
+        }
+
+        tf2::Transform t;
+        tf2::fromMsg(tfMsg.transform, t);
+        childInRoot = mrpt::ros2bridge::fromROS(t);
+      }
+      catch (const tf2::TransformException&)
+      {
+        // A frame with no usable transform at this time is skipped, together
+        // with its own subtree (it has no resolvable pose to draw it at).
+        continue;
+      }
+
+      if (!visited.insert(child).second)
+      {
+        continue;
+      }
+
+      tree.nodes.push_back({child, frame, childInRoot});
+      pending.push_back(child);
+    }
+  }
+
+  return tree;
+}
+
 // TODO: Remove once this package is well available
 #if MRPT_ROS2_BRIDGE_VERSION < 0x030400
 bool Rosbag2Dataset::findOutSensorPose(
@@ -1196,6 +1331,54 @@ Rosbag2Dataset::Obs Rosbag2Dataset::toImage(
   return {imgObs};
 }
 #endif
+
+Rosbag2Dataset::Obs Rosbag2Dataset::toCompressedImage(
+    std::string_view label, const rosbag2_storage::SerializedBagMessage& rosmsg,
+    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
+{
+  rclcpp::SerializedMessage                                       serMsg(*rosmsg.serialized_data);
+  static rclcpp::Serialization<sensor_msgs::msg::CompressedImage> serializer;
+
+  sensor_msgs::msg::CompressedImage image;
+  serializer.deserialize_message(&serMsg, &image);
+
+  auto imgObs = mrpt::obs::CObservationImage::Create();
+
+  imgObs->sensorLabel = label;
+  imgObs->timestamp   = mrpt::ros2bridge::fromROS(image.header.stamp);
+
+  auto cv_ptr = cv_bridge::toCvCopy(image, "bgr8");
+
+  // cv_ptr (and the cv::Mat it owns) is local to this call, so a shallow
+  // copy (ref-counted, no pixel buffer duplication) is safe here:
+  imgObs->image = mrpt::img::CImage(cv_ptr->image, mrpt::img::SHALLOW_COPY);
+
+  if (fixedSensorPose)
+  {
+    imgObs->cameraPose = *fixedSensorPose;
+  }
+  else
+  {
+    try
+    {
+      geometry_msgs::msg::TransformStamped ref_to_trgFrame =
+          tfBuffer_->lookupTransform(base_link_frame_id_, image.header.frame_id, {});
+
+      tf2::Transform tf;
+      tf2::fromMsg(ref_to_trgFrame.transform, tf);
+      imgObs->cameraPose = mrpt::ros2bridge::fromROS(tf);
+    }
+    catch (const tf2::TransformException& ex)
+    {
+      THROW_EXCEPTION_FMT(
+          "toCompressedImage (label='%s'): could not find sensor pose '%s' -> '%s': %s",
+          std::string(label).c_str(), base_link_frame_id_.c_str(), image.header.frame_id.c_str(),
+          ex.what());
+    }
+  }
+
+  return {imgObs};
+}
 
 // TODO: When removed the code above, port this one too:
 
