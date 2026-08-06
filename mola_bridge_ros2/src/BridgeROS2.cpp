@@ -57,8 +57,7 @@
 #include <mrpt/ros2bridge/ros_to_mrpt_obs.h>
 #endif
 
-#if MRPT_VERSION < 0x030000  // Support deprecated classes for mrpt < 3.0.0
-#include <mrpt/maps/CPointsMapXYZI.h>
+#if MRPT_VERSION < 0x020f03  // needed by the POINT_FIELD_TIMESTAMP fallback below (mrpt < 2.15.3)
 #include <mrpt/maps/CPointsMapXYZIRT.h>
 #endif
 
@@ -72,6 +71,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/node.hpp>
+#include <set>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
@@ -80,6 +80,23 @@ using namespace mola;
 
 namespace
 {
+// tf2_ros::TransformListener/TransformBroadcaster/StaticTransformBroadcaster
+// changed their preferred node-argument type across ROS 2 distros: Humble,
+// Jazzy, and Kilted accept a shared_ptr<rclcpp::Node> (dereferenced
+// internally via "->"), while Rolling switched to an aggregated
+// `RequiredInterfaces` object built from an rclcpp::Node& (via "."). The
+// nested `RequiredInterfaces` type alias only exists on the Rolling API, so
+// its presence is used here to pick the right argument form at compile time.
+template <typename, typename = void>
+struct HasRequiredInterfaces : std::false_type
+{
+};
+
+template <typename T>
+struct HasRequiredInterfaces<T, std::void_t<typename T::RequiredInterfaces>> : std::true_type
+{
+};
+
 // Default subscription queue depth for sensor topics. ROS 2's
 // SensorDataQoS defaults to keep_last(5), which is too shallow for
 // high-rate sensors (e.g. 640 Hz IMU) when the executor is under
@@ -271,14 +288,36 @@ void BridgeROS2::ros_node_thread_main(Yaml cfg)
     // /tf_static subscriptions share the same DDS participant, clock, and
     // use_sim_time setting as the bridge.  spin_thread=false: rosNode_ is
     // already spun by the loop below; a second spinner would be redundant.
-    tf_buffer_   = std::make_shared<tf2::BufferCore>();
-    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, rosNode_, false);
+    tf_buffer_ = std::make_shared<tf2::BufferCore>();
+    if constexpr (HasRequiredInterfaces<tf2_ros::TransformListener>::value)
+    {
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, *rosNode_, false);
+    }
+    else
+    {
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, rosNode_, false);
+    }
 
     // TF broadcaster:
     auto lckTfBc = mrpt::lockHelper(ros_tf_bc_mtx_);
 
-    tf_bc_        = std::make_shared<tf2_ros::TransformBroadcaster>(rosNode_);
-    tf_static_bc_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(rosNode_);
+    if constexpr (HasRequiredInterfaces<tf2_ros::TransformBroadcaster>::value)
+    {
+      tf_bc_ = std::make_shared<tf2_ros::TransformBroadcaster>(*rosNode_);
+    }
+    else
+    {
+      tf_bc_ = std::make_shared<tf2_ros::TransformBroadcaster>(rosNode_);
+    }
+
+    if constexpr (HasRequiredInterfaces<tf2_ros::StaticTransformBroadcaster>::value)
+    {
+      tf_static_bc_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(*rosNode_);
+    }
+    else
+    {
+      tf_static_bc_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(rosNode_);
+    }
 
     lckTfBc.unlock();
 
@@ -617,6 +656,101 @@ void BridgeROS2::callbackOnPointCloud2(
   MRPT_END
 }
 #endif
+
+std::optional<mola::TransformTree> BridgeROS2::transform_tree(
+    const std::string& root, const std::optional<mrpt::Clock::time_point>& timestamp) const
+{
+  // No external locking is needed here: tf2::BufferCore guards its own
+  // internals, so this walk may run concurrently with the TransformListener
+  // thread feeding /tf.
+  if (!tf_buffer_ || !tf_buffer_->_frameExists(root))
+  {
+    return {};
+  }
+
+  // Build the parent -> children adjacency of the whole buffer first, so the
+  // subtree below 'root' can then be walked depth-first. Each node is emitted
+  // before its own children are queued, which is what gives the "parents
+  // before children" order the interface promises.
+  std::vector<std::string> allFrames;
+  tf_buffer_->_getFrameStrings(allFrames);
+
+  const tf2::TimePoint queryTime =
+      timestamp ? tf2::TimePoint(timestamp->time_since_epoch()) : tf2::TimePoint();
+
+  std::map<std::string, std::vector<std::string>> children;
+  for (const auto& f : allFrames)
+  {
+    std::string parent;
+    if (tf_buffer_->_getParent(f, queryTime, parent) ||
+        tf_buffer_->_getParent(f, tf2::TimePoint(), parent))
+    {
+      children[parent].push_back(f);
+    }
+  }
+
+  mola::TransformTree tree;
+  tree.root      = root;
+  tree.timestamp = timestamp.value_or(mrpt::Clock::now());
+  tree.nodes.push_back({root, {}, mrpt::poses::CPose3D::Identity()});
+
+  // 'visited' guards against a cyclic parent chain: tf2 reassigns a frame's
+  // parent on every setTransform(), so malformed input can produce one, and
+  // the walk would otherwise never terminate.
+  std::set<std::string>    visited = {root};
+  std::vector<std::string> pending = {root};
+  while (!pending.empty())
+  {
+    const std::string frame = pending.back();
+    pending.pop_back();
+
+    const auto itChildren = children.find(frame);
+    if (itChildren == children.end())
+    {
+      continue;
+    }
+
+    for (const auto& child : itChildren->second)
+    {
+      mrpt::poses::CPose3D childInRoot;
+      try
+      {
+        // Prefer the requested time, but fall back to the latest available
+        // transform: a consumer asking about "now" can easily be slightly
+        // ahead of what the listener has received so far.
+        geometry_msgs::msg::TransformStamped tfMsg;
+        try
+        {
+          tfMsg = tf_buffer_->lookupTransform(root, child, queryTime);
+        }
+        catch (const tf2::TransformException&)
+        {
+          tfMsg = tf_buffer_->lookupTransform(root, child, tf2::TimePoint());
+        }
+
+        tf2::Transform t;
+        tf2::fromMsg(tfMsg.transform, t);
+        childInRoot = mrpt::ros2bridge::fromROS(t);
+      }
+      catch (const tf2::TransformException&)
+      {
+        // A frame with no usable transform at this time is skipped, together
+        // with its own subtree (it has no resolvable pose to draw it at).
+        continue;
+      }
+
+      if (!visited.insert(child).second)
+      {
+        continue;
+      }
+
+      tree.nodes.push_back({child, frame, childInRoot});
+      pending.push_back(child);
+    }
+  }
+
+  return tree;
+}
 
 bool BridgeROS2::waitForTransform(
     mrpt::poses::CPose3D& des, const std::string& frame, const std::string& referenceFrame)
@@ -1115,20 +1249,6 @@ void BridgeROS2::internalOn(
     {
       mrpt::ros2bridge::toROS(*xyzgen, msg_header, msg_pts);
     }
-#if MRPT_VERSION < 0x030000  // older than v3.0.0, support deprecated classes
-    else if (const auto* xyzIRT =
-                 dynamic_cast<const mrpt::maps::CPointsMapXYZIRT*>(obs.pointcloud.get());
-             xyzIRT)
-    {
-      mrpt::ros2bridge::toROS(*xyzIRT, msg_header, msg_pts);
-    }
-    else if (const auto* xyzi =
-                 dynamic_cast<const mrpt::maps::CPointsMapXYZI*>(obs.pointcloud.get());
-             xyzi)
-    {
-      mrpt::ros2bridge::toROS(*xyzi, msg_header, msg_pts);
-    }
-#endif
     else if (const auto* sPts =
                  dynamic_cast<const mrpt::maps::CSimplePointsMap*>(obs.pointcloud.get());
              sPts)
@@ -1764,10 +1884,38 @@ void BridgeROS2::publishLocalizationTf(const LocalizationSourceBase::Localizatio
         const auto ref_to_trgFrame_latest =
             tf_buffer_->lookupTransform(l.child_frame, params_.odom_frame, tf2::TimePointZero);
         tf2::fromMsg(ref_to_trgFrame_latest.transform, odomOnBase_tf);
-        MRPT_LOG_THROTTLE_WARN_STREAM(
-            60.0, "publish_localization_following_rep105: exact sensor-stamp tf '"
-                      << params_.odom_frame << "' -> '" << l.child_frame << "' unavailable ("
-                      << ex.what() << "); using latest available transform instead.");
+
+        // This fallback composes map->odom against a STALE odom transform, which
+        // biases the published TF by the robot's motion over the stamp gap
+        // (motion-correlated jitter, worst mid-turn). It used to be warned only
+        // on a 60 s throttle, which hid a persistent timing violation for a long
+        // time. Emit a loud, explanatory warning the first time it happens (with
+        // the recommended fix), then fall back to the throttled steady-state
+        // warning so logs are not flooded.
+        static bool warnedStaleOdomOnce = false;
+        if (!warnedStaleOdomOnce)
+        {
+          warnedStaleOdomOnce = true;
+          MRPT_LOG_WARN_STREAM(
+              "publish_localization_following_rep105: exact sensor-stamp tf '"
+              << params_.odom_frame << "' -> '" << l.child_frame << "' is unavailable ("
+              << ex.what()
+              << "), so map->odom is being composed against the LATEST (stale) odom "
+                 "transform. This injects motion-correlated jitter into the published "
+                 "map->odom and is expected whenever the localizer stamp leads the odom "
+                 "TF (the normal case for an estimate extrapolated to 'now'). To avoid "
+                 "the composition entirely, have the state estimator publish map->odom "
+                 "directly (StateEstimationSmoother param 'publish_map_to_odom_tf') and "
+                 "route the bridge's TF source filter to that '/map_odom' method. "
+                 "Further occurrences are throttled.");
+        }
+        else
+        {
+          MRPT_LOG_THROTTLE_WARN_STREAM(
+              60.0, "publish_localization_following_rep105: exact sensor-stamp tf '"
+                        << params_.odom_frame << "' -> '" << l.child_frame << "' unavailable ("
+                        << ex.what() << "); using latest (stale) odom transform instead.");
+        }
       }
       catch (const tf2::TransformException& ex2)
       {
