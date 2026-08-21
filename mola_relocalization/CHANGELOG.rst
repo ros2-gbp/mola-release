@@ -3,6 +3,15 @@ Changelog for package mola_relocalization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+3.2.0 (2026-08-21)
+------------------
+* Merge remote-tracking branch 'origin/feat/map-frame-gauge-change' into feat/map-frame-gauge-change
+* Merge branch 'develop' into feat/map-frame-gauge-change
+* Contributors: Jose Luis Blanco-Claraco
+
+3.1.1 (2026-08-10)
+------------------
+
 3.1.0 (2026-08-06)
 ------------------
 * Merge pull request `#187 <https://github.com/MOLAorg/mola/issues/187>`_ from MOLAorg/feat/incremental-point-cloud-kdtree-bake
