@@ -106,6 +106,15 @@ All plugin modules derive from these virtual base classes:
   older fading on-screen text overlay) is a no-op on the `mola_viz_imgui`
   backend, superseded by the Console subwindow above; still implemented on
   the nanogui `MolaViz` backend.
+  Window-name invariant: the host window is registered under
+  `DEFAULT_WINDOW_NAME`, while modules calling `VizInterface` get the literal
+  `"main"` baked in as the default argument from `VizInterface.h`. Both
+  `MolaVizImGui::DEFAULT_WINDOW_NAME` and `MolaVizImGuiCore::DEFAULT_WINDOW_NAME`
+  must therefore be initialized from
+  `MolaVizImGuiCore::DEFAULT_WINDOW_NAME_LITERAL`, never copied from each
+  other: they live in different translation units, so a copy came out empty or
+  not depending on link order, and when empty the GUI silently rendered nothing
+  ("unknown parentWindow 'main'" warnings on every call).
 - `Relocalization` — global localization / loop closure
 - `OfflineDatasetSource` — offline dataset handling
 - `SharedKeyframeMap` — central-map keyframe-insertion sink (new 2026, see
@@ -168,6 +177,17 @@ Tests: `mola_yaml/tests/test-yaml-parser.cpp`
   resurrect evicted geometry. The storage array itself never shrinks on its own:
   it settles at its high-water mark and slots are recycled; `compact()` releases
   it on demand.
+  `changeCoordinatesReference()` (all 3 overloads) is shadowed: a global SE(3)
+  re-map moves every coordinate, so it applies the transform and then rebuilds
+  the index over the *live* slot set (`rebuildIndexInPlace()`), dropping the
+  covariance cache. The base-class methods are **not virtual**, so a call
+  through a `mrpt::maps::CPointsMap*` cannot be intercepted; instead
+  `ensureIndexUpToDate()` compares a handful of sampled slot coordinates
+  (`coordinates_watch_`, refreshed by every internal mutator) against their
+  last known values and forces the same rebuild when they moved. Since the
+  sample is bounded, that guard covers a **global** re-map (all points move),
+  not a mutator rewriting a few points or a caller poking the inherited
+  coordinate buffers directly; those stay as stale-index hazards.
   Implements `mp2p_icp::NearestPointWithCovCapable` with lazily computed,
   cached, plane-regularized per-point covariances (the "option A" of the plan;
   voxel/NDT-style and dirty-propagation covariances remain future work). Not for
@@ -231,6 +251,15 @@ Tests: `mola_yaml/tests/test-yaml-parser.cpp`
   voxel-decimate step) is the most expensive part of `regroupKeyframes()` and is
   parallelized across clusters with TBB (`tbb::parallel_for`, gated by
   `MOLA_METRIC_MAPS_USE_TBB`, falling back to a serial loop when TBB is absent).
+- `KeyframePointCloudMap::TCreationOptions::max_distance_for_cov` bounds the per-point
+  covariance neighborhood, which maps onto nanoflann's radius-limited kNN (RKNN) via the
+  optional max-distance argument of MRPT's `kdTreeNClosestPoint3DIdx()`. That overload
+  throws at runtime on nanoflann < 1.5.1 (still the case on Ubuntu jammy / Humble), so
+  `computeCovariancesAndDensity()` guards it with `MOLA_MM_HAS_RKNN_SEARCH`
+  (`NANOFLANN_VERSION >= 0x151`) and otherwise runs a plain kNN truncated at the same
+  radius, which yields exactly the same neighbor set since results come back sorted.
+  The `NANOFLANN_VERSION` that decides is the one MRPT's own templates were built
+  against, picked up transitively from the MRPT headers: do not include nanoflann there.
 - `KeyframePointCloudMap::TCreationOptions::approximate_cov` (default `false`): for
   `nn_search_cov2cov()` (used by `mp2p_icp::Matcher_Cov2Cov`, i.e. GICP-style pipelines).
   When `true`, `icp_get_prepared_as_global()` skips assembling the merged, multi-keyframe
@@ -242,6 +271,12 @@ Tests: `mola_yaml/tests/test-yaml-parser.cpp`
   Only affects `nn_search_cov2cov()`; the generic `NearestNeighborsCapable` entry points
   still require the merged submap. Exposed in `mola_lidar_odometry`'s
   `pipelines/lidar3d-gicp.yaml` as `MOLA_LOCALMAP_APPROXIMATE_COV`.
+- `nn_search_cov2cov()` has two overloads: the original scalar `float` search distance
+  (still supported, unchanged signature) and an additive overload taking an
+  `mp2p_icp::MatchingDistanceProfile`. The scalar overload just wraps its value into a flat
+  `MatchingDistanceProfile` and forwards to the same implementation. Both map classes (and the
+  approximate-cov path) keep a fast path for the flat case: no per-point range is computed and
+  the KD-tree query stays `k=1`. A range-adaptive profile opts into a per-point range.
   **Queries the per-KF *local*-frame cloud/KD-tree directly** (`kf.pointcloud()`, which is
   what `mm-kf-bake-kdtrees` bakes on disk): the query point is transformed into each active
   KF's local frame (`pose^{-1}`) before the lookup, and the match is composed back to global
@@ -354,6 +389,16 @@ types into `mola_kernel`: `transform_tree(root)` returns the subtree below
 - No locking is needed around the walk: `tf2::BufferCore` guards its own
   internals, so it may run while another thread feeds `/tf`.
 - Consumers detect it with `findService<mola::TransformTreeSource>()`.
+- `TransformTree`/`TransformTreeNode` must stay **aggregates**: every producer
+  fills them with brace initialization, and since C++20 giving them any
+  constructor — even `= default` — makes that stop compiling. Lyrical builds
+  at C++20 and Humble/Jazzy at C++17, so this breaks on one distro only.
+  `push_back({...})` into a `vector<TransformTreeNode>` must name the type
+  explicitly (`push_back(TransformTreeNode{...})`, not a bare braced list): on
+  GCC 15 (ROS 2 Rolling) the bare form fails to resolve between the
+  `push_back` overloads with "no known conversion from '<brace-enclosed
+  initializer list>'"; naming the type first sidesteps that overload
+  resolution entirely. Older GCC (Humble/Jazzy/Kilted) accepts either form.
 
 ### GUI Widget Creation (v2.6+)
 Use `GuiWidgetDescription` for backend-agnostic widget creation in `VizInterface`.
