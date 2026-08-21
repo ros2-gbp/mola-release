@@ -23,6 +23,7 @@
 #include <mrpt/io/CMemoryStream.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservationPointCloud.h>
+#include <mrpt/poses/CPose2D.h>
 #include <mrpt/poses/CPose3D.h>
 #include <mrpt/random/RandomGenerators.h>
 #include <mrpt/serialization/CArchive.h>
@@ -388,6 +389,63 @@ void test_cov2cov()
 }
 
 // -------------------------------------------------------------------------
+// Pairings must come back in a canonical order, every run. The parallel path
+// accumulates into thread-local vectors and merges them in an unspecified
+// order, and the snapshot of live local points is in k-d tree traversal order
+// rather than in slot order, so neither path was canonical on its own. The
+// resulting permutation reaches the solver's summation order and therefore the
+// optimized pose. Ascending local_idx is asserted because it is a total order
+// on a unique key, which also pins the parallel and sequential paths together.
+void test_pairing_order_is_canonical()
+{
+  // Big enough that TBB really splits the range across workers: on a small
+  // cloud the defect this guards against does not show up at all.
+  auto surface = mrpt::maps::CSimplePointsMap::Create();
+  for (int ix = -100; ix <= 100; ix++)
+  {
+    for (int iy = -100; iy <= 100; iy++)
+    {
+      surface->insertPointFast(
+          static_cast<float>(ix * 0.1), static_cast<float>(iy * 0.1),
+          static_cast<float>(rng.drawGaussian1D(0, 0.005)));
+    }
+  }
+  surface->mark_as_modified();
+
+  mola::IncrementalPointCloud global;
+  insertPoints(global, *surface);
+
+  mola::IncrementalPointCloud local;
+  insertPoints(local, *surface);
+
+  // Tombstones make the tree's traversal order diverge from slot order, which
+  // is the case the sort has to survive:
+  local.keepOnlyPointsNear({0, 0, 0}, 8.0);
+
+  std::vector<uint32_t> reference;
+  for (int pass = 0; pass < 4; pass++)
+  {
+    mp2p_icp::MatchedPointWithCovList pairings;
+    global.nn_search_cov2cov(
+        local, mrpt::poses::CPose3D::Identity(), 0.5f /*max search distance*/, pairings);
+    ASSERT_(!pairings.empty());
+
+    std::vector<uint32_t> order;
+    order.reserve(pairings.size());
+    for (const auto& p : pairings) order.push_back(static_cast<uint32_t>(p.local_idx));
+
+    ASSERTMSG_(
+        std::is_sorted(order.begin(), order.end()),
+        "Pairings are not in canonical (ascending local_idx) order");
+
+    if (pass == 0)
+      reference = order;
+    else
+      ASSERTMSG_(order == reference, "Pairing order differs between identical calls");
+  }
+}
+
+// -------------------------------------------------------------------------
 // Compares NN query results between two maps expected to hold the same set of
 // points (used by the k-d tree baking tests below).
 void assertSameNNResults(
@@ -639,6 +697,128 @@ void test_kdtree_bake_disabled_by_default()
   assertSameNNResults(map, loaded, 100, 10.0);
 }
 
+// -------------------------------------------------------------------------
+/// Compares NN queries of `map` against an independent, static-k-d-tree oracle.
+void assertMatchesReference(
+    const mola::IncrementalPointCloud& map, const mrpt::maps::CSimplePointsMap& ref, size_t nTrials,
+    const mrpt::math::TPoint3Df& center, double halfRange)
+{
+  ASSERT_EQUAL_(map.livePointCount(), ref.size());
+
+  for (size_t trial = 0; trial < nTrials; trial++)
+  {
+    const mrpt::math::TPoint3Df q = {
+        static_cast<float>(center.x + rng.drawUniform(-halfRange, halfRange)),
+        static_cast<float>(center.y + rng.drawUniform(-halfRange, halfRange)),
+        static_cast<float>(center.z + rng.drawUniform(-halfRange, halfRange))};
+
+    mrpt::math::TPoint3Df p;
+    mrpt::math::TPoint3Df gt_p;
+    float                 d     = 0;
+    float                 gt_d  = 0;
+    uint64_t              id    = 0;
+    uint64_t              gt_id = 0;
+
+    const bool ok    = map.nn_single_search(q, p, d, id);
+    const bool gt_ok = ref.nn_single_search(q, gt_p, gt_d, gt_id);
+
+    ASSERT_EQUAL_(ok, gt_ok);
+    if (!ok) continue;
+
+    ASSERT_NEAR_(d, gt_d, 1e-3f);
+    ASSERT_NEAR_(p.x, gt_p.x, 1e-3f);
+    ASSERT_NEAR_(p.y, gt_p.y, 1e-3f);
+    ASSERT_NEAR_(p.z, gt_p.z, 1e-3f);
+  }
+}
+
+// -------------------------------------------------------------------------
+// A global SE(3) re-map must move every point and leave the index consistent
+// with the new coordinates. Since CPointsMap::changeCoordinatesReference() is
+// not virtual, this is checked both on the concrete type (intercepted right
+// away) and through a base-class pointer (only detectable on the next query).
+void test_change_coordinates_reference(bool viaBasePointer, bool async)
+{
+  mola::IncrementalPointCloud map;
+  map.creationOptions.async_rebuild = async;
+  map.compact();  // apply the structural option above
+
+  insertPoints(map, *randomCloud(3000, {0, 0, 0}, 20.0));
+
+  // Leave tombstoned and recycled slots behind, so the rebuild has to preserve
+  // the live set instead of blindly re-indexing the whole storage:
+  map.keepOnlyPointsNear({5.0f, 0.0f, 0.0f}, 10.0);
+  insertPoints(map, *randomCloud(1500, {5, 0, 0}, 8.0));
+
+  const size_t liveBefore = map.livePointCount();
+  ASSERT_(liveBefore > 100);
+
+  const mrpt::poses::CPose3D T(1.0, -2.0, 0.5, 0.3, 0.15, -0.2);
+
+  // Oracle: the very same live points, transformed with plain MRPT:
+  const auto ref = bruteForceReference(map);
+  ref->changeCoordinatesReference(T);
+
+  if (viaBasePointer)
+  {
+    auto* asBase = static_cast<mrpt::maps::CPointsMap*>(&map);
+    asBase->changeCoordinatesReference(T);
+  }
+  else
+  {
+    map.changeCoordinatesReference(T);
+  }
+
+  ASSERT_EQUAL_(map.livePointCount(), liveBefore);
+  assertMatchesReference(map, *ref, 300, {6.0f, -2.0f, 0.5f}, 20.0);
+
+  // The map must stay usable afterwards: insertion, slot recycling and trimming
+  // all have to keep working on the rebuilt index.
+  insertPoints(map, *randomCloud(1000, {6, -2, 0}, 6.0));
+  map.keepOnlyPointsNear({6.0f, -2.0f, 0.0f}, 9.0);
+  ASSERT_(map.livePointCount() > 0);
+
+  assertMatchesReference(map, *bruteForceReference(map), 200, {6.0f, -2.0f, 0.0f}, 12.0);
+}
+
+// -------------------------------------------------------------------------
+// The other two changeCoordinatesReference() overloads must leave the map in
+// the same state as the CPose3D one they delegate to.
+void test_change_coordinates_reference_overloads()
+{
+  const auto cloud = randomCloud(2000, {0, 0, 0}, 15.0);
+
+  // a) The CPose2D overload:
+  {
+    mola::IncrementalPointCloud map;
+    insertPoints(map, *cloud);
+    map.keepOnlyPointsNear({3.0f, 0.0f, 0.0f}, 9.0);  // leave dead slots behind
+
+    const mrpt::poses::CPose2D p2d(2.0, -1.0, 0.7);
+
+    const auto ref = bruteForceReference(map);
+    ref->changeCoordinatesReference(mrpt::poses::CPose3D(p2d));
+
+    map.changeCoordinatesReference(p2d);
+    assertMatchesReference(map, *ref, 200, {5.0f, -1.0f, 0.0f}, 15.0);
+  }
+
+  // b) The (other, pose) overload: our previous contents must be replaced by
+  //    `other`'s, transformed.
+  {
+    mola::IncrementalPointCloud map;
+    insertPoints(map, *randomCloud(500, {50, 50, 50}, 5.0));  // to be discarded
+
+    const mrpt::poses::CPose3D T(-3.0, 4.0, 1.0, -0.4, 0.2, 0.1);
+
+    const auto ref = mrpt::maps::CSimplePointsMap::Create();
+    ref->changeCoordinatesReference(*cloud, T);
+
+    map.changeCoordinatesReference(*cloud, T);
+    assertMatchesReference(map, *ref, 200, {-3.0f, 4.0f, 1.0f}, 20.0);
+  }
+}
+
 }  // namespace
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
@@ -652,11 +832,19 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
     test_bounded_memory_under_churn();
     test_serialization_and_copy();
     test_cov2cov();
+    test_pairing_order_is_canonical();
     test_kdtree_bake_roundtrip_memory();
     test_kdtree_bake_roundtrip_file();
     test_kdtree_bake_then_clear_and_reinsert();
     test_kdtree_bake_then_modify();
     test_kdtree_bake_disabled_by_default();
+    test_change_coordinates_reference(false /*concrete type*/, false /*sync index*/);
+    test_change_coordinates_reference(false /*concrete type*/, true /*background rebuilds*/);
+    // A base-class call cannot join a pending background rebuild before it
+    // rewrites the coordinate buffers, so that combination is a data race by
+    // construction and is deliberately not exercised here.
+    test_change_coordinates_reference(true /*base-class pointer*/, false /*sync index*/);
+    test_change_coordinates_reference_overloads();
 
     std::cout << "All tests passed.\n";
   }
