@@ -41,8 +41,10 @@
 #include <mrpt/system/string_utils.h>  // unitsFormat()
 #include <mrpt/version.h>  // For MRPT_VERSION
 
+#include <algorithm>  // std::lower_bound
 #include <cmath>
 #include <cstdint>
+#include <iterator>  // std::distance
 #include <numeric>  // std::accumulate
 #include <sstream>
 #include <unordered_set>
@@ -54,6 +56,20 @@
 
 #include <atomic>
 #include <type_traits>
+
+// Radius-limited kNN (RKNN), which MRPT exposes as the optional
+// maximum-search-distance argument of kdTreeNClosestPoint3DIdx(), needs
+// nanoflann >= 1.5.1; older versions throw at runtime from that overload.
+// NANOFLANN_VERSION comes in transitively from the MRPT points-map headers
+// above, i.e. it describes exactly the copy MRPT's own templates were built
+// against, which is the one that decides here. (Do NOT include nanoflann
+// directly: see the note at the top of IncrementalKDTree.cpp.)
+//
+// The version varies across ROS distributions, so this cannot be assumed:
+// Ubuntu jammy still ships 1.4.2.
+#if defined(NANOFLANN_VERSION) && NANOFLANN_VERSION >= 0x151
+#define MOLA_MM_HAS_RKNN_SEARCH 1
+#endif
 
 #if defined(MOLA_MM_HAS_ROTATE_VIEW_HEADER)
 // Feature detection for mp2p_icp::rotateViewDirectionFields(): the function
@@ -944,6 +960,25 @@ void KeyframePointCloudMap::nn_search_cov2cov(
     const NearestPointWithCovCapable& localMap, const mrpt::poses::CPose3D& localMapPose,
     const float max_search_distance, mp2p_icp::MatchedPointWithCovList& outPairings) const
 {
+  nn_search_cov2cov_impl(
+      localMap, localMapPose, MatchingDistanceProfile(max_search_distance), outPairings);
+}
+
+#if defined(MP2P_ICP_HAS_MATCHING_DISTANCE_PROFILE)
+void KeyframePointCloudMap::nn_search_cov2cov(
+    const NearestPointWithCovCapable& localMap, const mrpt::poses::CPose3D& localMapPose,
+    const mp2p_icp::MatchingDistanceProfile& matchingDistance,
+    mp2p_icp::MatchedPointWithCovList&       outPairings) const
+{
+  nn_search_cov2cov_impl(localMap, localMapPose, matchingDistance, outPairings);
+}
+#endif
+
+void KeyframePointCloudMap::nn_search_cov2cov_impl(
+    const NearestPointWithCovCapable& localMap, const mrpt::poses::CPose3D& localMapPose,
+    const MatchingDistanceProfile&     matchingDistance,
+    mp2p_icp::MatchedPointWithCovList& outPairings) const
+{
   auto lck = mrpt::lockHelper(*state_mtx_);
 
   // Enforce local map to recompute its covariances to the new pose:
@@ -961,8 +996,7 @@ void KeyframePointCloudMap::nn_search_cov2cov(
     ASSERTMSG_(
         cached_.icp_search_kfs,
         "Using this method requires calling icp_get_prepared_as_global() first");
-    nn_search_cov2cov_approximate(
-        localKf, *cached_.icp_search_kfs, max_search_distance, outPairings);
+    nn_search_cov2cov_approximate(localKf, *cached_.icp_search_kfs, matchingDistance, outPairings);
     localKf.pose(originalLocalKfPose);
     return;
   }
@@ -980,7 +1014,12 @@ void KeyframePointCloudMap::nn_search_cov2cov(
 
   const auto localPointCount = localPointsTransf->size();
 
-  const float max_sqr_dist = mrpt::square(max_search_distance);
+  // Fast path: a flat threshold (the common case, and the only one before this
+  // profile existed) needs no per-point range computation.
+  const bool  matchDistIsFlat  = matchingDistance.isFlat();
+  const float matchDistFlatSqr = mrpt::square(matchingDistance.near);
+
+  const bool needsQueryRange = matchingDistance.needsRange();
 
   const auto& xs_tf = localPointsTransf->getPointsBufferRef_x();
   const auto& ys_tf = localPointsTransf->getPointsBufferRef_y();
@@ -1075,6 +1114,9 @@ void KeyframePointCloudMap::nn_search_cov2cov(
                      : -2.0f;  // sentinel: never reached when filter is disabled
 
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
+  // Pairings are appended, so only the ones added below get reordered:
+  const size_t firstNewPairing = outPairings.size();
+
   tbb::enumerable_thread_specific<mp2p_icp::MatchedPointWithCovList> tls;
 
   tbb::parallel_for(
@@ -1084,9 +1126,22 @@ void KeyframePointCloudMap::nn_search_cov2cov(
   for (size_t local_idx = 0; local_idx < localPointCount; local_idx++)
 #endif
       {
-        float nn_dist_sqr = std::numeric_limits<float>::max();
+        // Range from the sensor, i.e. in the query's own (untransformed) local frame -
+        // matches how the range-adaptive threshold was measured and validated (see
+        // ~/plans/icp-bench-range-adaptive-matching.md).
+        float range = 0;
+        if (needsQueryRange)
+        {
+          range = std::sqrt(
+              mrpt::square(xs[local_idx]) + mrpt::square(ys[local_idx]) +
+              mrpt::square(zs[local_idx]));
+        }
 
-        const auto nn_global_idx = globalPoints->kdTreeClosestPoint3D(
+        const float max_sqr_dist =
+            matchDistIsFlat ? matchDistFlatSqr : mrpt::square(matchingDistance(range));
+
+        float        nn_dist_sqr   = std::numeric_limits<float>::max();
+        const size_t nn_global_idx = globalPoints->kdTreeClosestPoint3D(
             xs_tf[local_idx], ys_tf[local_idx], zs_tf[local_idx], nn_dist_sqr);
 
         if (nn_dist_sqr > max_sqr_dist)
@@ -1154,6 +1209,15 @@ void KeyframePointCloudMap::nn_search_cov2cov(
         outPairings.end(), std::make_move_iterator(localVec.begin()),
         std::make_move_iterator(localVec.end()));
   }
+
+  // Thread-local vectors are visited in an unspecified order, so restore the
+  // order the sequential path produces. Each local point yields at most one
+  // pairing, so its index is a unique key. The pairing list order reaches the
+  // solver's summation order, and from there the optimized pose.
+  std::sort(
+      outPairings.begin() + firstNewPairing, outPairings.end(),
+      [](const mp2p_icp::point_with_cov_pair_t& a, const mp2p_icp::point_with_cov_pair_t& b)
+      { return a.local_idx < b.local_idx; });
 #endif
 
   // Recover original:
@@ -1177,15 +1241,20 @@ uint32_t packApproxGlobalIdx(uint32_t kf_ordinal, uint32_t local_idx)
 }  // namespace
 
 void KeyframePointCloudMap::nn_search_cov2cov_approximate(
-    const KeyFrame& localKf, const std::set<KeyFrameID>& activeKfs, const float max_search_distance,
+    const KeyFrame& localKf, const std::set<KeyFrameID>& activeKfs,
+    const MatchingDistanceProfile&     matchingDistance,
     mp2p_icp::MatchedPointWithCovList& outPairings) const
 {
   const auto& localKfCov        = localKf.covariancesGlobal();
   const auto& localPointsTransf = localKf.pointcloud_global();
   const auto& localPoints       = localKf.pointcloud();
 
-  const auto  localPointCount = localPointsTransf->size();
-  const float max_sqr_dist    = mrpt::square(max_search_distance);
+  const auto localPointCount = localPointsTransf->size();
+
+  // See the exact-mode nn_search_cov2cov() above for the rationale.
+  const bool  matchDistIsFlat  = matchingDistance.isFlat();
+  const float matchDistFlatSqr = mrpt::square(matchingDistance.near);
+  const bool  needsQueryRange  = matchingDistance.needsRange();
 
   const auto& xs_tf = localPointsTransf->getPointsBufferRef_x();
   const auto& ys_tf = localPointsTransf->getPointsBufferRef_y();
@@ -1284,6 +1353,9 @@ void KeyframePointCloudMap::nn_search_cov2cov_approximate(
   }
 
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
+  // Pairings are appended, so only the ones added below get reordered:
+  const size_t firstNewPairing = outPairings.size();
+
   tbb::enumerable_thread_specific<mp2p_icp::MatchedPointWithCovList> tls;
 
   tbb::parallel_for(
@@ -1293,11 +1365,35 @@ void KeyframePointCloudMap::nn_search_cov2cov_approximate(
   for (size_t local_idx = 0; local_idx < localPointCount; local_idx++)
 #endif
       {
+        float range = 0;
+        if (needsQueryRange)
+        {
+          range = std::sqrt(
+              mrpt::square(xs[local_idx]) + mrpt::square(ys[local_idx]) +
+              mrpt::square(zs[local_idx]));
+        }
+
+        const float max_sqr_dist =
+            matchDistIsFlat ? matchDistFlatSqr : mrpt::square(matchingDistance(range));
+
         // "N" KD-tree queries (one per active KF) instead of one on a merged cloud:
         float  best_dist_sqr = std::numeric_limits<float>::max();
         size_t best_entry    = 0;
         size_t best_idx      = 0;
         bool   found         = false;
+
+        // The winner may live in a different keyframe than the previous best, so
+        // candidates are folded across all of them.
+        const auto lambdaFoldCandidate = [&](size_t e, size_t idx, float d)
+        {
+          if (d < best_dist_sqr)
+          {
+            best_dist_sqr = d;
+            best_entry    = e;
+            best_idx      = idx;
+            found         = true;
+          }
+        };
 
         for (size_t e = 0; e < entries.size(); e++)
         {
@@ -1306,16 +1402,11 @@ void KeyframePointCloudMap::nn_search_cov2cov_approximate(
           // distances, so best_dist_sqr remains comparable across keyframes.
           const auto ql = entries[e].poseInv.composePoint(
               mrpt::math::TPoint3D(xs_tf[local_idx], ys_tf[local_idx], zs_tf[local_idx]));
+
           float      d   = std::numeric_limits<float>::max();
           const auto idx = entries[e].localPoints->kdTreeClosestPoint3D(
               static_cast<float>(ql.x), static_cast<float>(ql.y), static_cast<float>(ql.z), d);
-          if (d < best_dist_sqr)
-          {
-            best_dist_sqr = d;
-            best_entry    = e;
-            best_idx      = idx;
-            found         = true;
-          }
+          lambdaFoldCandidate(e, idx, d);
         }
 
         if (!found || best_dist_sqr > max_sqr_dist)
@@ -1405,6 +1496,15 @@ void KeyframePointCloudMap::nn_search_cov2cov_approximate(
         outPairings.end(), std::make_move_iterator(localVec.begin()),
         std::make_move_iterator(localVec.end()));
   }
+
+  // Thread-local vectors are visited in an unspecified order, so restore the
+  // order the sequential path produces. Each local point yields at most one
+  // pairing, so its index is a unique key. The pairing list order reaches the
+  // solver's summation order, and from there the optimized pose.
+  std::sort(
+      outPairings.begin() + firstNewPairing, outPairings.end(),
+      [](const mp2p_icp::point_with_cov_pair_t& a, const mp2p_icp::point_with_cov_pair_t& b)
+      { return a.local_idx < b.local_idx; });
 #endif
 
   if (debugMatchStats)
@@ -1412,9 +1512,10 @@ void KeyframePointCloudMap::nn_search_cov2cov_approximate(
     printf(
         "[KeyframePointCloudMap] nn_search_cov2cov_approximate: query_points=%zu "
         "active_kfs=%zu accepted=%zu no_candidate_in_range=%zu rejected_by_view_filter=%zu "
-        "max_search_distance=%.3f\n",
+        "matching_distance_near=%.3f matching_distance_far=%.3f\n",
         localPointCount, entries.size(), statsAccepted.load(), statsNoCandidateInRange.load(),
-        statsRejectedByViewFilter.load(), static_cast<double>(max_search_distance));
+        statsRejectedByViewFilter.load(), static_cast<double>(matchingDistance.near),
+        static_cast<double>(matchingDistance.far));
   }
 }
 
@@ -2797,9 +2898,26 @@ void KeyframePointCloudMap::KeyFrame::computeCovariancesAndDensity() const
         std::vector<size_t> k_indices;
         std::vector<float>  k_sq_distances;
 
+#if defined(MOLA_MM_HAS_RKNN_SEARCH)
         pointcloud_->kdTreeNClosestPoint3DIdx(
             xs[i], ys[i], zs[i], K_CORRESPONDENCES, k_indices, k_sq_distances,
             MAX_DIST_SQR_FOR_COV);
+#else
+    // Equivalent to the RKNN search above: a plain kNN returns its
+    // neighbors sorted by ascending squared distance, so cutting the
+    // result at the first entry that reaches the limit leaves exactly the
+    // ones an RKNN search would have accepted (it keeps distances strictly
+    // below the limit too). The only cost is visiting all K neighbors
+    // before dropping the far ones.
+    pointcloud_->kdTreeNClosestPoint3DIdx(
+        xs[i], ys[i], zs[i], K_CORRESPONDENCES, k_indices, k_sq_distances);
+
+    const auto within_radius = static_cast<size_t>(std::distance(
+        k_sq_distances.begin(),
+        std::lower_bound(k_sq_distances.begin(), k_sq_distances.end(), MAX_DIST_SQR_FOR_COV)));
+    k_indices.resize(within_radius);
+    k_sq_distances.resize(within_radius);
+#endif
 
         // Too few neighbors actually found: a plane/line fit from this few
         // samples is unreliable, so fall back to an isotropic covariance
