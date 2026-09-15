@@ -38,6 +38,7 @@
 #include <sstream>
 
 #include "IncrementalKDTree.h"
+#include "cov_diagnostics.h"
 
 #if defined(MOLA_METRIC_MAPS_USE_TBB)
 #include <tbb/enumerable_thread_specific.h>
@@ -919,6 +920,24 @@ void IncrementalPointCloud::computeCovariance(uint32_t slot) const
   }
   neighbors.colwise() -= Eigen::Vector3d(m_x[slot], m_y[slot], m_z[slot]);
 
+  // Planarity gate, off when the threshold is zero: do not assert a plane on a
+  // neighborhood that is not one. See KeyframePointCloudMap for the rationale.
+  if (creationOptions.max_plane_deviation_for_cov > 0)
+  {
+    const Eigen::Vector3d              centroid = neighbors.rowwise().mean();
+    const Eigen::Matrix<double, 3, -1> centered = neighbors.colwise() - centroid;
+
+    // Eigenvalues come out ascending, so column 0 is the plane normal.
+    const Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es(
+        (centered * centered.transpose()).eval());
+
+    if ((es.eigenvectors().col(0).transpose() * centered).cwiseAbs().maxCoeff() >
+        creationOptions.max_plane_deviation_for_cov)
+    {
+      return;  // keeps the isotropic covariance set at the top
+    }
+  }
+
   const Eigen::Matrix3d cov = neighbors * neighbors.transpose() / static_cast<double>(found);
 
   // Plane regularization of the singular values (see DLIO'2023, or Segal's
@@ -926,7 +945,7 @@ void IncrementalPointCloud::computeCovariance(uint32_t slot) const
   // plane normal direction.
   const Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
-  const Eigen::Vector3d values(1.0, 1.0, 1e-3);
+  const Eigen::Vector3d values(1.0, 1.0, creationOptions.plane_regularization_lambda);
   cov_[slot] = svd.matrixU() * values.asDiagonal() * svd.matrixV().transpose();
 }
 
@@ -1088,6 +1107,8 @@ void IncrementalPointCloud::nn_search_cov2cov_impl(
   // --- Pass 3: assemble the pairings --------------------------------------
   const Eigen::Matrix3f R = localMapPose.getRotationMatrix().cast_float().asEigen();
 
+  const std::size_t firstNewPairing = outPairings.size();
+
   outPairings.reserve(outPairings.size() + matches.size());
   for (const auto& m : matches)
   {
@@ -1105,6 +1126,19 @@ void IncrementalPointCloud::nn_search_cov2cov_impl(
     const Eigen::Matrix3f w = cov_[m.global_slot].asEigen() + covLocalGlobalFrame;
 
     p.cov_inv.asEigen() = w.inverse();
+  }
+
+  // Optional diagnostic; see cov_diagnostics.h. The local covariance is stored
+  // in the query cloud's own frame, and a rotation leaves an isotropic
+  // fallback unchanged, so it is recognizable without rotating it here.
+  if (auto* ds = mola::cov_diag::stream(); ds)
+  {
+    mola::cov_diag::dump(
+        *ds, "inc", outPairings, firstNewPairing,
+        [&](const mp2p_icp::point_with_cov_pair_t& p) -> const mrpt::math::CMatrixFloat33&
+        { return localPc->cov_[p.local_idx]; },
+        [&](const mp2p_icp::point_with_cov_pair_t& p) -> const mrpt::math::CMatrixFloat33&
+        { return cov_[p.global_idx]; });
   }
 }
 
@@ -1346,6 +1380,8 @@ void IncrementalPointCloud::TCreationOptions::loadFromConfigFile(
   MRPT_LOAD_CONFIG_VAR(alpha_deleted, float, c, s);
   MRPT_LOAD_CONFIG_VAR(reserve_points, uint64_t, c, s);
   MRPT_LOAD_CONFIG_VAR(k_correspondences_for_cov, uint64_t, c, s);
+  MRPT_LOAD_CONFIG_VAR(max_plane_deviation_for_cov, double, c, s);
+  MRPT_LOAD_CONFIG_VAR(plane_regularization_lambda, double, c, s);
   MRPT_LOAD_CONFIG_VAR(min_correspondences_for_cov, uint64_t, c, s);
   MRPT_LOAD_CONFIG_VAR(max_distance_for_cov, double, c, s);
   MRPT_LOAD_CONFIG_VAR(serialize_kdtree, bool, c, s);
@@ -1361,6 +1397,8 @@ void IncrementalPointCloud::TCreationOptions::dumpToTextStream(std::ostream& out
   LOADABLEOPTS_DUMP_VAR(alpha_deleted, float);
   LOADABLEOPTS_DUMP_VAR(reserve_points, int);
   LOADABLEOPTS_DUMP_VAR(k_correspondences_for_cov, int);
+  LOADABLEOPTS_DUMP_VAR(max_plane_deviation_for_cov, double);
+  LOADABLEOPTS_DUMP_VAR(plane_regularization_lambda, double);
   LOADABLEOPTS_DUMP_VAR(min_correspondences_for_cov, int);
   LOADABLEOPTS_DUMP_VAR(max_distance_for_cov, double);
   LOADABLEOPTS_DUMP_VAR(serialize_kdtree, bool);
@@ -1369,12 +1407,13 @@ void IncrementalPointCloud::TCreationOptions::dumpToTextStream(std::ostream& out
 void IncrementalPointCloud::TCreationOptions::writeToStream(
     mrpt::serialization::CArchive& out) const
 {
-  const int8_t version = 1;
+  const int8_t version = 2;
   out << version;
   out << remove_points_farther_than << async_rebuild << alpha_balance << alpha_deleted
       << reserve_points << k_correspondences_for_cov << min_correspondences_for_cov
       << max_distance_for_cov;
   out << serialize_kdtree;  // v1
+  out << max_plane_deviation_for_cov << plane_regularization_lambda;  // v2
 }
 
 void IncrementalPointCloud::TCreationOptions::readFromStream(mrpt::serialization::CArchive& in)
@@ -1385,6 +1424,7 @@ void IncrementalPointCloud::TCreationOptions::readFromStream(mrpt::serialization
   {
     case 0:
     case 1:
+    case 2:
     {
       in >> remove_points_farther_than >> async_rebuild >> alpha_balance >> alpha_deleted >>
           reserve_points >> k_correspondences_for_cov >> min_correspondences_for_cov >>
@@ -1396,6 +1436,10 @@ void IncrementalPointCloud::TCreationOptions::readFromStream(mrpt::serialization
       else
       {
         serialize_kdtree = false;
+      }
+      if (version >= 2)
+      {
+        in >> max_plane_deviation_for_cov >> plane_regularization_lambda;
       }
     }
     break;
