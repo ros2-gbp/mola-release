@@ -9,13 +9,24 @@
   :caption: Get started
 
   Home <index.html#http://>
+  quickstart
   why-mola
+  your-own-rosbag
+  gui-vs-cli
   building-maps
   localization
   geo-referencing
   ros2api
   mola_ros2_configurations
   map-tools
+  troubleshooting
+
+.. toctree::
+  :maxdepth: 1
+  :hidden:
+  :caption: Datasets
+
+  datasets/index
 
 .. toctree::
   :maxdepth: 2
@@ -33,6 +44,7 @@
   mola_lidar_odometry
   mola_lo_apps
   mola_lo_pipelines
+  mola_lo_diagnostics
   wrappers_3rd_party
 
 .. toctree::
@@ -77,6 +89,10 @@
   doxygen-index
   bibliography
 
+
+=====================================================
+MOLA: LiDAR Odometry, SLAM and Localization
+=====================================================
 
 .. raw:: html
 
