@@ -1,0 +1,12 @@
+Source: ros-rolling-mola-viz-imgui
+Section: misc
+Priority: optional
+Maintainer: "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, libglfw3-dev, ros-rolling-mola-kernel, ros-rolling-mrpt-gui, ros-rolling-mrpt-imgui, ros-rolling-mrpt-maps, ros-rolling-mrpt-obs, ros-rolling-mrpt-opengl, ros-rolling-mrpt-viz, ros-rolling-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_viz_imgui
+Standards-Version: 3.9.2
+
+Package: ros-rolling-mola-viz-imgui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libglfw3-dev, ros-rolling-mola-kernel, ros-rolling-mrpt-gui, ros-rolling-mrpt-imgui, ros-rolling-mrpt-maps, ros-rolling-mrpt-obs, ros-rolling-mrpt-opengl, ros-rolling-mrpt-viz, ros-rolling-ros-workspace
+Description: Dear ImGui (docking branch) GUI backend for MOLA
