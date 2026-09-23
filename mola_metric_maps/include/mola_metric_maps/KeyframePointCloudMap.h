@@ -30,7 +30,7 @@
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/maps/NearestNeighborsCapable.h>
 #include <mrpt/math/TBoundingBox.h>
-#include <mrpt/opengl/opengl_frwds.h>
+#include <mrpt/viz/viz_frwds.h>
 
 #include <functional>
 #include <map>
@@ -245,7 +245,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   /** Returns a short description of the map. */
   std::string asString() const override;
 
-  void getVisualizationInto(mrpt::opengl::CSetOfObjects& outObj) const override;
+  void getVisualizationInto(mrpt::viz::CSetOfObjects& outObj) const override;
 
   /** Returns true if the map is empty */
   bool isEmpty() const override;
@@ -258,7 +258,7 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 
   /// Returns a cached point cloud view of the entire map.
   /// Not efficient at all. Only for MOLA->ROS2 bridge.
-  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const override;
+  const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const;
 
   /** @} */
 
@@ -465,7 +465,17 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  in the surface, and on a ground vehicle the normal of the dominant
      *  surface is the vertical -- the axis that is already best determined.
      *  Raising this softens the assertion without changing which direction is
-     *  asserted. Must be in (0, 1].
+     *  asserted.
+     *
+     *  Values in (0, 1] regularize as described above. A value <= 0 switches
+     *  the regularization off and keeps the eigenvalues the neighborhood
+     *  actually produced, so a sparse or rough neighborhood carries less
+     *  information than a dense flat one instead of the same amount; the
+     *  magnitude of the value is then a floor on the smaller eigenvalues,
+     *  relative to the largest one. Note that the two regimes are not on the
+     *  same scale, since kept eigenvalues carry squared metric units, so a
+     *  matching threshold or robust kernel tuned against one does not
+     *  transfer to the other.
      */
     double plane_regularization_lambda = 1e-3;
 
@@ -754,11 +764,11 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      * normal per-field colormap, and the result is NOT cached (used by the per-keyframe
      * debug coloring, see `MOLA_KEYFRAME_MAP_VIZ_COLOR_BY_KF`).
      */
-    std::shared_ptr<mrpt::opengl::CPointCloudColoured> getViz(
+    std::shared_ptr<mrpt::viz::CPointCloudColoured> getViz(
         const TRenderOptions&                   ro,
         const std::optional<mrpt::img::TColor>& overrideColor = std::nullopt) const;
 
-    std::shared_ptr<mrpt::opengl::CSetOfObjects> getCovarianceEllipsoidViz(
+    std::shared_ptr<mrpt::viz::CSetOfObjects> getCovarianceEllipsoidViz(
         const TRenderOptions& ro) const;
 
    private:
@@ -794,10 +804,10 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
     mutable mrpt::maps::CPointsMap::Ptr pointcloud_global_;
 
     /** Cached visualization, created/getted by getViz() */
-    mutable std::shared_ptr<mrpt::opengl::CPointCloudColoured> cached_viz_;
+    mutable std::shared_ptr<mrpt::viz::CPointCloudColoured> cached_viz_;
 
     /** Cached cov visualization, created/getted by getCovarianceEllipsoidViz() */
-    mutable std::shared_ptr<mrpt::opengl::CSetOfObjects> cachez_viz_covs_;
+    mutable std::shared_ptr<mrpt::viz::CSetOfObjects> cachez_viz_covs_;
   };
 
   std::map<KeyFrameID, KeyFrame> keyframes_;
