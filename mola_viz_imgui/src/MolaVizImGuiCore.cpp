@@ -17,6 +17,9 @@
  * @date   2026
  */
 
+// GL headers come from mrpt/opengl/opengl_api.h, which must define
+// GL_GLEXT_PROTOTYPES before GL/gl.h is first seen.
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -985,7 +988,14 @@ void MolaVizImGuiCore::internal_handle_decaying_clouds(PerWindowData& wd)
           static_cast<float>(age - (maxScans - fadeCount)) / static_cast<float>(fadeCount);
       alpha = dc.initial_alpha * std::max(0.0f, 1.0f - t);
     }
-    dc.cloud->setAllPointsAlpha(mrpt::f2u8(alpha));
+    // Rewriting the alpha marks the whole cloud for a new GPU upload, so it is
+    // only done when it actually changes, i.e. when the queue advances:
+    const uint8_t a8 = mrpt::f2u8(alpha);
+    if (dc.applied_alpha != a8)
+    {
+      dc.cloud->setAllPointsAlpha(a8);
+      dc.applied_alpha = a8;
+    }
   }
 }
 
