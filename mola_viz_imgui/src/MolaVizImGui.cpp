@@ -21,6 +21,9 @@
  * C++ library for the Dear ImGui MOLA GUI backend
  */
 
+// GL headers come from mrpt/opengl/opengl_api.h, which must define
+// GL_GLEXT_PROTOTYPES before GL/gl.h is first seen.
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -33,8 +36,10 @@
 #include <mrpt/system/string_utils.h>
 #include <mrpt/system/thread_name.h>
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -295,9 +300,22 @@ void MolaVizImGui::gui_thread()
 
   const double frame_period = 1.0 / static_cast<double>(std::max(1, core_ptr_->target_fps_));
 
+  // Elapsed time between consecutive frame starts: what the user perceives
+  // as GUI (un)responsiveness. Reported by the profiler (mola-cli -p).
+  // Measured with a steady clock, since mrpt::Clock may follow simulated time.
+  std::optional<std::chrono::steady_clock::time_point> last_frame_start;
+
   while (!guiThreadShutdown_.load())
   {
-    const double t0 = mrpt::Clock::nowDouble();
+    const double t0          = mrpt::Clock::nowDouble();
+    const auto   frame_start = std::chrono::steady_clock::now();
+    if (last_frame_start && profiler_.isEnabled())
+    {
+      profiler_.registerUserMeasure(
+          "gui_thread.frame_interval",
+          std::chrono::duration<double>(frame_start - *last_frame_start).count());
+    }
+    last_frame_start = frame_start;
 
     glfwPollEvents();
 
@@ -306,10 +324,16 @@ void MolaVizImGui::gui_thread()
       if (wd.glfw_window && !glfwWindowShouldClose(wd.glfw_window)) any_open = true;
     if (!any_open) break;
 
-    for (auto& [name, wd] : core_ptr_->windows_)
     {
-      if (!wd.glfw_window || glfwWindowShouldClose(wd.glfw_window)) continue;
-      core_ptr_->render_frame(name, wd);
+      const ProfilerEntry tle(profiler_, "gui_thread.render_frame");
+      for (auto& [name, wd] : core_ptr_->windows_)
+      {
+        if (!wd.glfw_window || glfwWindowShouldClose(wd.glfw_window))
+        {
+          continue;
+        }
+        core_ptr_->render_frame(name, wd);
+      }
     }
 
     const double elapsed = mrpt::Clock::nowDouble() - t0;
@@ -382,6 +406,12 @@ void MolaVizImGui::dataset_ui_check_new_modules()
   {
     const auto modUI = std::dynamic_pointer_cast<Dataset_UI>(module);
     ASSERT_(modUI);
+
+    // Not an offline dataset (yet): check again on the next call.
+    if (!modUI->datasetUI_enabled())
+    {
+      continue;
+    }
 
     auto& e = datasetUIs_[module->getModuleInstanceName()];
     if (!e.first_time_seen) continue;
