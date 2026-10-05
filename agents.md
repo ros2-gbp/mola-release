@@ -134,6 +134,10 @@ All plugin modules derive from these virtual base classes:
   Both default to `std::nullopt` ("unknown"): the
   `mola_viz_imgui` panel omits the time if the position is unknown, and shows
   "t / ???" if the position is known but the total duration is not.
+  `datasetUI_enabled()` (default `true`, feature macro
+  `MOLA_KERNEL_DATASET_UI_HAS_ENABLED`) lets a source that can run both live
+  and from a recording (e.g. `mola_input_ouster`) opt out of the panel in live
+  mode. Both GUI backends poll it until it turns `true`.
 - `SharedKeyframeMap` — central-map keyframe-insertion sink (new 2026, see
   `mola_mapper_3d`): front ends (LIO/VIO) push sparse keyframes via
   `requestInsertKeyframe()`, decoupled from their own local map/odometry
@@ -164,7 +168,8 @@ Tests: `mola_yaml/tests/test-yaml-parser.cpp`
   rate over a 30 s window stays below 80% of the desired one, not on every
   single late cycle. Modules implementing `OfflineDatasetSource` are exempt:
   they replay at their own pace and catch up on the next cycle, so for them
-  `execution_rate` is just a polling rate.
+  `execution_rate` is just a polling rate. So are `Dataset_UI` modules while
+  `datasetUI_enabled()` returns `true`.
 
 ### `mola_bridge_ros2` — ROS 2 Integration
 - Consumes ROS 2 sensor topics as MOLA `RawDataSource`
@@ -181,6 +186,8 @@ module class name; nothing else in the tree may call MRPT GUI functions directly
   GLFW, both vendored under `3rdparty/`. Adds the docking layout, the Console log
   sink, and the metric plots described under `VizInterface` above.
   `MolaVizImGuiCore` is the reusable, MOLA-agnostic half.
+  Always `#define GLFW_INCLUDE_NONE` before `<GLFW/glfw3.h>`: GL headers must
+  first come from `mrpt/opengl/opengl_api.h` (which sets `GL_GLEXT_PROTOTYPES`).
 
 ### `mola_traj_tools` — Trajectory CLI Tools
 
@@ -255,6 +262,21 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   resurrect evicted geometry. The storage array itself never shrinks on its own:
   it settles at its high-water mark and slots are recycled; `compact()` releases
   it on demand.
+  Per-point `view_x/y/z` are kept in the **map frame**: `insertObservation()`
+  rotates the new ones by `robotPose + sensorPose` (the base class copies extra
+  fields verbatim) and `changeCoordinatesReference()` turns all of them.
+  `nn_search_cov2cov()` uses them through the view-direction filter options,
+  shared with `KeyframePointCloudMap` (see its bullet below). The default mode
+  here is `SurfaceSide`: `MaxAngle` also rejects the same surface seen from very
+  different azimuths (ground), which this map keeps around the robot, and
+  measured consistently worse on hand-held sequences. Known caveat: on one
+  GrandTour mission a few SurfaceSide runs (3 of 29) were not bit-reproducible,
+  while `None` always was; the cause (likely timing, only seen without
+  instrumentation) is not yet found.
+  Maps serialized before that guarantee (class version < 2)
+  have their view fields dropped on load, since those were stored in
+  per-insertion sensor frames; an in-place coordinate rewrite detected behind
+  the map's back (base-class call) zeroes them, since its rotation is unknown.
   `changeCoordinatesReference()` (all 3 overloads) is shadowed: a global SE(3)
   re-map moves every coordinate, so it applies the transform and then rebuilds
   the index over the *live* slot set (`rebuildIndexInPlace()`), dropping the
@@ -450,6 +472,26 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   lies farther than this from the fitted plane). A rejection deliberately leaves
   the local density estimate untouched, since that feeds the adaptive matching
   threshold.
+- The view-direction filter of cov-to-cov pairs has the same three options in both
+  cov2cov map classes: `use_view_direction_filter` (master switch),
+  `view_direction_filter` (`mola::ViewDirectionFilter` in
+  `include/mola_metric_maps/ViewDirectionFilter.h`: `None`, `MaxAngle`,
+  `SurfaceSide`) and `max_view_angle_deg` (`MaxAngle` only). Defaults differ:
+  `MaxAngle` for KFM (its historical behavior), `SurfaceSide` for
+  `IncrementalPointCloud`.
+  The per-pair test itself is shared, in `src/view_direction_test.h`
+  (`internal::ViewDirectionTest`); `SurfaceSide` needs the matched map point's
+  covariance, which both classes already have in the global frame. A zero
+  (missing) view direction never rejects. `SurfaceSide` rejects only when both
+  views are more than ~14.5 deg off the plane (|cos| > 0.25) AND the matched
+  point's *raw* neighborhood is flat (re-searched on demand, only for the few
+  pairs it would reject): the stored covariances are plane-regularized, so on
+  foliage/edges/poles they still look like planes with a meaningless normal.
+  Without that gate (and with a 0.1 cutoff) ~74% of its rejections were on
+  non-flat points, and it doubled the ATE of some Oxford Spires runs. `mola_lidar_odometry`'s
+  `localmap-gicp.yaml` exposes them as `MOLA_LOCALMAP_USE_VIEW_DIRECTION_FILTER`,
+  `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER` (empty = each class's default) and
+  `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER_ANGLE_DEG`.
 
 ### Feature macros
 
@@ -461,6 +503,7 @@ Guard with `#if defined(...)`, never with a version check.
 | `MOLA_KERNEL_VIZ_HAS_METRICS` | `interfaces/MetricChannel.h` | `VizInterface::register_metric()`/`push_metric()` exist |
 | `MOLA_KERNEL_VIZ_HAS_MOVABLE_FRAMES` | `interfaces/VizInterface.h` | named movable reference frames: `update_3d_object_frame()` and the `parentFrame` argument of `update_3d_object()`, `insert_point_cloud_with_decay()`, `update_viewport_look_at()` |
 | `MOLA_KERNEL_DATASET_UI_HAS_TIME` | `interfaces/Dataset_UI.h` | `datasetUI_time()`/`datasetUI_total_time()` |
+| `MOLA_KERNEL_DATASET_UI_HAS_ENABLED` | `interfaces/Dataset_UI.h` | `datasetUI_enabled()` |
 | `MOLA_KERNEL_NAVSTATE_FILTER_HAS_GEO_REFERENCE` | `interfaces/NavStateFilter.h` | geo-reference accessor |
 | `MOLA_KERNEL_NAVSTATE_FILTER_HAS_TRANSFORM_FRAME` | `interfaces/NavStateFilter.h` | `transform_frame()` |
 | `MOLA_METRIC_MAPS_HAS_INCREMENTAL_POINT_CLOUD` | CMake (PUBLIC) | `IncrementalPointCloud` is functional (nanoflann >= 1.10) |
