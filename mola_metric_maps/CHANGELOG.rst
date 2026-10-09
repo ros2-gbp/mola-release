@@ -2,6 +2,9 @@
 Changelog for package mola_metric_maps
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.3.2 (2026-10-09)
+------------------
+
 3.3.1 (2026-10-05)
 ------------------
 * IncrementalPointCloud: optional view-direction filter (None, MaxAngle, SurfaceSide), now enabled with SurfaceSide by default
