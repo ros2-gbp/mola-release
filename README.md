@@ -1,3 +1,43 @@
+## mola (lyrical) - 3.3.2-1
+
+The packages in the `mola` repository were released into the `lyrical` distro by running `/usr/bin/bloom-release -y -r lyrical mola` on `Fri, 09 Oct 2026 10:02:33 -0000`
+
+These packages were released:
+- `mola`
+- `mola_bridge_ros2`
+- `mola_demos`
+- `mola_input_lidar_bin_dataset`
+- `mola_input_rawlog`
+- `mola_input_rosbag2`
+- `mola_input_video`
+- `mola_kernel`
+- `mola_launcher`
+- `mola_metric_maps`
+- `mola_msgs`
+- `mola_pose_list`
+- `mola_relocalization`
+- `mola_traj_tools`
+- `mola_viz`
+- `mola_viz_imgui`
+- `mola_yaml`
+
+Version of package(s) in repository `mola`:
+
+- upstream repository: https://github.com/MOLAorg/mola.git
+- release repository: https://github.com/ros2-gbp/mola-release.git
+- rosdistro version: `3.3.1-1`
+- old version: `3.3.1-1`
+- new version: `3.3.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.14.4`
+- catkin_pkg version: `1.1.1`
+- rosdep version: `0.27.0`
+- rosdistro version: `1.1.0`
+- vcstools version: `0.1.42`
+
+
 ## mola (kilted) - 3.3.2-1
 
 The packages in the `mola` repository were released into the `kilted` distro by running `/usr/bin/bloom-release -y -r kilted mola` on `Fri, 09 Oct 2026 09:55:41 -0000`
