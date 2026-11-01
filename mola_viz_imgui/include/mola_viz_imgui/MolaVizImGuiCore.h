@@ -69,7 +69,6 @@ class ConsoleLogSink
   void                        push(const ConsoleLogEntry& e);
   std::deque<ConsoleLogEntry> snapshot() const;
   void                        clear();
-  void                        note_source(const std::string& s);
   std::vector<std::string>    sources() const;
 
   /** Bumped on every push()/clear(). Lock-free, so callers that re-render
@@ -343,7 +342,7 @@ class MolaVizImGuiCore : public VizInterface, public mrpt::system::COutputLogger
 
   bool   show_rgbd_as_point_cloud_ = false;
   double assumed_sensor_rate_hz_   = 10.0;
-  int    target_fps_               = 60;
+  int    target_fps_               = 30;
 
   /** Identifier used to key the imgui .ini persistence file.
    *  Empty string disables persistence.  See `MolaVizImGui` docs.

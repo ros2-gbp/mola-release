@@ -6,3 +6,17 @@ mola_add_test(
   LINK_LIBRARIES
     mola::mola_kernel
 )
+
+mola_add_test(
+  TARGET  test-parallelism
+  SOURCES test_parallelism.cpp
+  LINK_LIBRARIES
+    mola::mola_kernel
+)
+
+mola_add_test(
+  TARGET  test-log-hub
+  SOURCES test_log_hub.cpp
+  LINK_LIBRARIES
+    mola::mola_kernel
+)
