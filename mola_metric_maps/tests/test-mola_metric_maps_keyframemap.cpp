@@ -34,6 +34,7 @@
 #include <iostream>
 #include <numeric>
 #include <set>
+#include <thread>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,6 +123,21 @@ mola::KeyframePointCloudMap makeMapFromCloud(
 // Tests
 // ---------------------------------------------------------------------------
 
+// Through a CMetricMap reference, the contents are reachable as points
+// (e.g. for the ROS 2 bridge):
+void test_as_points_map()
+{
+#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
+  const auto                        pts = makeGridPts();
+  const mola::KeyframePointCloudMap m   = makeMapFromCloud(makeCloudWithViews(pts));
+
+  const mrpt::maps::CMetricMap& asMetricMap = m;
+  const auto*                   view        = mrpt::maps::asPointsMap(asMetricMap);
+  ASSERT_(view != nullptr);
+  ASSERT_EQUAL_(view->size(), pts.size());
+#endif
+}
+
 // ── 1. Basic map lifecycle ──────────────────────────────────────────────────
 void test_basic_ops()
 {
@@ -142,6 +158,65 @@ void test_basic_ops()
 
   const std::string s = m.asString();
   ASSERT_(!s.empty());
+}
+
+// ── 1b. Copies are complete, and safe while ICP prepares the map ──────────
+void test_copy_while_preparing_icp()
+{
+  mola::KeyframePointCloudMap m;
+  m.creationOptions.k_correspondences_for_cov = 5;
+  m.creationOptions.max_search_keyframes      = 2;
+
+  const int numKFs = 8;
+  for (int kf = 0; kf < numKFs; ++kf)
+  {
+    auto obs        = mrpt::obs::CObservationPointCloud::Create();
+    obs->pointcloud = makeCloudWithViews(makeGridPts());
+    m.insertObservation(*obs, mrpt::poses::CPose3D::FromTranslation(kf * 10.0, 0, 0));
+  }
+
+  {
+    const mola::KeyframePointCloudMap c = m;
+    ASSERT_EQUAL_(c.point_count(), m.point_count());
+    ASSERT_EQUAL_(c.nextFreeKeyFrameID_public(), m.nextFreeKeyFrameID_public());
+    ASSERT_EQUAL_(c.creationOptions.max_search_keyframes, m.creationOptions.max_search_keyframes);
+  }
+
+  // One thread keeps rebuilding the ICP search submap at alternating poses,
+  // as ICP does, while another one copies the map (as a GUI render would).
+  // Run under TSan to check for data races.
+  const int   numIters = 200;
+  std::thread icpThread(
+      [&]()
+      {
+        for (int i = 0; i < numIters; i++)
+        {
+          const double x = (i % 2 == 0) ? 0.0 : (numKFs - 1) * 10.0;
+          m.icp_get_prepared_as_global(mrpt::poses::CPose3D::FromTranslation(x, 0, 0));
+        }
+      });
+
+  // Joins the thread even if an assertion below throws:
+  struct JoinGuard
+  {
+    std::thread& t;
+    ~JoinGuard()
+    {
+      if (t.joinable())
+      {
+        t.join();
+      }
+    }
+  } joinGuard{icpThread};
+
+  for (int i = 0; i < numIters; i++)
+  {
+    const auto c = std::dynamic_pointer_cast<mola::KeyframePointCloudMap>(m.duplicateGetSmartPtr());
+    ASSERT_(c);
+    ASSERT_EQUAL_(c->point_count(), m.point_count());
+    const auto bb = m.boundingBox();
+    ASSERT_GT_(bb.max.x, bb.min.x);
+  }
 }
 
 // ── 2. clear() empties the map ─────────────────────────────────────────────
@@ -808,6 +883,57 @@ void test_view_filter_heading_sweep_pairing_accepted()
         static_cast<float>(Q_local_pt.z)};
     const mrpt::math::TPoint3Df P_global{50.f, 0.f, 0.f};
     ASSERT_(hasPairing(pairings, Q_local, P_global));
+  }
+}
+
+// ── 18. View filter with a rotated *global* keyframe ──────────────────────
+//
+// Same geometry as the sweep above, but now it is the reference (global)
+// map whose keyframe has a non-identity heading. Its view vectors are stored
+// in the KF frame and turned into the map frame by `updatePointsGlobal()`;
+// rotating them twice there (e.g. once by `insertAnotherMap()` and once more
+// explicitly) leaves P's view off by the KF heading, rejecting the pair.
+void test_view_filter_global_keyframe_heading_sweep()
+{
+  constexpr float kDz      = 0.02f;
+  constexpr float kMaxDist = 1.0f;
+
+  const mrpt::math::TPoint3D  P_global_pt{50.0, 0.0, 0.0};
+  const mrpt::math::TVector3D P_global_view{0.0, 1.0, 0.0};
+
+  // Local (query) map at the identity: Q near P, seen from the same side.
+  auto local_pts = makeGridPts(kDz, 0.f, 0.f, 1.f);
+  appendPt(local_pts, 50.f, 0.f, kDz, 0.f, +1.f, 0.f);
+  auto local_m = makeMapFromCloud(makeCloudWithViews(local_pts));
+
+  for (const double heading_deg : {0.0, 90.0, 180.0, 270.0})
+  {
+    const auto kfPose = mrpt::poses::CPose3D::FromXYZYawPitchRoll(
+        0.0, 0.0, 0.0, mrpt::DEG2RAD(heading_deg), 0.0, 0.0);
+
+    // P and its view, expressed in the global KF's local frame:
+    const mrpt::math::TPoint3D  P_local_pt = kfPose.inverseComposePoint(P_global_pt);
+    const mrpt::math::TVector3D localView  = kfPose.inverseRotateVector(P_global_view);
+
+    auto global_pts = makeGridPts(0.f, 0.f, 0.f, 1.f);
+    appendPt(
+        global_pts, static_cast<float>(P_local_pt.x), static_cast<float>(P_local_pt.y),
+        static_cast<float>(P_local_pt.z), static_cast<float>(localView.x),
+        static_cast<float>(localView.y), static_cast<float>(localView.z));
+
+    auto global_m = makeMapFromCloud(makeCloudWithViews(global_pts), kfPose);
+    global_m.icp_get_prepared_as_global(mrpt::poses::CPose3D::Identity());
+    global_m.creationOptions.use_view_direction_filter = true;
+    global_m.creationOptions.max_view_angle_deg        = 60.0;  // tight
+
+    mp2p_icp::MatchedPointWithCovList pairings;
+    global_m.nn_search_cov2cov(local_m, mrpt::poses::CPose3D::Identity(), kMaxDist, pairings);
+
+    const mrpt::math::TPoint3Df Q_local{50.f, 0.f, kDz};
+    const mrpt::math::TPoint3Df P_global{50.f, 0.f, 0.f};
+    ASSERTMSG_(
+        hasPairing(pairings, Q_local, P_global),
+        mrpt::format("Pair rejected with the global KF at heading %.0f deg", heading_deg));
   }
 }
 
@@ -1569,6 +1695,12 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
     std::cout << "test_basic_ops ...\n";
     test_basic_ops();
 
+    std::cout << "test_as_points_map ...\n";
+    test_as_points_map();
+
+    std::cout << "test_copy_while_preparing_icp ...\n";
+    test_copy_while_preparing_icp();
+
     std::cout << "test_clear ...\n";
     test_clear();
 
@@ -1617,6 +1749,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
     std::cout << "test_view_filter_heading_sweep_pairing_accepted ...\n";
     test_view_filter_heading_sweep_pairing_accepted();
+
+    std::cout << "test_view_filter_global_keyframe_heading_sweep ...\n";
+    test_view_filter_global_keyframe_heading_sweep();
 
     std::cout << "test_kf_pose_plumbing ...\n";
     test_kf_pose_plumbing();
