@@ -5,7 +5,7 @@
 -->
 <package format="3">
   <name>mola_bridge_ros2</name>
-  <version>3.3.2</version>
+  <version>3.4.0</version>
   <description>Bidirectional bridge ROS2-MOLA</description>
 
   <maintainer email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</maintainer>
@@ -35,6 +35,7 @@
   <depend>nav_msgs</depend>
   <depend>geographic_msgs</depend>
   <depend>gps_msgs</depend>  <!-- optional -->
+  <depend>rcl_interfaces</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>tf2</depend>
