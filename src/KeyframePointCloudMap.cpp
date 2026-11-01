@@ -52,6 +52,7 @@
 #include <fstream>
 #include <iterator>  // std::distance
 #include <memory>
+#include <mutex>
 #include <numeric>  // std::accumulate
 #include <ostream>
 #include <sstream>
@@ -474,8 +475,40 @@ void KeyframePointCloudMap::serializeFrom(mrpt::serialization::CArchive& in, uin
 
 KeyframePointCloudMap::~KeyframePointCloudMap() = default;
 
+KeyframePointCloudMap::KeyframePointCloudMap(const KeyframePointCloudMap& o) : CMetricMap()
+{
+  *this = o;
+}
+
+KeyframePointCloudMap& KeyframePointCloudMap::operator=(const KeyframePointCloudMap& o)
+{
+  if (this == &o)
+  {
+    return *this;
+  }
+
+  std::scoped_lock lck(*state_mtx_, *o.state_mtx_);
+
+  // Keep this list in sync with the data members:
+  genericMapParams          = o.genericMapParams;
+  creationOptions           = o.creationOptions;
+  insertionOptions          = o.insertionOptions;
+  likelihoodOptions         = o.likelihoodOptions;
+  renderOptions             = o.renderOptions;
+  keyframes_                = o.keyframes_;
+  last_inserted_kf_id_      = o.last_inserted_kf_id_;
+  evicted_kf_ids_           = o.evicted_kf_ids_;
+  next_free_kf_id_          = o.next_free_kf_id_;
+  cached_                   = o.cached_;
+  cachedPointsLastReturned_ = o.cachedPointsLastReturned_;
+
+  return *this;
+}
+
 mrpt::math::TBoundingBoxf KeyframePointCloudMap::boundingBox() const
 {
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   if (cached_.boundingBox)
   {
     return *cached_.boundingBox;
@@ -1031,12 +1064,15 @@ void KeyframePointCloudMap::nn_search_cov2cov_impl(
     const MatchingDistanceProfile&     matchingDistance,
     mp2p_icp::MatchedPointWithCovList& outPairings) const
 {
-  auto lck = mrpt::lockHelper(*state_mtx_);
-
   // Enforce local map to recompute its covariances to the new pose:
   const auto* localMapKF = dynamic_cast<const KeyframePointCloudMap*>(&localMap);
   ASSERTMSG_(
       localMapKF, "Implementation expects local map to be also of type KeyframePointCloudMap");
+
+  // The local map's keyframe pose is changed below, then restored: hold its
+  // lock too. std::scoped_lock avoids lock-order deadlocks, and both mutexes
+  // being recursive makes it safe if both maps are the same object.
+  std::scoped_lock lck(*state_mtx_, *localMapKF->state_mtx_);
 
   ASSERT_EQUAL_(localMapKF->keyframes_.size(), 1U);
   auto&      localKf             = const_cast<KeyFrame&>(localMapKF->keyframes_.at(0));
@@ -1090,41 +1126,19 @@ void KeyframePointCloudMap::nn_search_cov2cov_impl(
   // ------------------------------------------------------------------
   // View-direction filter setup
   // ------------------------------------------------------------------
-  // "view_x/y/z" are unit vectors in the *local KF frame* of each cloud,
-  // pointing FROM the point TOWARD the sensor at acquisition time.
+  // "view_x/y/z" are unit vectors pointing FROM each point TOWARD the sensor
+  // at acquisition time.
   //
-  // The merged submap (globalPoints) and localPointsTransf are plain
-  // CSimplePointsMap objects that carry only XYZ - custom fields such as
-  // view_x/y/z are not propagated by insertAnotherMap().  We therefore
-  // read view vectors directly from the original local-frame clouds and
-  // rotate them to the global frame on the fly.
+  // - The local query cloud stores them in its own KF frame, so they are
+  //   rotated by localMapPose on the fly.
+  // - The reference submap (globalPoints) has them already in the global
+  //   frame: icp_get_prepared_as_global() merges the KFs' pointcloud_global()
+  //   (which rotates them, see updatePointsGlobal()) into a CGenericPointsMap
+  //   if the first contributing cloud carries them (the submap type is chosen
+  //   from it).
   //
-  // For the global reference submap we need the view vectors from each
-  // contributing KF.  Because the submap was built by sequentially
-  // appending KF point clouds (see icp_get_prepared_as_global), the
-  // global point index `nn_global_idx` maps directly into that merged
-  // buffer - but we cannot recover which KF it came from without extra
-  // bookkeeping.  As a pragmatic solution we instead use the view
-  // vectors stored in the *reference keyframe's global pointcloud*.
-  //
-  // The reference submap is cached_.icp_search_submap, which is itself
-  // a KeyFrame object.  Its `pointcloud()` holds the merged local cloud
-  // (without view fields) while the individual contributing KFs hold the
-  // original clouds.  Since the submap KF is a synthetic merge, the only
-  // robust approach that does not require index-bookkeeping is to obtain
-  // the global-frame view vectors from the *original* KFs stored in
-  // keyframes_.
-  //
-  // For simplicity - and because this filter is a best-effort heuristic -
-  // we only activate the filter when the *local* query cloud carries view
-  // fields AND the global reference submap's merged pointcloud also does.
-  // The merged submap won't have them unless explicitly populated, so the
-  // effective activation path today is:
-  //
-  //   local KF cloud has view_x/y/z   AND
-  //   globalPoints (the icp_search_submap pointcloud_global()) has view_x/y/z
-  //
-  // If only one side has them the filter is silently skipped.
+  // The filter only runs when both clouds carry all three fields; otherwise
+  // it is silently skipped.
   const bool try_view_filter = creationOptions.use_view_direction_filter;
 
   // Local cloud view buffers - in the *local KF frame* of the query map.
@@ -1133,9 +1147,7 @@ void KeyframePointCloudMap::nn_search_cov2cov_impl(
   const mrpt::aligned_std_vector<float>* local_view_y = nullptr;
   const mrpt::aligned_std_vector<float>* local_view_z = nullptr;
 
-  // Global (reference submap) view buffers - already in global frame if the
-  // submap pointcloud carries them (currently only if the upstream pipeline
-  // populated them via e.g. insertAnotherMap on a CGenericPointsMap).
+  // Global (reference submap) view buffers, already in the global frame.
   const mrpt::aligned_std_vector<float>* global_view_x = nullptr;
   const mrpt::aligned_std_vector<float>* global_view_y = nullptr;
   const mrpt::aligned_std_vector<float>* global_view_z = nullptr;
@@ -1754,11 +1766,11 @@ bool KeyframePointCloudMap::trySetCreationOptions(
   // icp_get_prepared_as_global() compares cached_.icp_search_built_approximate against the live
   // option, so a change here (even with an unchanged active KF set) is picked up and forces a
   // rebuild on the next call.
+  auto lck = mrpt::lockHelper(*state_mtx_);
+
   TCreationOptions newOpts = creationOptions;
   newOpts.loadFromConfigFile(cfg, section);
   creationOptions = newOpts;
-
-  auto lck = mrpt::lockHelper(*state_mtx_);
   for (auto& kv : keyframes_)
   {
     kv.second.updateCovarianceParams(
@@ -2012,8 +2024,10 @@ mrpt::maps::CPointsMap::Ptr buildSuperKeyframeCloud(
 #else
   localCloud->insertAnotherMap(mergedGlobal.get(), anchorInv);
 #endif
-  // insertAnotherMap copies the (still global-frame) view vectors verbatim;
-  // rotate them into the anchor-local frame to satisfy the KF contract.
+  // Before MRPT 3.6.0, insertAnotherMap copies the (still global-frame) view
+  // vectors verbatim: rotate them into the anchor-local frame to satisfy the
+  // KF contract. Newer versions rotate them already.
+#if MRPT_VERSION < 0x030600
   if (hasView)
   {
 #if defined(MOLA_MM_HAS_ROTATE_VIEW_HEADER)
@@ -2022,6 +2036,7 @@ mrpt::maps::CPointsMap::Ptr buildSuperKeyframeCloud(
     rotateViewDirectionFieldsLegacy(*localCloud, anchorInv);
 #endif
   }
+#endif
 
   return localCloud;
 }
@@ -2939,8 +2954,10 @@ void KeyframePointCloudMap::KeyFrame::updatePointsGlobal() const
   // This automatically registers all source fields
   pointcloud_global_->insertAnotherMap(pointcloud_.get(), pose());
 
-  // insertAnotherMap() does not know that view_{x,y,z} are direction vectors,
-  // so it copies local-frame values as-is.  Rotate them to the global frame now.
+  // Before MRPT 3.6.0, insertAnotherMap() does not know that view_{x,y,z} are
+  // direction vectors, so it copies local-frame values as-is: rotate them to
+  // the global frame now. Newer versions rotate them already.
+#if MRPT_VERSION < 0x030600
   if (has_view)
   {
 #if defined(MOLA_MM_HAS_ROTATE_VIEW_HEADER)
@@ -2949,6 +2966,7 @@ void KeyframePointCloudMap::KeyFrame::updatePointsGlobal() const
     rotateViewDirectionFieldsLegacy(*pointcloud_global_, pose_);
 #endif
   }
+#endif
 }
 
 void KeyframePointCloudMap::KeyFrame::computeCovariancesAndDensity() const
