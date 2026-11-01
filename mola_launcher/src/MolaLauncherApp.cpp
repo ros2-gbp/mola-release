@@ -156,7 +156,17 @@ void MolaLauncherApp::shutdown()
     }
   }
   MRPT_LOG_INFO("shutdown(): Done.");
-  running_threads_.clear();
+
+  // Destroy the modules out of the map, and with the lock released: a module
+  // thread still running until its own destructor (e.g. a ROS node spinner)
+  // may look up other modules meanwhile, and must then find none.
+  {
+    std::map<std::string, InfoPerRunningThread> modules;
+    {
+      std::lock_guard<std::mutex> lck(running_threads_mtx_);
+      modules.swap(running_threads_);
+    }
+  }
 
   threads_must_end_ = true;
   // we need to wait for the end of spin, only if we are now in a different
@@ -313,14 +323,23 @@ void MolaLauncherApp::setup(
 
       MRPT_LOG_INFO_STREAM(
           "Instantiating module `" << ds_label << "` of type `" << ds_classname << "`");
-      // Create object (needs to be registered):
-      info.impl = sectGenerator(ds_classname);
+      // Create object (needs to be registered). The class may come from a
+      // library that could not be loaded, so report those too:
+      try
+      {
+        info.impl = sectGenerator(ds_classname);
+      }
+      catch (const std::exception& e)
+      {
+        THROW_EXCEPTION_FMT("%s%s", e.what(), failed_module_libs_report().c_str());
+      }
       ASSERTMSG_(
-          info.impl, mrpt::format(
-                         "Error: object for module `%s` of type `%s` couldn't be "
-                         "constructed from the Factory. Check class type spelling, "
-                         "and whether the corresponding MOLA module is loaded.",
-                         ds_label.c_str(), ds_classname.c_str()));
+          info.impl,
+          mrpt::format(
+              "Error: object for module `%s` of type `%s` couldn't be "
+              "constructed from the Factory. Check class type spelling, "
+              "and whether the corresponding MOLA module is loaded.%s",
+              ds_label.c_str(), ds_classname.c_str(), failed_module_libs_report().c_str()));
 
       // Inherit verbosity level:
       auto verb_level = this->getMinLoggingLevel();
@@ -562,6 +581,7 @@ ExecutableBase::Ptr MolaLauncherApp::nameServerImpl(const std::string& name)
   // If the requested name has the format: "[" + <i>, return the i-th
   // module, or nullptr if out of range.
   // This is used by ExecutableBase::findService()
+  std::lock_guard<std::mutex> lck(running_threads_mtx_);
   if (name.size() >= 2 && name[0] == '[')
   {
     const auto idx = std::stoul(name.substr(1));
