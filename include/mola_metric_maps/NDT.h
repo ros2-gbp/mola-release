@@ -33,6 +33,7 @@
 #include <tsl/robin_map.h>
 
 #include <array>
+#include <cmath>
 #include <functional>
 #include <optional>
 
@@ -87,12 +88,16 @@ class NDT : public mrpt::maps::CMetricMap,
   constexpr static std::size_t GLOBAL_ID_SUBVOXEL_BITCOUNT = 5;
   static_assert(MAX_POINTS_PER_VOXEL <= (1 << GLOBAL_ID_SUBVOXEL_BITCOUNT));
 
+  /// Global index of the voxel containing a point: voxel `i` spans
+  /// `[i*voxel_size, (i+1)*voxel_size)` along each axis. Rounds down (`floor`),
+  /// not toward zero, so the voxels on both sides of an axis plane are not
+  /// merged into one of double size.
   inline global_index3d_t coordToGlobalIdx(const mrpt::math::TPoint3Df& pt) const
   {
     return global_index3d_t(
-        static_cast<int32_t>(pt.x * voxel_size_inv_),  //
-        static_cast<int32_t>(pt.y * voxel_size_inv_),  //
-        static_cast<int32_t>(pt.z * voxel_size_inv_));
+        static_cast<int32_t>(std::floor(pt.x * voxel_size_inv_)),  //
+        static_cast<int32_t>(std::floor(pt.y * voxel_size_inv_)),  //
+        static_cast<int32_t>(std::floor(pt.z * voxel_size_inv_)));
   }
 
   /// returns the coordinate of the voxel "bottom" corner
@@ -344,7 +349,6 @@ class NDT : public mrpt::maps::CMetricMap,
       std::vector<mrpt::math::TPoint2Df>& results, std::vector<float>& out_dists_sqr,
       std::vector<uint64_t>& resultIndicesOrIDs, size_t maxPoints) const override;
 
-  template <size_t MAX_KNN>
   void nn_multiple_search_impl(
       const mrpt::math::TPoint3Df& query, const size_t N,
       std::vector<mrpt::math::TPoint3Df>& results, std::vector<float>& out_dists_sqr,
@@ -416,6 +420,14 @@ class NDT : public mrpt::maps::CMetricMap,
   /// Returns a cached point cloud view of the hash map.
   /// Not efficient at all. Only for MOLA->ROS2 bridge.
   const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const;
+
+#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
+  /// Makes the contents above reachable via mrpt::maps::asPointsMap().
+  [[nodiscard]] const mrpt::maps::CPointsMap* asPointsMapView() const override
+  {
+    return getAsSimplePointsMap();
+  }
+#endif
 
   /** @} */
 
