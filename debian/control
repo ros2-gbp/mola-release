@@ -1,0 +1,12 @@
+Source: ros-kilted-mola-viz-imgui
+Section: misc
+Priority: optional
+Maintainer: "Jose-Luis Blanco-Claraco" <joseluisblancoc@gmail.com>
+Build-Depends: debhelper (>= 9.0.0), cmake, libglfw3-dev, ros-kilted-mola-kernel, ros-kilted-mrpt-gui, ros-kilted-mrpt-imgui, ros-kilted-mrpt-maps, ros-kilted-mrpt-obs, ros-kilted-mrpt-opengl, ros-kilted-mrpt-viz, ros-kilted-ros-workspace
+Homepage: https://github.com/MOLAorg/mola/tree/develop/mola_viz_imgui
+Standards-Version: 3.9.2
+
+Package: ros-kilted-mola-viz-imgui
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libglfw3-dev, ros-kilted-mola-kernel, ros-kilted-mrpt-gui, ros-kilted-mrpt-imgui, ros-kilted-mrpt-maps, ros-kilted-mrpt-obs, ros-kilted-mrpt-opengl, ros-kilted-mrpt-viz, ros-kilted-ros-workspace
+Description: Dear ImGui (docking branch) GUI backend for MOLA
