@@ -19,6 +19,7 @@
  */
 #pragma once
 
+#include <mola_kernel/LogHub.h>
 #include <mola_kernel/interfaces/Dataset_UI.h>
 #include <mola_kernel/interfaces/ExecutableBase.h>
 #include <mola_viz_imgui/MolaVizImGuiCore.h>
@@ -69,6 +70,7 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   // ExecutableBase
   void initialize(const Yaml& cfg) override;
   void spinOnce() override;
+  void onQuit() override;
 
   // =========================================================================
   /** @name mola-viz-imgui main API
@@ -293,6 +295,9 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   // ---------------------------------------------------------------------------
   // GUI thread (host mode only)
   // ---------------------------------------------------------------------------
+  // Ends and joins the GUI thread, releasing its GL resources:
+  void stop_gui_thread();
+
   std::thread       guiThread_;
   std::atomic<bool> guiThreadShutdown_{false};
   ImGuiContext*     imgui_ctx_  = nullptr;
@@ -322,12 +327,10 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   // ---------------------------------------------------------------------------
   // Console window: log capture from all discovered ExecutableBase modules
   // ---------------------------------------------------------------------------
-  double                lastTimeCheckForConsoleModules_ = 0;
-  std::set<std::string> consoleHookedModules_;  // instance names already hooked
-  // child_loggers() entries already hooked, keyed by logger identity (a
-  // module may create/destroy these, e.g. a background-thread engine, so
-  // they cannot be tracked by instance name alone).
-  std::set<const mrpt::system::COutputLogger*> consoleHookedChildLoggers_;
+  double lastTimeCheckForConsoleModules_ = 0;
+
+  // Our sink in the process-wide LogHub; empty while the console is disabled.
+  std::shared_ptr<LogHub::Sink> consoleHubSink_;
 
   void console_check_new_modules();
 };
