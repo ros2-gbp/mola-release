@@ -2,6 +2,11 @@
 Changelog for package mola_yaml
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.4.0 (2026-11-01)
+------------------
+* New $append / $prepend directives to edit an $import'ed sequence (`#263 <https://github.com/MOLAorg/mola/issues/263>`_)
+* Contributors: Jose Luis Blanco-Claraco
+
 3.3.2 (2026-10-09)
 ------------------
 
