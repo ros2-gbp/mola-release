@@ -2,6 +2,12 @@
 Changelog for package mola_viz_imgui
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.4.0 (2026-11-01)
+------------------
+* Default GUI refresh rate 30 FPS; MOLA_GUI_TARGET_FPS env var override
+* Dataset playback panel layout fixes; end the GUI thread in onQuit()
+* Contributors: Jose Luis Blanco-Claraco
+
 3.3.2 (2026-10-09)
 ------------------
 * Use MRPT's vendored Dear ImGui and render the background scene directly (mrpt_imgui_vendor is optional).
