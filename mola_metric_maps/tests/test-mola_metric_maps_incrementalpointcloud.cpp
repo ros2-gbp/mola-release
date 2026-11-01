@@ -87,11 +87,106 @@ void insertPoints(mola::IncrementalPointCloud& map, const mrpt::maps::CSimplePoi
 }
 
 // -------------------------------------------------------------------------
-void test_queries_against_brute_force(bool async)
+/// Checks the single, k-NN and radius searches of `map` at `q` against `ref`.
+void checkQueryAgainstReference(
+    const mola::IncrementalPointCloud& map, const mrpt::maps::CSimplePointsMap& ref,
+    const mrpt::math::TPoint3Df& q, float radiusSqr, size_t knn = 5)
 {
-  mola::IncrementalPointCloud map;
+  // Relative beyond 1, for queries far from the map:
+  const auto tol = [](float d) { return 1e-4f * std::max(1.0f, d); };
+
+  // 1) single NN
+  {
+    mrpt::math::TPoint3Df p;
+    float                 d  = 0;
+    uint64_t              id = 0;
+    const bool            ok = map.nn_single_search(q, p, d, id);
+    mrpt::math::TPoint3Df gt_p;
+    float                 gt_d  = 0;
+    uint64_t              gt_id = 0;
+    const bool            gt_ok = ref.nn_single_search(q, gt_p, gt_d, gt_id);
+
+    ASSERT_EQUAL_(ok, gt_ok);
+    if (!ok) return;
+
+    ASSERT_NEAR_(d, gt_d, tol(gt_d));
+
+    // The returned index must address the live point in our own storage:
+    float sx = 0;
+    float sy = 0;
+    float sz = 0;
+    map.getPointFast(id, sx, sy, sz);
+    ASSERT_NEAR_(sx, p.x, 1e-6f);
+    ASSERT_NEAR_(sy, p.y, 1e-6f);
+    ASSERT_NEAR_(sz, p.z, 1e-6f);
+  }
+
+  // 2) k-NN
+  {
+    std::vector<mrpt::math::TPoint3Df> res;
+    std::vector<float>                 dists;
+    std::vector<uint64_t>              ids;
+    map.nn_multiple_search(q, knn, res, dists, ids);
+
+    std::vector<mrpt::math::TPoint3Df> gt_res;
+    std::vector<float>                 gt_dists;
+    std::vector<uint64_t>              gt_ids;
+    ref.nn_multiple_search(q, knn, gt_res, gt_dists, gt_ids);
+
+    ASSERT_EQUAL_(res.size(), gt_res.size());
+    for (size_t k = 0; k < res.size(); k++)
+    {
+      ASSERT_NEAR_(dists[k], gt_dists[k], tol(gt_dists[k]));
+    }
+  }
+
+  // 3) radius search (unlimited count): same set of neighbors
+  {
+    std::vector<mrpt::math::TPoint3Df> res;
+    std::vector<float>                 dists;
+    std::vector<uint64_t>              ids;
+    map.nn_radius_search(q, radiusSqr, res, dists, ids, 0 /*maxPoints*/);
+
+    std::vector<mrpt::math::TPoint3Df> gt_res;
+    std::vector<float>                 gt_dists;
+    std::vector<uint64_t>              gt_ids;
+    ref.nn_radius_search(q, radiusSqr, gt_res, gt_dists, gt_ids, 0 /*maxPoints*/);
+
+    ASSERT_EQUAL_(res.size(), gt_res.size());
+
+    std::sort(dists.begin(), dists.end());
+    std::sort(gt_dists.begin(), gt_dists.end());
+    for (size_t k = 0; k < dists.size(); k++)
+    {
+      ASSERT_NEAR_(dists[k], gt_dists[k], tol(gt_dists[k]));
+    }
+  }
+}
+
+/// Selects the spatial index (a structural option, applied by compact()).
+void useIndex(mola::IncrementalPointCloud& map, mola::PointIndexType type, bool async = false)
+{
+  map.creationOptions.index_type    = type;
   map.creationOptions.async_rebuild = async;
-  map.compact();  // apply the structural option above
+  map.compact();
+}
+
+const char* indexName(mola::PointIndexType type, bool async)
+{
+  if (type == mola::PointIndexType::VoxelHash)
+  {
+    return "voxel hash";
+  }
+  return async ? "k-d tree, background rebuilds" : "k-d tree";
+}
+
+// -------------------------------------------------------------------------
+void test_queries_against_brute_force(mola::PointIndexType type, bool async)
+{
+  std::cout << "[brute force] " << indexName(type, async) << "\n";
+
+  mola::IncrementalPointCloud map;
+  useIndex(map, type, async);
   ASSERT_(map.isEmpty());
 
   // A first batch, then a trim, then a second batch: the index must be correct
@@ -115,74 +210,7 @@ void test_queries_against_brute_force(bool async)
         static_cast<float>(rng.drawUniform(-20.0, 20.0)),
         static_cast<float>(rng.drawUniform(-20.0, 20.0))};
 
-    // 1) single NN
-    {
-      mrpt::math::TPoint3Df p;
-      float                 d  = 0;
-      uint64_t              id = 0;
-      const bool            ok = map.nn_single_search(q, p, d, id);
-      mrpt::math::TPoint3Df gt_p;
-      float                 gt_d  = 0;
-      uint64_t              gt_id = 0;
-      const bool            gt_ok = ref->nn_single_search(q, gt_p, gt_d, gt_id);
-
-      ASSERT_EQUAL_(ok, gt_ok);
-      if (!ok) continue;
-
-      ASSERT_NEAR_(d, gt_d, 1e-4f);
-
-      // The returned index must address the live point in our own storage:
-      float sx = 0;
-      float sy = 0;
-      float sz = 0;
-      map.getPointFast(id, sx, sy, sz);
-      ASSERT_NEAR_(sx, p.x, 1e-6f);
-      ASSERT_NEAR_(sy, p.y, 1e-6f);
-      ASSERT_NEAR_(sz, p.z, 1e-6f);
-    }
-
-    // 2) k-NN
-    {
-      constexpr size_t                   knn = 5;
-      std::vector<mrpt::math::TPoint3Df> res;
-      std::vector<float>                 dists;
-      std::vector<uint64_t>              ids;
-      map.nn_multiple_search(q, knn, res, dists, ids);
-
-      std::vector<mrpt::math::TPoint3Df> gt_res;
-      std::vector<float>                 gt_dists;
-      std::vector<uint64_t>              gt_ids;
-      ref->nn_multiple_search(q, knn, gt_res, gt_dists, gt_ids);
-
-      ASSERT_EQUAL_(res.size(), gt_res.size());
-      for (size_t k = 0; k < res.size(); k++)
-      {
-        ASSERT_NEAR_(dists[k], gt_dists[k], 1e-4f);
-      }
-    }
-
-    // 3) radius search (unlimited count): same set of neighbors
-    {
-      constexpr float                    radiusSqr = 4.0f;
-      std::vector<mrpt::math::TPoint3Df> res;
-      std::vector<float>                 dists;
-      std::vector<uint64_t>              ids;
-      map.nn_radius_search(q, radiusSqr, res, dists, ids, 0 /*maxPoints*/);
-
-      std::vector<mrpt::math::TPoint3Df> gt_res;
-      std::vector<float>                 gt_dists;
-      std::vector<uint64_t>              gt_ids;
-      ref->nn_radius_search(q, radiusSqr, gt_res, gt_dists, gt_ids, 0 /*maxPoints*/);
-
-      ASSERT_EQUAL_(res.size(), gt_res.size());
-
-      std::sort(dists.begin(), dists.end());
-      std::sort(gt_dists.begin(), gt_dists.end());
-      for (size_t k = 0; k < dists.size(); k++)
-      {
-        ASSERT_NEAR_(dists[k], gt_dists[k], 1e-4f);
-      }
-    }
+    checkQueryAgainstReference(map, *ref, q, 4.0f);
   }
 }
 
@@ -447,6 +475,58 @@ void test_pairing_order_is_canonical()
 }
 
 // -------------------------------------------------------------------------
+// creationOptions.min_distance_between_points: an inserted point closer than
+// that to an existing one is dropped, the rest of the batch is kept.
+void test_min_distance_between_points()
+{
+  const auto makeObs = [](double dx)
+  {
+    auto pc = mrpt::maps::CSimplePointsMap::Create();
+    for (int ix = -10; ix <= 10; ix++)
+    {
+      for (int iy = -10; iy <= 10; iy++)
+      {
+        pc->insertPointFast(static_cast<float>(ix * 0.5 + dx), static_cast<float>(iy * 0.5), 0.f);
+      }
+    }
+    pc->mark_as_modified();
+    mrpt::obs::CObservationPointCloud obs;
+    obs.pointcloud = pc;
+    return obs;
+  };
+  const std::size_t nGrid = 21 * 21;
+
+  for (const double minDist : {0.0, 0.1})
+  {
+    mola::IncrementalPointCloud map;
+    map.creationOptions.min_distance_between_points = minDist;
+
+    map.insertObservation(makeObs(0.0));
+    ASSERT_EQUAL_(map.livePointCount(), nGrid);
+
+    // Every point within 0.05 m of an existing one:
+    map.insertObservation(makeObs(0.05));
+    ASSERT_EQUAL_(map.livePointCount(), minDist > 0 ? nGrid : 2 * nGrid);
+
+    // Every point farther than the threshold from the existing ones:
+    map.insertObservation(makeObs(0.25));
+    ASSERT_EQUAL_(map.livePointCount(), minDist > 0 ? 2 * nGrid : 3 * nGrid);
+
+    // The kept points are the right ones, and indexed:
+    float                 d  = 0;
+    uint64_t              id = 0;
+    mrpt::math::TPoint3Df nn;
+    ASSERT_(map.nn_single_search({0.25f, 0.f, 0.f}, nn, d, id));
+    ASSERT_NEAR_(d, 0.f, 1e-6f);
+    if (minDist > 0)
+    {
+      ASSERT_(map.nn_single_search({0.05f, 0.f, 0.f}, nn, d, id));
+      ASSERT_NEAR_(nn.x, 0.f, 1e-6f);
+    }
+  }
+}
+
+// -------------------------------------------------------------------------
 // Compares NN query results between two maps expected to hold the same set of
 // points (used by the k-d tree baking tests below).
 void assertSameNNResults(
@@ -489,6 +569,7 @@ void test_kdtree_bake_roundtrip_memory()
 {
   mola::IncrementalPointCloud map;
   map.creationOptions.serialize_kdtree = true;
+  useIndex(map, mola::PointIndexType::KDTree);  // the only one baking applies to
 
   insertPoints(map, *randomCloud(4000, {0, 0, 0}, 15.0));
   map.keepOnlyPointsNear({0, 0, 0}, 9.0);  // introduce tombstones before baking
@@ -535,7 +616,8 @@ void test_kdtree_bake_roundtrip_file()
 {
   mola::IncrementalPointCloud map;
   map.creationOptions.serialize_kdtree = true;
-  map.creationOptions.async_rebuild    = false;
+  useIndex(map, mola::PointIndexType::KDTree);  // the only one baking applies to
+  map.creationOptions.async_rebuild = false;
 
   insertPoints(map, *randomCloud(3000, {2, -1, 0}, 12.0));
 
@@ -568,6 +650,7 @@ void test_kdtree_bake_then_clear_and_reinsert()
 {
   mola::IncrementalPointCloud map;
   map.creationOptions.serialize_kdtree = true;
+  useIndex(map, mola::PointIndexType::KDTree);  // the only one baking applies to
   insertPoints(map, *randomCloud(1500, {0, 0, 0}, 10.0));
 
   mrpt::io::CMemoryStream buf;
@@ -627,6 +710,7 @@ void test_kdtree_bake_then_modify()
 {
   mola::IncrementalPointCloud map;
   map.creationOptions.serialize_kdtree = true;
+  useIndex(map, mola::PointIndexType::KDTree);  // the only one baking applies to
   insertPoints(map, *randomCloud(2500, {0, 0, 0}, 12.0));
 
   mrpt::io::CMemoryStream buf;
@@ -680,6 +764,7 @@ void test_kdtree_bake_then_modify()
 void test_kdtree_bake_disabled_by_default()
 {
   mola::IncrementalPointCloud map;
+  useIndex(map, mola::PointIndexType::KDTree);
   ASSERT_(!map.creationOptions.serialize_kdtree);
   insertPoints(map, *randomCloud(1000, {0, 0, 0}, 10.0));
 
@@ -738,11 +823,10 @@ void assertMatchesReference(
 // with the new coordinates. Since CPointsMap::changeCoordinatesReference() is
 // not virtual, this is checked both on the concrete type (intercepted right
 // away) and through a base-class pointer (only detectable on the next query).
-void test_change_coordinates_reference(bool viaBasePointer, bool async)
+void test_change_coordinates_reference(bool viaBasePointer, mola::PointIndexType type, bool async)
 {
   mola::IncrementalPointCloud map;
-  map.creationOptions.async_rebuild = async;
-  map.compact();  // apply the structural option above
+  useIndex(map, type, async);
 
   insertPoints(map, *randomCloud(3000, {0, 0, 0}, 20.0));
 
@@ -1203,26 +1287,33 @@ void test_base_class_remap_then_append()
 // no filter branch recognizes.
 void test_invalid_view_filter_mode_rejected()
 {
-  mrpt::io::CMemoryStream buf;
-  auto                    arch = mrpt::serialization::archiveFrom(buf);
-  mola::IncrementalPointCloud::TCreationOptions().writeToStream(arch);
+  // Offsets from the end of the stream: the index type byte is followed by the
+  // voxel size (v6), and the view filter mode byte by the angle, the minimum
+  // distance between points (v5) and those two.
+  constexpr size_t indexTypeFromEnd = sizeof(float) + 1;
+  constexpr size_t viewModeFromEnd  = indexTypeFromEnd + 2 * sizeof(double) + 1;
 
-  // The mode byte is the last field but one, the angle (a double):
-  const auto modeOffset = buf.getTotalBytesCount() - sizeof(double) - 1;
-  static_cast<uint8_t*>(buf.getRawBufferData())[modeOffset] = 3;
-  buf.Seek(0);
+  for (const size_t fromEnd : {viewModeFromEnd, indexTypeFromEnd})
+  {
+    mrpt::io::CMemoryStream buf;
+    auto                    arch = mrpt::serialization::archiveFrom(buf);
+    mola::IncrementalPointCloud::TCreationOptions().writeToStream(arch);
 
-  bool rejected = false;
-  try
-  {
-    mola::IncrementalPointCloud::TCreationOptions loaded;
-    loaded.readFromStream(arch);
+    static_cast<uint8_t*>(buf.getRawBufferData())[buf.getTotalBytesCount() - fromEnd] = 3;
+    buf.Seek(0);
+
+    bool rejected = false;
+    try
+    {
+      mola::IncrementalPointCloud::TCreationOptions loaded;
+      loaded.readFromStream(arch);
+    }
+    catch (const std::exception&)
+    {
+      rejected = true;
+    }
+    ASSERT_(rejected);
   }
-  catch (const std::exception&)
-  {
-    rejected = true;
-  }
-  ASSERT_(rejected);
 }
 
 /// Gives the tests access to the (protected) versioned serialization entry points.
@@ -1255,6 +1346,158 @@ void test_legacy_view_fields_dropped_on_load()
   ASSERT_(!reloaded.hasPointField("view_z"));
 }
 
+// -------------------------------------------------------------------------
+// Cases a voxel grid could get wrong, checked on every index: points exactly
+// on voxel boundaries and on both sides of the axis planes, queries far from
+// the map (whose nearest neighbor lies many voxels away), isolated points, and
+// radii covering the whole map.
+void test_index_edge_cases(mola::PointIndexType type, bool async)
+{
+  std::cout << "[edge cases] " << indexName(type, async) << "\n";
+
+  mola::IncrementalPointCloud map;
+  useIndex(map, type, async);
+
+  insertPoints(map, *randomCloud(500, {0, 0, 0}, 1.5));
+  for (int i = -2; i <= 2; i++)
+  {
+    for (int j = -2; j <= 2; j++)
+    {
+      for (int k = -2; k <= 2; k++)
+      {
+        map.insertPoint(static_cast<float>(i), static_cast<float>(j), static_cast<float>(k));
+      }
+    }
+  }
+  map.insertPoint(50.0f, -30.0f, 2.0f);
+  map.insertPoint(-200.0f, 10.0f, -5.0f);
+  map.insertPoint(0.0f, 0.0f, -1000.0f);
+
+  std::vector<mrpt::math::TPoint3Df> queries = {
+      {0.0f, 0.0f, 0.0f},          {-0.0f, -0.0f, -0.0f}, {1e-7f, -1e-7f, 1e-7f},
+      {-1.0f, -1.0f, -1.0f},       {0.5f, -0.5f, 0.0f},   {-2.5f, 2.5f, -2.5f},
+      {50.0f, -30.0f, 2.5f},       {-150.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -500.0f},
+      {5000.0f, 5000.0f, 5000.0f}, {-1e5f, 3.0f, -7.0f},  {0.0f, 2e6f, 0.0f}};
+  for (int i = 0; i < 100; i++)
+  {
+    queries.emplace_back(
+        static_cast<float>(rng.drawUniform(-300.0, 300.0)),
+        static_cast<float>(rng.drawUniform(-300.0, 300.0)),
+        static_cast<float>(rng.drawUniform(-300.0, 300.0)));
+  }
+
+  const auto ref = bruteForceReference(map);
+  for (const auto& q : queries)
+  {
+    checkQueryAgainstReference(map, *ref, q, 4.0f);
+    checkQueryAgainstReference(map, *ref, q, 1e8f /*all but the farthest*/, 50);
+  }
+}
+
+// -------------------------------------------------------------------------
+// A point the voxel index cannot bucket (more than 2^30 voxels away from the
+// origin) is left out of it, as a non-finite one is, without disturbing the
+// others; a query that far is still answered.
+void test_voxel_index_unindexable_points()
+{
+  mola::IncrementalPointCloud map;
+  ASSERT_(map.creationOptions.index_type == mola::PointIndexType::VoxelHash);
+
+  insertPoints(map, *randomCloud(300, {0, 0, 0}, 5.0));
+  map.insertPoint(1e15f, 0.0f, 0.0f);
+  ASSERT_EQUAL_(map.livePointCount(), 300UL);
+
+  const auto ref = bruteForceReference(map);
+  for (int i = 0; i < 50; i++)
+  {
+    const mrpt::math::TPoint3Df q = {
+        static_cast<float>(rng.drawUniform(-10.0, 10.0)),
+        static_cast<float>(rng.drawUniform(-10.0, 10.0)),
+        static_cast<float>(rng.drawUniform(-10.0, 10.0))};
+    checkQueryAgainstReference(map, *ref, q, 4.0f);
+  }
+  checkQueryAgainstReference(map, *ref, {1e15f, 0.0f, 0.0f}, 4.0f);
+}
+
+// -------------------------------------------------------------------------
+// index_type and index_voxel_size: defaults, loading, switching the index of a
+// populated map, and serialization.
+void test_index_options()
+{
+  mola::IncrementalPointCloud map;
+  ASSERT_(map.creationOptions.index_type == mola::PointIndexType::VoxelHash);
+  ASSERT_EQUAL_(map.creationOptions.index_voxel_size, 1.0f);
+
+  insertPoints(map, *randomCloud(1500, {0, 0, 0}, 10.0));
+  const auto ref = bruteForceReference(map);
+
+  const auto checkQueries = [&]()
+  {
+    ASSERT_EQUAL_(map.livePointCount(), 1500UL);
+    for (int i = 0; i < 50; i++)
+    {
+      const mrpt::math::TPoint3Df q = {
+          static_cast<float>(rng.drawUniform(-12.0, 12.0)),
+          static_cast<float>(rng.drawUniform(-12.0, 12.0)),
+          static_cast<float>(rng.drawUniform(-12.0, 12.0))};
+      checkQueryAgainstReference(map, *ref, q, 4.0f);
+    }
+  };
+
+  mrpt::config::CConfigFileMemory cfg;
+  cfg.write("creationOptions", "index_type", "PointIndexType::KDTree");
+  cfg.write("creationOptions", "index_voxel_size", "0.5");
+  ASSERT_(map.trySetCreationOptions(cfg, "creationOptions"));
+  ASSERT_(map.creationOptions.index_type == mola::PointIndexType::KDTree);
+  ASSERT_EQUAL_(map.creationOptions.index_voxel_size, 0.5f);
+  checkQueries();
+
+  cfg.write("creationOptions", "index_type", "PointIndexType::VoxelHash");
+  ASSERT_(map.trySetCreationOptions(cfg, "creationOptions"));
+  ASSERT_(map.creationOptions.index_type == mola::PointIndexType::VoxelHash);
+  checkQueries();
+
+  mrpt::io::CMemoryStream buf;
+  auto                    arch = mrpt::serialization::archiveFrom(buf);
+  arch << map;
+  buf.Seek(0);
+  mola::IncrementalPointCloud loaded;
+  arch >> loaded;
+  ASSERT_(loaded.creationOptions.index_type == mola::PointIndexType::VoxelHash);
+  ASSERT_EQUAL_(loaded.creationOptions.index_voxel_size, 0.5f);
+  assertSameNNResults(map, loaded, 100, 12.0);
+}
+
+// -------------------------------------------------------------------------
+// serialize_kdtree only applies to the k-d tree: a map using the voxel index
+// is written without a baked index, and loads as usual.
+void test_kdtree_bake_skipped_for_voxel_index()
+{
+  mola::IncrementalPointCloud map;
+  insertPoints(map, *randomCloud(2000, {0, 0, 0}, 10.0));
+
+  const auto bytesWritten = [&](bool bake)
+  {
+    map.creationOptions.serialize_kdtree = bake;
+    mrpt::io::CMemoryStream buf;
+    auto                    arch = mrpt::serialization::archiveFrom(buf);
+    arch << map;
+    return buf.getTotalBytesCount();
+  };
+  ASSERT_EQUAL_(bytesWritten(true), bytesWritten(false));
+
+  map.creationOptions.serialize_kdtree = true;
+  mrpt::io::CMemoryStream buf;
+  auto                    arch = mrpt::serialization::archiveFrom(buf);
+  arch << map;
+  buf.Seek(0);
+  mola::IncrementalPointCloud loaded;
+  arch >> loaded;
+  ASSERT_(loaded.creationOptions.index_type == mola::PointIndexType::VoxelHash);
+  ASSERT_(loaded.creationOptions.serialize_kdtree);
+  assertSameNNResults(map, loaded, 100, 10.0);
+}
+
 }  // namespace
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
@@ -1263,23 +1506,37 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
   {
     rng.randomize(1234U);
 
-    test_queries_against_brute_force(false /*sync index*/);
-    test_queries_against_brute_force(true /*background rebuilds*/);
+    test_queries_against_brute_force(mola::PointIndexType::VoxelHash, false);
+    test_queries_against_brute_force(mola::PointIndexType::KDTree, false /*sync index*/);
+    test_queries_against_brute_force(mola::PointIndexType::KDTree, true /*background rebuilds*/);
+    test_index_edge_cases(mola::PointIndexType::VoxelHash, false);
+    test_index_edge_cases(mola::PointIndexType::KDTree, false);
+    test_voxel_index_unindexable_points();
+    test_index_options();
+    test_kdtree_bake_skipped_for_voxel_index();
     test_bounded_memory_under_churn();
     test_serialization_and_copy();
     test_cov2cov();
     test_pairing_order_is_canonical();
+    test_min_distance_between_points();
     test_kdtree_bake_roundtrip_memory();
     test_kdtree_bake_roundtrip_file();
     test_kdtree_bake_then_clear_and_reinsert();
     test_kdtree_bake_then_modify();
     test_kdtree_bake_disabled_by_default();
-    test_change_coordinates_reference(false /*concrete type*/, false /*sync index*/);
-    test_change_coordinates_reference(false /*concrete type*/, true /*background rebuilds*/);
+    test_change_coordinates_reference(
+        false /*concrete type*/, mola::PointIndexType::VoxelHash, false);
+    test_change_coordinates_reference(
+        false /*concrete type*/, mola::PointIndexType::KDTree, false /*sync index*/);
+    test_change_coordinates_reference(
+        false /*concrete type*/, mola::PointIndexType::KDTree, true /*background rebuilds*/);
     // A base-class call cannot join a pending background rebuild before it
     // rewrites the coordinate buffers, so that combination is a data race by
     // construction and is deliberately not exercised here.
-    test_change_coordinates_reference(true /*base-class pointer*/, false /*sync index*/);
+    test_change_coordinates_reference(
+        true /*base-class pointer*/, mola::PointIndexType::VoxelHash, false);
+    test_change_coordinates_reference(
+        true /*base-class pointer*/, mola::PointIndexType::KDTree, false /*sync index*/);
     test_change_coordinates_reference_overloads();
     test_view_fields_in_map_frame();
     test_view_fields_in_recycled_slots();
