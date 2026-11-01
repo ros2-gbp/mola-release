@@ -31,6 +31,7 @@
 
 #include <mola_metric_maps/MatchingDistanceProfileCompat.h>
 #include <mola_metric_maps/OptionsCapable.h>
+#include <mola_metric_maps/PointIndexType.h>
 #include <mola_metric_maps/ViewDirectionFilter.h>
 #include <mp2p_icp/NearestPointWithCovCapable.h>
 #include <mrpt/config/CLoadableOptions.h>
@@ -54,14 +55,17 @@ class IncrementalKDTree;
 }
 
 /** A single-global-frame, sliding-window point map for LiDAR (inertial)
- *  odometry, backed by **one incremental, self-balancing nanoflann k-d tree**
- *  instead of a static tree rebuilt on every scan.
+ *  odometry, backed by **one incremental spatial index**, updated in place
+ *  instead of rebuilt on every scan: a hashed voxel grid by default, or an
+ *  incremental, self-balancing nanoflann k-d tree. See
+ *  `TCreationOptions::index_type`.
  *
  * ## Why
  * `mrpt::maps::CPointsMap` is a `mrpt::math::KDTreeCapable`: every insertion
  * marks the index dirty and the **entire** tree is rebuilt on the next query,
- * i.e. O(N log N) per scan. Here insertion is amortized O(log N) per point plus
- * bounded (optionally backgrounded) partial rebuilds.
+ * i.e. O(N log N) per scan. Here insertion is O(1) per point with the voxel
+ * index, or amortized O(log N) per point plus bounded (optionally
+ * backgrounded) partial rebuilds with the k-d tree.
  *
  * ## Role
  * This is the *odometry local map*, playing the same role as
@@ -82,22 +86,24 @@ class IncrementalKDTree;
  * toward the sensor, as produced by `mp2p_icp_filters::Generator`), they are
  * rotated along with the point coordinates by `insertObservation()` and by
  * `changeCoordinatesReference()`, so the stored ones are always expressed in
- * this map's frame. `insertAnotherMap()` called directly copies them verbatim,
- * as for any `CGenericPointsMap`, so a caller using that path must rotate them
- * itself (`mp2p_icp::rotateViewDirectionFields()`). A coordinate rewrite this
- * class cannot see (a non-virtual `CPointsMap` mutator called through a base
- * pointer) leaves their frame unknown, so they are zeroed when it is detected,
- * and a zero direction never rejects a pairing.
+ * this map's frame. `insertAnotherMap()` called directly treats them as for any
+ * `CGenericPointsMap`: it rotates them since MRPT 3.6.0, and copies them
+ * verbatim before that, so with older versions a caller using that path must
+ * rotate them itself (`mp2p_icp::rotateViewDirectionFields()`). A coordinate
+ * rewrite this class cannot see (a non-virtual `CPointsMap` mutator called
+ * through a base pointer) leaves their frame unknown, so they are zeroed when
+ * it is detected, and a zero direction never rejects a pairing.
  *
  * ## Not for loop closure
- * A single global tree cannot cheaply absorb a global SE(3) re-map: every
+ * A single global index cannot cheaply absorb a global SE(3) re-map: every
  * coordinate moves, forcing a full rebuild and a full covariance recompute. For
  * loop-closing maps use `mola::KeyframePointCloudMap`, which keeps points in
  * per-keyframe local frames.
  *
  * ## Point indices are storage slots
- * Removal from the tree is lazy (tombstones reclaimed by later rebuilds), and
- * reclaimed slots are recycled by subsequent insertions to keep memory bounded.
+ * Removed points free their slots right away with the voxel index, or lazily
+ * with the k-d tree (tombstones reclaimed by later rebuilds), and freed slots
+ * are recycled by subsequent insertions to keep memory bounded.
  * As a consequence, the inherited `size()` reports the **storage** size (live,
  * plus reclaimed-but-not-yet-reused, plus not-yet-reclaimed slots); use
  * `livePointCount()` for the number of points actually in the map, or
@@ -109,9 +115,9 @@ class IncrementalKDTree;
  * Reclaimed slots are blanked to NaN rather than left holding the evicted
  * point's coordinates, so that generic code walking the inherited `CPointsMap`
  * buffers (notably `insertAnotherMap()`, used to copy map layers out for
- * publishing/visualization) does not resurrect long-evicted geometry. Slots of
- * points that are tombstoned but not reclaimed yet do still hold their
- * coordinates; that fraction is bounded by
+ * publishing/visualization) does not resurrect long-evicted geometry. With the
+ * k-d tree, slots of points that are tombstoned but not reclaimed yet do still
+ * hold their coordinates; that fraction is bounded by
  * `TCreationOptions::alpha_deleted`.
  *
  * ## The inherited static k-d tree is disabled
@@ -307,11 +313,11 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
    *  `likelihoodOptions` and `renderOptions` groups inherited from
    *  `mrpt::maps::CPointsMap` apply as usual.
    *
-   *  Changing any of the k-d tree parameters (`async_rebuild`, `alpha_*`,
-   *  `reserve_points`) on an already-populated map is fine:
-   *  `trySetCreationOptions()` compacts and rebuilds the index with the new
-   *  values, so no point is lost, but the point indices previously returned by
-   *  the `nn_*` methods are invalidated. \sa compact()
+   *  Changing any of the index parameters (`index_type`, `index_voxel_size`,
+   *  `async_rebuild`, `alpha_*`, `reserve_points`) on an already-populated map
+   *  is fine: `trySetCreationOptions()` compacts and rebuilds the index with
+   *  the new values, so no point is lost, but the point indices previously
+   *  returned by the `nn_*` methods are invalidated. \sa compact()
    */
   struct TCreationOptions : public mrpt::config::CLoadableOptions
   {
@@ -332,7 +338,39 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
      */
     double remove_points_farther_than = .0;
 
-    /** Perform the k-d tree balancing rebuilds on a background thread. Bounds
+    /** If !=0, an inserted point closer than this distance [m] to a point
+     *  already in the map is dropped, which caps the map density where scans
+     *  overlap (in LO, almost everywhere). Points inserted in the same batch
+     *  are not compared with each other. 0 (default) keeps every point.
+     */
+    double min_distance_between_points = .0;
+
+    /** The spatial index answering every nearest-neighbor query (ICP matching,
+     *  covariance estimation, the `nn_*` methods). Both are exact, returning
+     *  the same neighbor distances (they may only pick different points
+     *  among exactly equidistant ones):
+     *  - `VoxelHash` (default): points bucketed in a hashed grid of
+     *    `index_voxel_size` voxels, searched ring by ring around the query.
+     *    O(1) insertion and removal per point and no rebuilds, so no latency
+     *    spikes and no background thread, and results are deterministic. In
+     *    LiDAR odometry on KITTI-07 it took the mean time per scan from 75 to
+     *    56 ms and the worst map update from 131 to 30 ms, against the k-d
+     *    tree with background rebuilds, at the same accuracy.
+     *  - `KDTree`: incremental nanoflann k-d tree, tuned by `async_rebuild`,
+     *    `alpha_balance` and `alpha_deleted`, which only apply to it, as does
+     *    `serialize_kdtree`.
+     */
+    PointIndexType index_type = PointIndexType::VoxelHash;
+
+    /** Voxel side [m] of the `VoxelHash` index. Results are exact for any
+     *  value; it only trades the number of voxels a query visits against the
+     *  number of points it scans in each, so it is best near the typical
+     *  nearest-neighbor distance of the queries. On KITTI, 1.0 m was faster
+     *  than 0.5 m and 1.5 m.
+     */
+    float index_voxel_size = 1.0f;
+
+    /** k-d tree only: perform the balancing rebuilds on a background thread. Bounds
      *  the mapping-thread tail latency (on a LiDAR-odometry local map this
      *  turns ~300 ms insertion spikes into a flat ~10 ms), at the cost of
      *  roughly twice the index memory.
@@ -346,13 +384,13 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
      */
     bool async_rebuild = false;
 
-    /** Weight-balance rebuild threshold: a subtree is rebuilt when its larger
+    /** k-d tree only: weight-balance rebuild threshold. A subtree is rebuilt when its larger
      *  child holds more than this fraction of its points. Lower keeps queries
      *  faster and rebuilds more frequent.
      */
     float alpha_balance = 0.75f;
 
-    /** Tombstone rebuild threshold: a subtree is rebuilt, physically dropping
+    /** k-d tree only: tombstone rebuild threshold. A subtree is rebuilt, physically dropping
      *  removed points, once this fraction of it is dead.
      */
     float alpha_deleted = 0.5f;
@@ -378,16 +416,17 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
 
     /** Minimum number of neighbors that must have been found for a computed
      *  per-point covariance to be stored in the cache. A point whose
-     *  neighborhood was still too thin is left uncached and recomputed on the
-     *  next query, by which time the map may have densified around it, so an
-     *  unreliable estimate (in particular the isotropic fallback) is never
-     *  frozen for the whole life of the point.
+     *  neighborhood was still too thin keeps its estimate only until the map
+     *  content changes (e.g. across the iterations of one ICP call), and is
+     *  recomputed after that, by which time the map may have densified around
+     *  it, so an unreliable estimate (in particular the isotropic fallback) is
+     *  never frozen for the whole life of the point.
      *
      *  0 (default) means `k_correspondences_for_cov`, i.e. only a full
      *  neighborhood is trusted. 1 caches every result, which is cheapest but
      *  never revisits an early estimate. A value above
-     *  `k_correspondences_for_cov` can never be met, which disables the cache
-     *  altogether: every query is then exact, at a large cost.
+     *  `k_correspondences_for_cov` can never be met, so every estimate is then
+     *  recomputed after each change of the map, at a large cost.
      *
      *  @note Eviction is not covered: a point that was already well populated
      *  keeps its covariance when its neighbors are trimmed away.
@@ -442,7 +481,8 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
      */
     double max_view_angle_deg = 120.0;
 
-    /** If `true`, the k-d tree index is serialized alongside the points (see
+    /** k-d tree only (with `VoxelHash`, rebuilt in linear time on load, there
+     *  is nothing to cache). If `true`, the k-d tree index is serialized alongside the points (see
      *  `IncrementalPointCloud` serialization), so it does NOT have to be
      *  rebuilt (an O(N log N) bulk build) when the map is loaded. Requires an
      *  MRPT/nanoflann build providing the incremental index's save/load API
@@ -518,7 +558,13 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
 
   /// Per-point, plane-regularized covariance cache, in this map's frame.
   mutable std::vector<mrpt::math::CMatrixFloat33> cov_;
-  mutable std::vector<uint8_t>                    cov_valid_;
+  /// One of the COV_* states, see IncrementalPointCloud.cpp.
+  mutable std::vector<uint8_t> cov_valid_;
+
+  /// Slots holding a provisional covariance (one too thin to be cached for
+  /// good), valid only while the index content version stays the same.
+  mutable std::vector<uint32_t> provisional_cov_slots_;
+  mutable uint64_t              provisional_cov_version_ = 0;
 
   /// Diagnostics only: how many times a point covariance has been estimated.
   mutable std::atomic<uint64_t> cov_computations_{0};
@@ -600,6 +646,11 @@ class IncrementalPointCloud : public mrpt::maps::CGenericPointsMap,
    *  never write to the same cache entry.
    */
   void ensureCovariancesFor(const std::vector<uint32_t>& slots) const;
+
+  /** Drops the points appended from `firstAppended` on (not indexed yet) that
+   *  lie closer than `min_distance_between_points` to an indexed point.
+   */
+  void dropAppendedPointsNearExisting(std::size_t firstAppended);
 };
 
 }  // namespace mola
