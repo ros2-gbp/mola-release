@@ -88,11 +88,14 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
 {
   DEFINE_SERIALIZABLE(KeyframePointCloudMap, mola)
  public:
-  // Prevent copying and moving
-  KeyframePointCloudMap(const KeyframePointCloudMap&)            = default;
-  KeyframePointCloudMap& operator=(const KeyframePointCloudMap&) = default;
-  KeyframePointCloudMap(KeyframePointCloudMap&&)                 = default;
-  KeyframePointCloudMap& operator=(KeyframePointCloudMap&&)      = default;
+  /** Copies take the source's internal mutex, so a map can be copied while
+   *  another thread uses it (e.g. ICP preparing its search submap). */
+  KeyframePointCloudMap(const KeyframePointCloudMap& o);
+  KeyframePointCloudMap& operator=(const KeyframePointCloudMap& o);
+
+  /** Moves are not synchronized: the source must not be in use elsewhere. */
+  KeyframePointCloudMap(KeyframePointCloudMap&&)            = default;
+  KeyframePointCloudMap& operator=(KeyframePointCloudMap&&) = default;
 
   /** @name Basic API for construction and main parameters
    *  @{ */
@@ -260,6 +263,14 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   /// Returns a cached point cloud view of the entire map.
   /// Not efficient at all. Only for MOLA->ROS2 bridge.
   const mrpt::maps::CSimplePointsMap* getAsSimplePointsMap() const;
+
+#if defined(MRPT_HAS_METRIC_MAP_POINTS_VIEW)
+  /// Makes the contents above reachable via mrpt::maps::asPointsMap().
+  [[nodiscard]] const mrpt::maps::CPointsMap* asPointsMapView() const override
+  {
+    return getAsSimplePointsMap();
+  }
+#endif
 
   /** @} */
 
@@ -504,12 +515,15 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  Contract: the "view_x/y/z" fields stored in a keyframe's point cloud
      *  (`KeyFrame::pointcloud_`) MUST be expressed in the *local KF frame*,
      *  not in the global/map frame. `KeyFrame::updatePointsGlobal()` rotates
-     *  them to the global frame using `mp2p_icp::rotateViewDirectionFields()`
-     *  (see `mp2p_icp/pointcloud_field_utils.h`). Any code that inserts
+     *  them to the global frame (`insertAnotherMap()` does since MRPT 3.6.0;
+     *  before it, `mp2p_icp::rotateViewDirectionFields()`, see
+     *  `mp2p_icp/pointcloud_field_utils.h`). Any code that inserts
      *  points carrying these fields into a keyframe (e.g.
-     *  `mp2p_icp_filters::FilterMerge`) must call the same helper to rotate
-     *  the fields alongside the point coordinates, or this filter will
-     *  silently compare vectors expressed in inconsistent frames.
+     *  `mp2p_icp_filters::FilterMerge`) must rotate the fields alongside the
+     *  point coordinates exactly once: `insertAnotherMap()` already does it
+     *  since MRPT 3.6.0, older versions need that helper. Rotating them twice,
+     *  or not at all, makes this filter silently compare vectors expressed in
+     *  inconsistent frames.
      *
      *  Same option as in `IncrementalPointCloud`, so a pipeline configuring
      *  both classes from one block of options switches both at once.
