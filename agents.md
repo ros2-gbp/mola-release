@@ -12,7 +12,7 @@
 **Maintainer**: Jose Luis Blanco-Claraco
 **License**: GPL-3.0 (core) and BSD-3-Clause (utilities, bridge, demos)
 **Commercial use**: requires a commercial license, see [Licensing](#licensing-commercial-use-requires-a-license) below
-**Current Version**: 3.2.0
+**Current Version**: 3.5.0
 **Official Docs**: https://docs.mola-slam.org/latest/
 
 **Important**: Whenever a change is made to the repo, reflect it here if applicable, to keep it in sync with the code.
@@ -69,7 +69,7 @@ mola_viz/                      # GUI visualization, nanogui backend (`MolaViz`)
 mola_viz_imgui/                # GUI visualization, Dear ImGui + ImPlot backend (`MolaVizImGui`)
 
 # Data Input Sources (RawDataSource implementations)
-mola_input_rosbag2/            # ROS 2 bag file player
+mola_input_rosbag2/            # ROS 2 bag file player (RGB-D: CObservation3DRangeScan from depth+intensity+camera_info)
 mola_input_rawlog/             # MRPT rawlog binary format
 mola_input_video/              # Live/offline video sources (OpenCV)
 mola_input_lidar_bin_dataset/  # Generic binary LiDAR format
@@ -133,7 +133,12 @@ All plugin modules derive from these virtual base classes:
   menu (with "Quit", which requests full application shutdown), the "View"
   menu, plus any module-installed `set_menu_bar()` menus) can be turned off
   entirely via `menu_bar_enabled` (default `true`); existing plot/console
-  windows keep working when it is disabled. `output_console_message()` (the
+  windows keep working when it is disabled. If an `OfflineDatasetSource`
+  module reports a ground-truth trajectory (e.g. `ground_truth_tum_file` in
+  the rosbag1/rosbag2 inputs), `mola_viz_imgui` draws it once (magenta line,
+  XYZ corners every `ground_truth_corner_spacing` m, default 10, axis length
+  `ground_truth_corner_scale`) with a "Ground truth" toggle in the "View"
+  menu. `output_console_message()` (the
   older fading on-screen text overlay) is a no-op on the `mola_viz_imgui`
   backend, superseded by the Console subwindow above; still implemented on
   the nanogui `MolaViz` backend.
@@ -176,6 +181,19 @@ All plugin modules derive from these virtual base classes:
   `requestInsertKeyframe()`, decoupled from their own local map/odometry
   frame. Detected via `findService<>()` the same way as `NavStateFilter`,
   but optional.
+- `ImuBiasSource`: per-IMU (sensor label) gyroscope/accelerometer bias
+  estimates with covariances, from a provider (e.g. a state estimator) to any
+  consumer (e.g. LIO deskew): query `imu_bias(label, t)` from any thread, or
+  subscribe to updates (callbacks run without its lock held). Providers implement
+  `imu_bias_sensor_labels()` and `imu_bias_impl()` and call
+  `advertise_updated_imu_bias()`. Optional, found via `findService<>()`; detect
+  the header with `__has_include`.
+- `LocalMapCorrectionSource`: a global mapper tells front ends that keyframe
+  poses changed (small `LocalMapCorrection` event, e.g. after loop closures);
+  the front end then pulls `local_map_keyframes(reference, radius)`: keyframes
+  near one of its own, with poses relative to it, plus their raw observations, to
+  rebuild its local map anchored at its own pose. Same subscription rules and
+  `__has_include` detection as `ImuBiasSource`.
 
 Other key types:
 - `GuiWidgetDescription` — descriptor for GUI widget creation (backend-agnostic)
@@ -188,6 +206,14 @@ to add items to the imported list), and the `$define` map directive (binds `${NA
 it appears in, including sibling `$import`ed files; priority `env > $define > |default`),
 C++17 filesystem.
 Tests: `mola_yaml/tests/test-yaml-parser.cpp`
+
+### Keyframe observations from bags (`mola_kernel/utils/simplemap_attach_observations.h`)
+`simplemap_attach_observations()` adds observations of any `OfflineDatasetSource` to the
+keyframes of a simplemap (nearest keyframe of each one, nearest one per keyframe; images
+written as jpg/png to `<output>_Images/`, as a new observation since `CImage` copies are
+shallow). CLIs: `mola-sm-attach-from-rosbag2` (`mola_input_rosbag2`) and
+`mola-sm-attach-from-rosbag1` (`mola_input_rosbag1` repo). `BridgeROS2` subscribes to
+`sensor_msgs/Image` (`msg_type: Image`; Bayer encodings demosaiced).
 
 ### `mola_launcher` — CLI Entry Point
 - **`mola-cli`**: main executable, takes YAML config, loads and orchestrates modules
@@ -256,6 +282,13 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
 `mola::OccGrid` (super-resolution occupancy grid), `mola::HashedVoxelPointCloud`,
 `mola::SparseVoxelPointCloud`, `mola::SparseTreesPointCloud`, `mola::NDT`,
 `mola::TSDF`, `mola::KeyframePointCloudMap`, `mola::IncrementalPointCloud`.
+
+- `insertObservation()` follows MRPT: points of point clouds, Velodyne scans and
+  `points3D_*` are in the **sensor** frame, placed at `robotPose + sensorPose`;
+  TSDF/NDT use the sensor position as ray origin. `KeyframePointCloudMap` keeps
+  KF poses as robot poses and moves the cloud to the robot frame instead.
+  Pipelines (`FilterMerge`) insert robot-frame clouds with an identity `sensorPose`.
+  Tests: `tests/test-sensor-pose-insertion.cpp`.
 
 - `TSDF` (new 2026): voxel-hashed truncated signed distance field. Each measured
   point writes a signed distance **along its own ray** into the voxels of a
@@ -595,6 +628,35 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   `localmap-gicp.yaml` exposes them as `MOLA_LOCALMAP_USE_VIEW_DIRECTION_FILTER`,
   `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER` (empty = each class's default) and
   `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER_ANGLE_DEG`.
+- Dependencies: MRPT and `mp2p_icp_map` only, **not** `mola_kernel`, so the library (and
+  the `mola-metric-maps` pip wheel) stands alone; keep it so. CMake options
+  `MOLA_METRIC_MAPS_BUILD_{APPS,TESTING,PYTHON}` (default ON) let a superbuild skip parts.
+- Python bindings (`python/`): extension `mola_metric_maps._core` (pybind11, `src/`) plus
+  the pure Python package `mola_metric_maps`, built only if pybind11 is found, installed
+  into `lib/pythonX.Y/site-packages` (override: `MOLA_METRIC_MAPS_PYTHON_INSTALL_DIR`).
+  Tests: `tests/` (pytest, ctest `python_mola_metric_maps`). Docs:
+  `docs/source/mola_metric_maps_python.rst`. Rules:
+  - Classes derive from the types registered by the `mrpt` Python modules (`CMetricMap`,
+    `CGenericPointsMap`, `CSerializable`, `CLoadableOptions`, shared_ptr holders), and
+    `_core`/`__init__.py` import `mrpt.*` and `mp2p_icp` first (`PlanePatch` is returned).
+    Same pybind11 as MRPT's bindings, or types are not shared.
+  - Linking `_core` to the library loads it on import, which registers the classes: then
+    `mp2p_icp.MetricMap.from_file()` needs no `load_plugins()` and returns the real classes.
+  - `creationOptions` returns a copy; assigning it goes through
+    `trySetCreationOptions(const TCreationOptions&)` (raises if refused). The other option
+    groups are live references. `ViewDirectionFilter.None` is `None_` in Python.
+  - `insertPointCloud()` builds a `CObservationPointCloud` with the points in the **robot**
+    frame and an identity `sensorPose`, so TSDF/NDT use the robot position as ray origin.
+  - After changing bindings, regenerate `mola_metric_maps/_core.pyi` with
+    `scripts/generate_stubs.py`.
+- pip wheel `mola-metric-maps` (`packaging/pip/`, read its `README-dev.md`): a
+  scikit-build-core superbuild of only this package, against the C++ SDKs of the `mp2p-icp`
+  wheel (`mp2p_icp_map`, `mola_common`) and the `mrpt3` one (MRPT, nanoflann, oneTBB).
+  `_core` and `libmola_metric_maps.so` go into `site-packages/mola_metric_maps/`, with a
+  RUNPATH to both SDK lib dirs; `libmp2p_icp*`, `libmrpt_*` and `libtbb` are never bundled.
+  Requires `mp2p-icp`/`mrpt3` of the minor series it was built against. CI:
+  `.github/workflows/python-wheels.yml`, uploaded to PyPI on release tags (the pinned
+  mp2p-icp must be published first).
 
 ### Feature macros
 
@@ -609,6 +671,8 @@ Guard with `#if defined(...)`, never with a version check.
 | `MOLA_KERNEL_DATASET_UI_HAS_ENABLED` | `interfaces/Dataset_UI.h` | `datasetUI_enabled()` |
 | `MOLA_KERNEL_NAVSTATE_FILTER_HAS_GEO_REFERENCE` | `interfaces/NavStateFilter.h` | geo-reference accessor |
 | `MOLA_KERNEL_NAVSTATE_FILTER_HAS_TRANSFORM_FRAME` | `interfaces/NavStateFilter.h` | `transform_frame()` |
+| `MOLA_KERNEL_NAVSTATE_FILTER_HAS_FUSE_POSE_DEFERRED` | `interfaces/NavStateFilter.h` | `fuse_pose_deferred()`: a pose whose covariance is a future |
+| `MOLA_KERNEL_NAVSTATE_FILTER_HAS_RESET_MOTION` | `interfaces/NavStateFilter.h` | `reset_motion()`: a reset that keeps the reference frames (default: `reset()`, enough for an estimator whose `reset()` never redefines them) |
 | `MOLA_METRIC_MAPS_HAS_INCREMENTAL_POINT_CLOUD` | CMake (PUBLIC) | `IncrementalPointCloud` is functional (nanoflann >= 1.10) |
 | `MOLA_METRIC_MAPS_HAS_INCREMENTAL_KDTREE_BAKE` | CMake (PUBLIC) | incremental k-d tree save/load (nanoflann >= 1.11) |
 | `MOLA_MM_HAS_RKNN_SEARCH` | `mola_metric_maps` sources | MRPT's radius-limited kNN overload is usable (nanoflann >= 1.5.1) |
@@ -661,7 +725,7 @@ colcon build --symlink-install
 - CI/CD, three workflows: `check-clang-format.yml` (style),
   `check-docs.yml` (see "Documentation Build" below), and `build-ros.yml`:
   Humble and Jazzy, each as a `stable` (released debs) and a `testing` (`ros2-testing`) variant, on
-  GitHub-hosted x86_64 and self-hosted arm64; Rolling entries exist
+  GitHub-hosted x86_64 and arm64 (`ubuntu-24.04-arm`); Rolling entries exist
   commented-out. `rosdep install` runs twice when the first pass fails: the
   retry skips the optional keys (`nanoflann_vendor`, `gps_msgs`), which are not
   published on every channel yet, so the build still runs there; anything else
@@ -669,8 +733,8 @@ colcon build --symlink-install
 - Style: enforced with `.clang-format` and `.clang-tidy`
 
 Test coverage exists for: `mola_yaml`, `mola_metric_maps` (11 test binaries, the
-bulk of the suite), `mola_pose_list`, `mola_relocalization`, `mola_kernel`
-(diagnostics provider).
+bulk of the suite, plus pytest tests of its Python bindings), `mola_pose_list`,
+`mola_relocalization`, `mola_kernel` (diagnostics provider).
 
 ---
 
@@ -773,6 +837,12 @@ pipeline it selects). They are **not committed** -- edit the profile, not a page
 generator and fails the build on structural breakage (missing include, dangling
 reference, unreachable page). Sibling repos call it via `workflow_call` so their
 own PRs are checked against the real doc set.
+
+**Sensors and datasets page** (`docs/source/supported-sensors.rst`): its
+launcher tables are hand-written and must list every `mola-lo-{gui,cli}-*`
+wrapper in `mola_lidar_odometry/scripts/`. Update it in the same change that
+adds, renames or removes a wrapper (see "Dataset wrappers" in
+`mola_lidar_odometry/agents.md`).
 
 **Consequence**: do not remove toctree entries from `docs/source/modules.rst` (or
 other `.rst` files) just because a package moved to a different repo — the entry will
