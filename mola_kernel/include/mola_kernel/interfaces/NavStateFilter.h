@@ -31,6 +31,7 @@
 #include <mrpt/system/COutputLogger.h>
 #include <mrpt/topography/data_types.h>
 
+#include <future>
 #include <set>
 #include <string>
 
@@ -103,7 +104,8 @@ class NavStateFilter : public mola::ExecutableBase, public RawDataConsumer
   /** Integrates new GNSS observations into the estimator */
   virtual void fuse_gnss(const mrpt::obs::CObservationGPS& gps) = 0;
 
-  /** Integrates new twist estimation (in the odom frame) */
+  /** Integrates new twist estimation, given in the local vehicle frame like
+   *  NavState::twist, with `twistCov` in the order [vx vy vz wx wy wz]. */
   virtual void fuse_twist(
       const mrpt::Clock::time_point& timestamp, const mrpt::math::TTwist3D& twist,
       const mrpt::math::CMatrixDouble66& twistCov) = 0;
@@ -179,6 +181,37 @@ class NavStateFilter : public mola::ExecutableBase, public RawDataConsumer
     return false;  // Default: not implemented.
   }
 
+  /** (Optional virtual method) Like fuse_pose(), for a pose whose covariance
+   *  is still being computed elsewhere (e.g. by a worker thread of the front
+   *  end), so the caller does not have to wait for it. `cov` becomes ready
+   *  later, in the parameterization of mrpt::poses::CPose3DPDFGaussian::cov.
+   *
+   *  Estimators that process measurements asynchronously should override this
+   *  to wait for `cov` off the caller's thread. The default waits for it here
+   *  and calls fuse_pose().
+   */
+  virtual void fuse_pose_deferred(
+      const mrpt::Clock::time_point& timestamp, const mrpt::poses::CPose3D& mean,
+      const std::shared_future<mrpt::math::CMatrixDouble66>& cov, const std::string& frame_id)
+  {
+    fuse_pose(timestamp, mrpt::poses::CPose3DPDFGaussian(mean, cov.get()), frame_id);
+  }
+
+  /** (Optional virtual method) Forgets the motion state (velocities and
+   *  recent poses; estimator-tracked sensor biases may be kept, as with
+   *  reset()), e.g. after its prediction proved implausible, but keeps the
+   *  reference frames: {map}, each odometry frame, the gravity (ENU) alignment
+   *  and the geo-reference datum. The poses fused next continue in the same
+   *  frames as before. reset(), instead, starts from scratch: the next poses
+   *  may define the frames again, as needed after a re-localization.
+   *
+   *  The default calls reset(). An estimator whose reset() redefines frames
+   *  (e.g. anchors {map} to the next pose, or levels gravity again) must
+   *  override it to keep them. Inputs still pending at the call may be
+   *  dropped. Callable from any thread, like reset() and the fuse_*() methods.
+   */
+  virtual void reset_motion() { reset(); }
+
  private:
   /// A list of one or multiple MOLA **module names** to which to subscribe
   std::set<std::string> navstate_source_names_;
@@ -191,5 +224,13 @@ class NavStateFilter : public mola::ExecutableBase, public RawDataConsumer
 /// Can be used to detect the existence of the transform_frame() method, which
 /// re-expresses the estimator state in a new reference frame.
 #define MOLA_KERNEL_NAVSTATE_FILTER_HAS_TRANSFORM_FRAME
+
+/// Can be used to detect the existence of the fuse_pose_deferred() method, for
+/// a pose whose covariance becomes ready later.
+#define MOLA_KERNEL_NAVSTATE_FILTER_HAS_FUSE_POSE_DEFERRED
+
+/// Can be used to detect the existence of the reset_motion() method, a reset
+/// that keeps the reference frames (see its docs).
+#define MOLA_KERNEL_NAVSTATE_FILTER_HAS_RESET_MOTION
 
 }  // namespace mola
