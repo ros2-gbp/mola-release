@@ -20,6 +20,7 @@ Viewer
    :maxdepth: 1
 
    app_mm-viewer
+   app_mm-render
 
 |
 
@@ -44,6 +45,7 @@ Import / export
    app_mm2ply
    app_mm2txt
    app_mm2grid
+   app_mm2kml
    app_txt2mm
    app_kitti2mm
 
@@ -66,3 +68,12 @@ ICP tools
 
    app_icp-log-viewer
    app_icp-run
+
+|
+
+Python
+-------
+.. toctree::
+   :maxdepth: 1
+
+   mola_metric_maps_python

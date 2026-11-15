@@ -365,10 +365,12 @@ bool SparseTreesPointCloud::internal_insertObservation(
     // Empty point set, or load from XYZ in observation:
     if (o.hasPoints3D)
     {
+      // points3D_* are in the sensor frame:
+      const auto sensorPose3D = robotPose3D + o.sensorPose;
       for (size_t i = 0; i < o.points3D_x.size(); i++)
       {
         this->insertPoint(
-            robotPose3D.composePoint({o.points3D_x[i], o.points3D_y[i], o.points3D_z[i]}));
+            sensorPose3D.composePoint({o.points3D_x[i], o.points3D_y[i], o.points3D_z[i]}));
       }
 
       return true;
@@ -404,9 +406,10 @@ bool SparseTreesPointCloud::internal_insertObservation(
       const_cast<CObservationVelodyneScan&>(o).generatePointCloud();
     }
 
+    // point_cloud is in the sensor frame:
     internal_insertPointCloud3D(
-        robotPose3D, o.point_cloud.x.data(), o.point_cloud.y.data(), o.point_cloud.z.data(),
-        o.point_cloud.x.size());
+        robotPose3D + o.sensorPose, o.point_cloud.x.data(), o.point_cloud.y.data(),
+        o.point_cloud.z.data(), o.point_cloud.x.size());
 
     return true;
   }
@@ -420,7 +423,9 @@ bool SparseTreesPointCloud::internal_insertObservation(
     const auto& ys = o.pointcloud->getPointsBufferRef_y();
     const auto& zs = o.pointcloud->getPointsBufferRef_z();
 
-    internal_insertPointCloud3D(robotPose3D, xs.data(), ys.data(), zs.data(), xs.size());
+    // The cloud is in the sensor frame:
+    internal_insertPointCloud3D(
+        robotPose3D + o.sensorPose, xs.data(), ys.data(), zs.data(), xs.size());
 
     return true;
   }
@@ -440,10 +445,8 @@ double SparseTreesPointCloud::internal_computeObservationLikelihood(
   using namespace mrpt::poses;
   using namespace mrpt::maps;
 
-  if (isEmpty())
-  {
-    return 0;
-  }
+  // An empty map is not an early exit: every point of a scan is then
+  // unmatched, the worst score, so it never beats a partially matching map.
 
   // This function depends on the observation type:
   // -----------------------------------------------------
@@ -541,10 +544,11 @@ double SparseTreesPointCloud::internal_computeObservationLikelihoodPointCloud3D(
     // position:
     const auto gPt = pc_in_map.composePoint({xs[i], ys[i], zs[i]});
 
+    // A point with no map point nearby is the worst match, not a perfect one:
     const bool found = nn_single_search(gPt, closest, closest_err, closest_id);
     if (!found)
     {
-      continue;
+      closest_err = max_sqr_err;
     }
 
     // Put a limit:
@@ -605,7 +609,11 @@ bool SparseTreesPointCloud::trySetCreationOptions(
 {
   TCreationOptions newOpts = creationOptions;
   newOpts.loadFromConfigFile(cfg, section);
+  return trySetCreationOptions(newOpts);
+}
 
+bool SparseTreesPointCloud::trySetCreationOptions(const TCreationOptions& newOpts)
+{
   if (newOpts.grid_size != creationOptions.grid_size)
   {
     if (!isEmpty())

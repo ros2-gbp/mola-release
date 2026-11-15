@@ -51,9 +51,10 @@ namespace mola
  *
  * ## Input
  * The caller inserts `mrpt::obs::CObservationPointCloud` observations, with
- * points already expressed in the vehicle `base_link` frame and already motion
- * compensated (deskewed). This is typically produced by an `mp2p_icp::Generator`
- * plus optional filter pipeline.
+ * points already motion compensated (deskewed). This is typically produced by
+ * an `mp2p_icp::Generator` plus optional filter pipeline. As in MRPT, points are
+ * in the sensor frame, placed on the vehicle by the observation `sensorPose`;
+ * keyframes store them in the vehicle `base_link` frame.
  *
  * ## Per-keyframe data
  * Each `KeyFrame` holds:
@@ -484,7 +485,8 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
      *  actually produced, so a sparse or rough neighborhood carries less
      *  information than a dense flat one instead of the same amount; the
      *  magnitude of the value is then a floor on the smaller eigenvalues,
-     *  relative to the largest one. Note that the two regimes are not on the
+     *  relative to the largest one, and never below 1e-5 so the matrix stays
+     *  invertible in single precision. Note that the two regimes are not on the
      *  same scale, since kept eigenvalues carry squared metric units, so a
      *  matching threshold or robust kernel tuned against one does not
      *  transfer to the other.
@@ -614,6 +616,10 @@ class KeyframePointCloudMap : public mrpt::maps::CMetricMap,
   [[nodiscard]] std::map<std::string, mrpt::config::CLoadableOptions*> optionsByName() override;
   bool                                                                 trySetCreationOptions(
                                                                       const mrpt::config::CConfigFileBase& cfg, const std::string& section) override;
+
+  /** Same as trySetCreationOptions(cfg, section), from an already filled set of
+   *  creation options. */
+  bool trySetCreationOptions(const TCreationOptions& newOpts);
 
   // Interface for use within a mrpt::maps::CMultiMetricMap:
   MAP_DEFINITION_START(KeyframePointCloudMap)
