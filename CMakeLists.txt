@@ -22,6 +22,7 @@ find_package(mrpt_libros_bridge REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
@@ -49,6 +50,7 @@ mola_add_library(
     mrpt::mrpt_obs
     mrpt_libros_bridge::mrpt_libros_bridge
     tf2::tf2
+    rclcpp::rclcpp
     rosbag2_cpp::rosbag2_cpp
     tf2_geometry_msgs::tf2_geometry_msgs
     tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
@@ -74,4 +76,31 @@ message(STATUS "Found: mrpt_libros_bridge_VERSION: ${mrpt_libros_bridge_VERSION}
 
 if (gps_msgs_FOUND)
   target_compile_definitions(${PROJECT_NAME} PRIVATE HAS_GPS_MSGS)
+endif()
+# CLI app: adds observations from a bag (e.g. camera images) to simplemap keyframes
+find_package(CLI11 REQUIRED)
+mola_add_executable(
+  TARGET  mola-sm-attach-from-rosbag2
+  SOURCES apps/mola-sm-attach-from-rosbag2.cpp
+  LINK_LIBRARIES
+    ${PROJECT_NAME}
+    mola::mola_kernel
+    CLI11::CLI11
+)
+
+# -----------------------
+# Unit tests:
+option(MOLA_INPUT_ROSBAG2_BUILD_TESTING "Build the unit tests" ON)
+if(MOLA_INPUT_ROSBAG2_BUILD_TESTING)
+  enable_testing()
+  mola_add_test(
+    TARGET  test-mola_input_rosbag2_rgbd_assembler
+    SOURCES tests/test-rgbd-assembler.cpp src/RgbdAssembler.cpp
+    LINK_LIBRARIES
+      mrpt::mrpt_obs
+      mrpt_libros_bridge::mrpt_libros_bridge
+      tf2::tf2
+      tf2_geometry_msgs::tf2_geometry_msgs
+      sensor_msgs::sensor_msgs_library
+  )
 endif()
