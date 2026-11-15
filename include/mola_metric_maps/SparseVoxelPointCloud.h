@@ -446,8 +446,9 @@ class SparseVoxelPointCloud : public mrpt::maps::CMetricMap,
     void writeToStream(mrpt::serialization::CArchive& out) const;
     void readFromStream(mrpt::serialization::CArchive& in);
 
-    /** Sigma (standard deviation, in meters) of the Gaussian observation
-     *  model used to model the likelihood (default= 0.5 m) */
+    /** Divisor of the squared point-to-map distance in the per-point
+     *  log-likelihood, -d^2/sigma_dist [m^2]. For a Gaussian of standard
+     *  deviation s it is 2*s^2, so the default 0.5 means s = 0.5 m. */
     double sigma_dist = 0.5;
 
     /** Maximum distance in meters to consider for the numerator divided by
@@ -507,6 +508,10 @@ class SparseVoxelPointCloud : public mrpt::maps::CMetricMap,
   bool                                                                 trySetCreationOptions(
                                                                       const mrpt::config::CConfigFileBase& cfg, const std::string& section) override;
 
+  /** Same as trySetCreationOptions(cfg, section), from an already filled set of
+   *  creation options. */
+  bool trySetCreationOptions(const TCreationOptions& newOpts);
+
  public:
   // Interface for use within a mrpt::maps::CMultiMetricMap:
   MAP_DEFINITION_START(SparseVoxelPointCloud)
@@ -532,6 +537,19 @@ class SparseVoxelPointCloud : public mrpt::maps::CMetricMap,
   struct CachedData
   {
     CachedData() = default;
+
+    // A copy of the map starts with an empty cache: the source one points
+    // into the grids of the source map. Moves keep it, since the grid nodes
+    // move along with the std::map holding them.
+    CachedData(const CachedData& /*o*/) : CachedData() {}
+    CachedData& operator=(const CachedData& /*o*/)
+    {
+      reset();
+      return *this;
+    }
+    CachedData(CachedData&&) noexcept            = default;
+    CachedData& operator=(CachedData&&) noexcept = default;
+    ~CachedData()                                = default;
 
     void reset() { *this = CachedData(); }
 
