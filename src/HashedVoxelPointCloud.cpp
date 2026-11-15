@@ -381,9 +381,13 @@ bool HashedVoxelPointCloud::internal_insertObservation(
     // Empty point set, or load from XYZ in observation:
     if (o.hasPoints3D)
     {
+      // points3D_* are in the sensor frame:
+      const auto sensorPose3D = robotPose3D + o.sensorPose;
       for (size_t i = 0; i < o.points3D_x.size(); i++)
+      {
         this->insertPoint(
-            robotPose3D.composePoint({o.points3D_x[i], o.points3D_y[i], o.points3D_z[i]}));
+            sensorPose3D.composePoint({o.points3D_x[i], o.points3D_y[i], o.points3D_z[i]}));
+      }
 
       return true;
     }
@@ -413,10 +417,12 @@ bool HashedVoxelPointCloud::internal_insertObservation(
     // Automatically generate pointcloud if needed:
     if (!o.point_cloud.size()) const_cast<CObservationVelodyneScan&>(o).generatePointCloud();
 
+    // point_cloud is in the sensor frame:
+    const auto sensorPose3D = robotPose3D + o.sensorPose;
     for (size_t i = 0; i < o.point_cloud.x.size(); i++)
     {
       insertPoint(
-          robotPose3D.composePoint({o.point_cloud.x[i], o.point_cloud.y[i], o.point_cloud.z[i]}));
+          sensorPose3D.composePoint({o.point_cloud.x[i], o.point_cloud.y[i], o.point_cloud.z[i]}));
     }
 
     return true;
@@ -430,9 +436,11 @@ bool HashedVoxelPointCloud::internal_insertObservation(
     const auto& ys = o.pointcloud->getPointsBufferRef_y();
     const auto& zs = o.pointcloud->getPointsBufferRef_z();
 
+    // The cloud is in the sensor frame:
+    const auto sensorPose3D = robotPose3D + o.sensorPose;
     for (size_t i = 0; i < xs.size(); i++)
     {
-      insertPoint(robotPose3D.composePoint({xs[i], ys[i], zs[i]}));
+      insertPoint(sensorPose3D.composePoint({xs[i], ys[i], zs[i]}));
     }
 
     return true;
@@ -455,7 +463,8 @@ double HashedVoxelPointCloud::internal_computeObservationLikelihood(
   using namespace mrpt::poses;
   using namespace mrpt::maps;
 
-  if (isEmpty()) return 0;
+  // An empty map is not an early exit: every point of a scan is then
+  // unmatched, the worst score, so it never beats a partially matching map.
 
   // This function depends on the observation type:
   // -----------------------------------------------------
@@ -539,10 +548,11 @@ double HashedVoxelPointCloud::internal_computeObservationLikelihoodPointCloud3D(
     // position:
     const auto gPt = pc_in_map.composePoint({xs[i], ys[i], zs[i]});
 
+    // A point with no map point nearby is the worst match, not a perfect one:
     const bool found = nn_single_search(gPt, closest, closest_err, closest_id);
     if (!found)
     {
-      continue;
+      closest_err = max_sqr_err;
     }
 
     // Put a limit:
@@ -600,7 +610,11 @@ bool HashedVoxelPointCloud::trySetCreationOptions(
 {
   TCreationOptions newOpts = creationOptions;
   newOpts.loadFromConfigFile(cfg, section);
+  return trySetCreationOptions(newOpts);
+}
 
+bool HashedVoxelPointCloud::trySetCreationOptions(const TCreationOptions& newOpts)
+{
   if (newOpts.voxel_size != creationOptions.voxel_size)
   {
     if (!isEmpty())
