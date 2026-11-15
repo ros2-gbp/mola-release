@@ -2,6 +2,9 @@
 Changelog for package mola_launcher
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+3.5.0 (2026-11-15)
+------------------
+
 3.4.0 (2026-11-01)
 ------------------
 * Do not destroy modules while other threads look them up (`#264 <https://github.com/MOLAorg/mola/issues/264>`_)
