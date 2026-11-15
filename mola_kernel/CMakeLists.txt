@@ -34,6 +34,8 @@ set(LIB_SRCS
   src/interfaces/ExecutableBase.cpp
   src/interfaces/FilterBase.cpp
   src/interfaces/FrontEndBase.cpp
+  src/interfaces/ImuBiasSource.cpp
+  src/interfaces/LocalMapCorrectionSource.cpp
   src/interfaces/MetricChannel.cpp
   src/interfaces/NavStateFilter.cpp
   src/interfaces/RawDataSourceBase.cpp
@@ -42,6 +44,7 @@ set(LIB_SRCS
   src/interfaces/VizInterface.cpp
   src/LogHub.cpp
   src/utils/parallelism.cpp
+  src/utils/simplemap_attach_observations.cpp
   src/utils/Synchronizer.cpp
   src/MinimalModuleContainer.cpp
   src/pretty_print_exception.cpp
@@ -58,6 +61,8 @@ set(LIB_PUBLIC_HDRS
   include/mola_kernel/interfaces/ExecutableBase.h
   include/mola_kernel/interfaces/FilterBase.h
   include/mola_kernel/interfaces/FrontEndBase.h
+  include/mola_kernel/interfaces/ImuBiasSource.h
+  include/mola_kernel/interfaces/LocalMapCorrectionSource.h
   include/mola_kernel/interfaces/LocalizationSourceBase.h
   include/mola_kernel/interfaces/MapServer.h
   include/mola_kernel/interfaces/MapSourceBase.h
@@ -76,6 +81,7 @@ set(LIB_PUBLIC_HDRS
   include/mola_kernel/utils/parallelism.h
   include/mola_kernel/utils/RegexCache.h
   include/mola_kernel/utils/Synchronizer.h
+  include/mola_kernel/utils/simplemap_attach_observations.h
   include/mola_kernel/variant_helper.h
   include/mola_kernel/Yaml.h
 )
@@ -121,5 +127,6 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC MOLA_PATCH_VERSION=${MOLA_PATC
 
 # Tests
 if(BUILD_TESTING)
+  enable_testing()
   add_subdirectory(tests)
 endif()
