@@ -8,12 +8,6 @@ This page gives instructions on how to convert robotics datasets between
 ROS 1 and ROS 2 bag files or live messages, MRPT's cross-platform RawLog format, and
 the custom formats of popular robotics and computer vision datasets.
 
-.. contents::
-   :depth: 1
-   :local:
-   :backlinks: none
-
-
 1. Dataset formats
 ---------------------------------
 Robotics datasets consist of **sequences** of raw sensory data as captured by
@@ -28,13 +22,13 @@ Each robotic framework or library has defined its own formats over time:
 - `MRPT <https://github.com/MRPT/mrpt>`_, on which MOLA is internally based on, 
   defined its own serialized dataset format (~2005) named
   `RawLogs <https://docs.mrpt.org/reference/latest/class_mrpt_obs_CRawlog.html>`_, which is ensured
-  to be portable across operative systems, backwards compatible across MRPT versions,
+  to be portable across operating systems, backwards compatible across MRPT versions,
   and processor architecture independent.
 
 .. note::
-   Apart of these *standardized formats*, many robotic datasets have their own custom
+   Apart from these *standardized formats*, many robotic datasets have their own custom
    data layout (e.g. one binary file for each 3D LiDAR scan or image).
-   MOLA makes easy reading them by providing *adapter modules* that can read the most
+   MOLA reads them through *adapter modules* for the most
    popular datasets (see :ref:`list <supported_sensors>`) through unified C++ APIs
    (:ref:`doxid-classmola_1_1_offline_dataset_source`)
    or :ref:`re-publishing them to ROS <mola-dataset-to-ros>`.
@@ -50,35 +44,39 @@ To convert a ROS bag into a RawLog, you need two items:
 - The program ``rosbag2rawlog``, and
 - the **configuration file** specifying what ROS messages should be converted.
 
-There are two versions of ``rosbag2rawlog``, for **ROS 1** and **ROS 2 bags**:
+``rosbag2rawlog`` is part of `mrpt_ros_bridge <https://github.com/MRPT/mrpt_ros_bridge>`_,
+which has one version for each ROS generation:
 
 .. tab-set::
 
     .. tab-item:: ROS 2 bags
       :selected:
 
-      ``rosbag2rawlog`` for **ROS 2 bags**. It is shipped with the ROS package `mrpt_rawlog <https://github.com/mrpt-ros-pkg/mrpt_navigation/tree/ros2/mrpt_rawlog>`_
-      so it can be installed with:
+      From the ``ros2`` branch (the default one), released as a binary package:
 
       .. code-block:: bash
 
-        sudo apt install ros-${ROS_DISTRO}-mrpt-rawlog
+        sudo apt install ros-${ROS_DISTRO}-rosbag2rawlog
 
     .. tab-item:: ROS 1 bags
 
-      ``rosbag2rawlog`` for **ROS 1 bags** belongs to upstream MRPT, and it is generated only *if*
-      ROS 1 is detected at cmake configuration time. You can either build MRPT from sources after activating
-      your ROS 1 environment, or install the Ubuntu package ``mrpt-apps``, which already ships ``rosbag2rawlog``
-      for Ubuntu versions <=22.04 (In Ubuntu 24.04, ROS 1 packages were removed upstream).
-      To ensure having the latest version, consider installing it from `the PPA <https://launchpad.net/~joseluisblancoc/+archive/ubuntu/mrpt-stable>`_.
+      From the ``ros1`` branch, built from sources in a ROS 1 (Noetic) workspace:
 
-.. note::
-   As of 2025, there is an ongoing effort to move all ROS-related apps and bridge libraries into `its own repository <https://github.com/MRPT/mrpt_ros_bridge>`_,
-   which will be the single repository for all MRPT-ROS stuff after the release of `MRPT 3.0.0 <https://github.com/MRPT/mrpt/issues/1330>`_.
+      .. code-block:: bash
+
+        source /opt/ros/noetic/setup.bash
+        mkdir -p ~/ros1_ws/src && cd ~/ros1_ws/src
+        git clone -b ros1 https://github.com/MRPT/mrpt_ros_bridge.git
+        cd ~/ros1_ws
+        rosdep install --from-paths src --ignore-src -r -y
+        colcon build --symlink-install
+
+      Note that MOLA can also read ROS 1 bags directly, with no ROS 1 installation
+      (see :ref:`supported_sensors`).
 
 |
 
-Once you have ``rosbag2rawlog`` installed it can be invoked like:
+Once you have ``rosbag2rawlog`` installed it can be invoked like (ROS 2 version):
 
 .. dropdown:: rosbag2rawlog CLI arguments
   :open:
@@ -87,37 +85,23 @@ Once you have ``rosbag2rawlog`` installed it can be invoked like:
 
       $ rosbag2rawlog --help
 
-      USAGE: 
+      rosbag2rawlog (ROS 2)
+      Usage: rosbag2rawlog [OPTIONS] bags
 
-        rosbag2rawlog  [-b <base_link>] [-w] -c <config.yml> -o
-                        <dataset_out.rawlog> [--] [--version] [-h] <log.bag> ...
+      Positionals:
+        bags TEXT:FILE REQUIRED     Input bag files (required) (*.mcap,*.db3)
 
-
-      Where: 
-
-        -b <base_link>,  --base-link <base_link>
-          Reference /tf frame for the robot frame (Default: 'base_link')
-
-        -w,  --overwrite
-          Force overwrite target file without prompting.
-
-        -c <config.yml>,  --config <config.yml>
-          (required)  Config yaml file (*.yml)
-
-        -o <dataset_out.rawlog>,  --output <dataset_out.rawlog>
-          (required)  Output dataset (*.rawlog)
-
-        --,  --ignore_rest
-          Ignores the rest of the labeled arguments following this flag.
-
-        --version
-          Displays version information and exits.
-
-        -h,  --help
-          Displays usage information and exits.
-
-        <log.bag>  (accepted multiple times)
-          (required)  Input bag files (required) (*.bag)
+      Options:
+        -h,--help                   Print this help message and exit
+        -o,--output TEXT REQUIRED   Output dataset (*.rawlog)
+        -c,--config TEXT:FILE REQUIRED
+                                    Config yaml file (*.yml)
+        --storage-id TEXT=mcap      rosbag2 storage_id format (sqlite3|mcap|...)
+        --serialization-format TEXT=cdr
+                                    rosbag2 serialization format (cdr)
+        -w,--overwrite              Force overwrite target file without prompting.
+        -b,--base-link TEXT=base_link
+                                    Reference /tf frame for the robot frame (Default: 'base_link')
 
 
 For example:
@@ -250,18 +234,21 @@ The rest will be discarded, after emitting a warning to the terminal.
 
 3. rawlog ⇒ ROS
 ----------------------------
-For ROS 2. There is no ROS 1 republishing path: MOLA's bridge module targets
-ROS 2 only, and ``mola_input_rosbag1`` reads ROS 1 bags rather than writing
-them.
+For ROS 2 only: there is no ROS 1 writing path.
 
-There is no dedicated ``rawlog2rosbag`` program either, because the general
-mechanism covers this case: a rawlog is read by the ``mola_input_rawlog`` module, and any
-MOLA dataset source can be republished as live ROS topics through the ROS 2
-bridge. See :ref:`§5 below <mola-dataset-to-ros>`, using ``mola_input_rawlog``
-as the dataset source module.
+To write a ROS 2 bag (``.mcap`` or ``.db3``), use ``rawlog2rosbag``, from the ROS package
+``rawlog2rosbag`` of `mrpt_ros_bridge <https://github.com/MRPT/mrpt_ros_bridge>`_:
 
-Record those topics with ``ros2 bag record`` if you want a bag rather than a
-live replay.
+.. code-block:: bash
+
+    sudo apt install ros-${ROS_DISTRO}-rawlog2rosbag
+
+    rawlog2rosbag -i dataset.rawlog -o dataset_bag/
+
+Run it with ``--help`` for its options (storage format, frames, images, ground truth).
+
+To replay a rawlog as live ROS 2 topics instead, use the ``mola_input_rawlog`` module as
+the dataset source of :ref:`a MOLA system with the ROS 2 bridge <mola-dataset-to-ros>`.
 
 
 |
@@ -271,7 +258,8 @@ live replay.
 
 4. ROS1 ⇒ ROS2
 ----------------------------
-One way to use rosbags from ROS 1 with MOLA is to port them to ROS 2 bags.
+MOLA reads ROS 1 bags directly (see :ref:`supported_sensors`). To use them with ROS 2 tools,
+they can be converted to ROS 2 bags.
 
 You can use the Python package ``rosbags`` to `perform the conversion <https://ternaris.gitlab.io/rosbags/topics/convert.html>`_,
 like in this example:
@@ -281,7 +269,9 @@ like in this example:
     rosbags-convert --src my_ros1.bag --dst my_ros2.mcap --dst-storage mcap
 
 
-An alternative is to use :ref:`rosbag2rawlog <rosbag2rawlog>` (the ROS 1 version!) to convert them to RawLogs, then use them as input to MOLA.
+An alternative is to convert them to RawLogs with the ROS 1 version of
+:ref:`rosbag2rawlog <rosbag2rawlog>`, then use them as input to MOLA.
+
 
 |
 
