@@ -177,7 +177,7 @@ All plugin modules derive from these virtual base classes:
   outlive consumers. Sinks run on the logging thread: they must only queue, and
   only capture state they co-own. Never call ROS from a logger callback directly.
 - `SharedKeyframeMap` — central-map keyframe-insertion sink (new 2026, see
-  `mola_mapper_3d`): front ends (LIO/VIO) push sparse keyframes via
+  `mola_mapper`): front ends (LIO/VIO) push sparse keyframes via
   `requestInsertKeyframe()`, decoupled from their own local map/odometry
   frame. Detected via `findService<>()` the same way as `NavStateFilter`,
   but optional.
@@ -251,6 +251,9 @@ shallow). CLIs: `mola-sm-attach-from-rosbag2` (`mola_input_rosbag2`) and
   thread publishes the queue with its own `/rosout` publisher, never through
   `RCLCPP_*`/rcutils (no global logging mutex, no second terminal print, no
   publishing after `rclcpp::shutdown()` from a module destructor).
+- `nav_msgs/Odometry` topics are forwarded as `CObservationRobotPose` (SE(3), for LiDAR or
+  visual odometry) or `CObservationOdometry` (planar: the smoother applies its wheel motion
+  model): param `odometry_as_robot_pose_observation`, overridable per `subscribe` entry.
 - Input callbacks set `CObservation::timestamp` from `header.stamp` explicitly:
   never rely on `mrpt::ros2bridge::fromROS()` for it, since some versions leave
   the default (wall-clock `now()`), which breaks bag replay and sim time.
@@ -267,6 +270,12 @@ module class name; nothing else in the tree may call MRPT GUI functions directly
   The GUI thread redraws everything (including the full 3D scene) every frame
   at `target_fps` (default 30, vsync off); the env var `MOLA_GUI_TARGET_FPS`
   overrides the YAML value and is the main knob for its GPU load.
+  Video recording (host mode): `record_video` (env `MOLA_VIZ_RECORD_VIDEO` overrides it,
+  likewise `_FPS`, `_WIDTH`, `_HEIGHT`, `_FFMPEG_OPTIONS`) draws each frame UI-less into an
+  off-screen FBO of the video size (`VideoRecorder`; sRGB if the window is), pipes RGBA to
+  ffmpeg (one video frame per GUI frame; `target_fps` is set to the video rate; the GUI loop
+  uses absolute steady-clock deadlines) and blits a preview to the window; the UNIX time of each
+  frame goes to `<video>.times.txt`. On any recording failure the normal GUI comes back.
   `MolaVizImGuiCore` is the reusable, MOLA-agnostic half.
   Always `#define GLFW_INCLUDE_NONE` before `<GLFW/glfw3.h>`: GL headers must
   first come from `mrpt/opengl/opengl_api.h` (which sets `GL_GLEXT_PROTOTYPES`).
@@ -612,9 +621,9 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   cov2cov map classes: `use_view_direction_filter` (master switch),
   `view_direction_filter` (`mola::ViewDirectionFilter` in
   `include/mola_metric_maps/ViewDirectionFilter.h`: `None`, `MaxAngle`,
-  `SurfaceSide`) and `max_view_angle_deg` (`MaxAngle` only). Defaults differ:
-  `MaxAngle` for KFM (its historical behavior), `SurfaceSide` for
-  `IncrementalPointCloud`.
+  `SurfaceSide`, `SurfaceSideGravityAligned`) and `max_view_angle_deg` (`MaxAngle`
+  only). Defaults differ: `MaxAngle` for KFM (its historical behavior),
+  `SurfaceSide` for `IncrementalPointCloud`.
   The per-pair test itself is shared, in `src/view_direction_test.h`
   (`internal::ViewDirectionTest`); `SurfaceSide` needs the matched map point's
   covariance, which both classes already have in the global frame. A zero
@@ -624,8 +633,13 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   pairs it would reject): the stored covariances are plane-regularized, so on
   foliage/edges/poles they still look like planes with a meaningless normal.
   Without that gate (and with a 0.1 cutoff) ~74% of its rejections were on
-  non-flat points, and it doubled the ATE of some Oxford Spires runs. `mola_lidar_odometry`'s
-  `localmap-gicp.yaml` exposes them as `MOLA_LOCALMAP_USE_VIEW_DIRECTION_FILTER`,
+  non-flat points, and it doubled the ATE of some Oxford Spires runs.
+  `SurfaceSideGravityAligned` (opt-in, needs a map frame with +z up) judges a
+  near-horizontal surface (|n_z| > 0.9) by the sign of the views' z components
+  instead, trusted down to |v_z| > 0.03, so a floor slab's top face seen at grazing
+  incidence is not paired with its underside; other surfaces as `SurfaceSide`.
+  The test's frame must then be the map's (both classes already use it).
+  `mola_lidar_odometry`'s `localmap-gicp.yaml` exposes them as `MOLA_LOCALMAP_USE_VIEW_DIRECTION_FILTER`,
   `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER` (empty = each class's default) and
   `MOLA_LOCALMAP_VIEW_DIRECTION_FILTER_ANGLE_DEG`.
 - Dependencies: MRPT and `mp2p_icp_map` only, **not** `mola_kernel`, so the library (and
@@ -655,8 +669,8 @@ Classes registered by `src/register.cpp` (these are the names a YAML must use):
   `_core` and `libmola_metric_maps.so` go into `site-packages/mola_metric_maps/`, with a
   RUNPATH to both SDK lib dirs; `libmp2p_icp*`, `libmrpt_*` and `libtbb` are never bundled.
   Requires `mp2p-icp`/`mrpt3` of the minor series it was built against. CI:
-  `.github/workflows/python-wheels.yml`, uploaded to PyPI on release tags (the pinned
-  mp2p-icp must be published first).
+  `.github/workflows/python-wheels.yml`, uploaded to PyPI on release tags (an mp2p-icp satisfying its lower-bound
+  build requirement must be published first).
 
 ### Feature macros
 
@@ -667,6 +681,7 @@ Guard with `#if defined(...)`, never with a version check.
 |---|---|---|
 | `MOLA_KERNEL_VIZ_HAS_METRICS` | `interfaces/MetricChannel.h` | `VizInterface::register_metric()`/`push_metric()` exist |
 | `MOLA_KERNEL_VIZ_HAS_MOVABLE_FRAMES` | `interfaces/VizInterface.h` | named movable reference frames: `update_3d_object_frame()` and the `parentFrame` argument of `update_3d_object()`, `insert_point_cloud_with_decay()`, `update_viewport_look_at()` |
+| `MOLA_KERNEL_VIZ_HAS_CAMERA_ORIENTATION` | `interfaces/VizInterface.h` | `update_viewport_camera()`: look-at, azimuth, elevation and distance of the viewport camera (optional: default returns false) |
 | `MOLA_KERNEL_DATASET_UI_HAS_TIME` | `interfaces/Dataset_UI.h` | `datasetUI_time()`/`datasetUI_total_time()` |
 | `MOLA_KERNEL_DATASET_UI_HAS_ENABLED` | `interfaces/Dataset_UI.h` | `datasetUI_enabled()` |
 | `MOLA_KERNEL_NAVSTATE_FILTER_HAS_GEO_REFERENCE` | `interfaces/NavStateFilter.h` | geo-reference accessor |
