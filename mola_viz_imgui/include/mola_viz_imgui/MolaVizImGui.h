@@ -23,6 +23,7 @@
 #include <mola_kernel/interfaces/Dataset_UI.h>
 #include <mola_kernel/interfaces/ExecutableBase.h>
 #include <mola_viz_imgui/MolaVizImGuiCore.h>
+#include <mrpt/containers/yaml.h>
 
 #include <atomic>
 #include <map>
@@ -218,6 +219,15 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
     return core_ptr_->update_viewport_camera_orthographic(orthographic, viewportName, parentWindow);
   }
 
+  std::future<bool> update_viewport_camera(
+      const mrpt::math::TPoint3Df& lookAt, double azimuth, double elevation, double zoomDistance,
+      const std::string& viewportName = "main",
+      const std::string& parentWindow = DEFAULT_WINDOW_NAME) override
+  {
+    return core_ptr_->update_viewport_camera(
+        lookAt, azimuth, elevation, zoomDistance, viewportName, parentWindow);
+  }
+
   std::future<bool> execute_custom_code_on_background_scene(
       const std::function<void(mrpt::viz::Scene&)>& userCode,
       const std::string&                            parentWindow = DEFAULT_WINDOW_NAME) override
@@ -303,7 +313,9 @@ class MolaVizImGui : public ExecutableBase, public VizInterface
   ImGuiContext*     imgui_ctx_  = nullptr;
   ImPlotContext*    implot_ctx_ = nullptr;
 
-  void                             gui_thread();
+  void gui_thread();
+  /// Video recording params: YAML, overridden by MOLA_VIZ_RECORD_* env vars.
+  void                             load_video_recording_params(const mrpt::containers::yaml& cfg);
   MolaVizImGuiCore::PerWindowData& create_and_add_window(const window_name_t& name);
 
   // ---------------------------------------------------------------------------
