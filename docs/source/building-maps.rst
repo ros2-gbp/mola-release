@@ -1,61 +1,32 @@
 .. _building-maps:
 
 ======================
-Tutorial: build a map
+Build a map
 ======================
 
 This tutorial describes the steps for building metric maps using MOLA.
 
-____________________________________________
 
-.. contents::
-   :depth: 1
-   :local:
-   :backlinks: none
-
-____________________________________________
-
-|
-
-1. Prepare the input data
+1. Record the data
 ---------------------------------
-- Think what sensors do you want to use:
-
-  - At least, one **2D or 3D LiDAR**. It is possible to have multiple LiDARs.
-  - Optional: Encoder-based odometry, for wheeled robots.
-  - Optional: Low-cost GNSS (GPS) receiver, for georeferencing the final metric maps. 
-    You can use `mrpt_sensor_gnss_nmea <https://github.com/mrpt-ros-pkg/mrpt_sensors?tab=readme-ov-file#mrpt_sensor_gnss_nmea>`_ for 
-    standard GNSS USB devices providing NMEA messages.
-
-- Decide whether SLAM will run **online** (live) or **offline** (in postprocessing).
-
-- If running **offline** (**recommended**): Grab the data using `ros2 bag record <https://docs.ros.org/en/foxy/Tutorials/Beginner-CLI-Tools/Recording-And-Playing-Back-Data/Recording-And-Playing-Back-Data.html>`_
-  if you use ROS 2. Alternative options include using :ref:`MOLA-based dataset sources <supported_sensors>`.
-
-- If using ROS 2...
-
-  - ...and you only have **one LiDAR** as the **unique sensor**,
-    then setting up `ROS tf frames <https://www.google.com/search?q=ROS+tf+frames+tutorials>`_
-    is not mandatory, if you are happy with tracking the **sensor** pose (vs the vehicle pose).
-
-  - ...and you have wheels odometry or additional sensors on the robot, then having correct ``/tf`` messages
-    published is important to let the mapping algorithm know what is the **relative pose of the sensor** within
-    the vehicle.
-    
-- Even if having only one single LiDAR, correctly defining the sensor pose on the vehicle is important
-  for correctly tracking the *vehicle pose* instead of the *sensor pose*. This can be done by either...
-
-    - correctly setting up ``/tf``, or
-    - using the MOLA-LO applications :ref:`flag <mola_lo_gui_rosbag2>` to manually set the sensor pose on the vehicle without ``/tf``.
+- Sensors: at least one **2D or 3D LiDAR** (several are possible). Optionally, an **IMU**
+  (LiDAR-inertial odometry), **wheel odometry**, and a **GNSS receiver** to
+  :ref:`geo-reference <geo-referencing>` the map (e.g.
+  `mrpt_sensor_gnss_nmea <https://github.com/mrpt-ros-pkg/mrpt_sensors?tab=readme-ov-file#mrpt_sensor_gnss_nmea>`_
+  for NMEA receivers).
+- Building the map **offline** from a recording is recommended, so you can try several
+  configurations on the same data. With ROS 2, record the sensor topics plus ``/tf`` and
+  ``/tf_static`` with ``ros2 bag record``. Other recording formats are listed in
+  :ref:`supported_sensors`.
+- MOLA reads the pose of each sensor on the vehicle from ``/tf``. If your recording has no
+  ``/tf``, see :ref:`your_own_rosbag`.
 
 |
-
-
 
 2. Run MOLA-LO
 ---------------------------------
-The output of running LiDAR odometry on your dataset is a 
-an estimated trajectory and a **simple-map** (here is the main stuff to build maps from):
+The output of running LiDAR odometry on your dataset is an estimated trajectory and a
+**simple-map**, the input to build maps from:
 
 .. figure:: imgs/odometry_inputs_outputs.png
    :width: 400
@@ -83,7 +54,6 @@ or from the :ref:`UI controls <mola_lo_gui_common_parts>` in the ``mola_lidar_od
     .. tab-set::
 
         .. tab-item:: From a rosbag2 (GUI)
-          :selected:
 
             .. code-block:: bash
 
@@ -97,6 +67,7 @@ or from the :ref:`UI controls <mola_lo_gui_common_parts>` in the ``mola_lidar_od
                 Remember changing ``MOLA_LIDAR_TOPIC`` to your actual raw (unfiltered) LiDAR topic (``sensor_msgs/PointCloud2``).
 
         .. tab-item:: From a rosbag2 (CLI)
+          :selected:
 
             .. code-block:: bash
 
@@ -136,16 +107,16 @@ or from the :ref:`UI controls <mola_lo_gui_common_parts>` in the ``mola_lidar_od
 
 .. dropdown:: Building 2D maps
 
-    Until ``mola_2d_mapper`` is released, you can also use the generic LiDAR odometry module to 
-    build 2D maps from range finder (2D scanners).
+    You can use the generic LiDAR odometry module to build 2D maps from range finders
+    (2D scanners).
 
-    Just set the ``PIPELINE_YAML`` environment variable pointing to the 2D mapping pipeline (`lidar2d.yaml <https://github.com/MOLAorg/mola_lidar_odometry/blob/develop/pipelines/lidar2d.yaml>`_)
+    Just set the ``MOLA_ODOMETRY_PIPELINE_YAML`` environment variable pointing to the 2D mapping pipeline (`lidar2d.yaml <https://github.com/MOLAorg/mola_lidar_odometry/blob/develop/pipelines/lidar2d.yaml>`_)
     shipped with the ``mola_lidar_odometry`` package:
 
     .. code-block:: bash
 
         MOLA_LIDAR_TOPIC=/scan1 \
-        PIPELINE_YAML=$(ros2 pkg prefix mola_lidar_odometry)/share/mola_lidar_odometry/pipelines/lidar2d.yaml \
+        MOLA_ODOMETRY_PIPELINE_YAML=$(ros2 pkg prefix mola_lidar_odometry)/share/mola_lidar_odometry/pipelines/lidar2d.yaml \
         MOLA_GENERATE_SIMPLEMAP=true \
         MOLA_SIMPLEMAP_OUTPUT=myMap.simplemap \
           mola-lo-gui-rosbag2 /path/to/your/dataset.mcap
@@ -253,7 +224,7 @@ Afterwards, visualizing :ref:`metric map files <mp2p_icp_basics>` (``*.mm``) can
         .. tab-item:: Build an aggregated 3D point cloud
           :selected:
 
-            Download the example pipeline `sm2mm_pointcloud_voxelize_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_pointcloud_voxelize_no_deskew.yaml>`_
+            Download the example pipeline `sm2mm_pointcloud_voxelize_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/develop/mp2p_icp_core/demos/sm2mm_pointcloud_voxelize_no_deskew.yaml>`_
             and then run:
 
             .. code-block:: bash
@@ -271,7 +242,7 @@ Afterwards, visualizing :ref:`metric map files <mp2p_icp_basics>` (``*.mm``) can
 
         .. tab-item:: Build a voxel map + 2D grid map
 
-            Download the example pipeline `sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/master/demos/sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml>`_
+            Download the example pipeline `sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml <https://github.com/MOLAorg/mp2p_icp/raw/develop/mp2p_icp_core/demos/sm2mm_bonxai_voxelmap_gridmap_no_deskew.yaml>`_
             and then run:
 
             .. code-block:: bash
@@ -343,7 +314,7 @@ and then visualize them with the GUI app :ref:`icp-log-viewer <app_icp-log-viewe
       # Generate ICP log files:
       MP2P_ICP_GENERATE_DEBUG_FILES=1 \
       MP2P_ICP_LOG_FILES_DECIMATION=1 \
-      mola-lo-gui-rosbag  [...]  # the rest remains the same
+      mola-lo-gui-rosbag2  [...]  # the rest remains the same
 
   You should now have a directory ``icp-logs`` with as many files as times ICP invocations.
   Then, visualize the logs in the GUI with:
@@ -362,7 +333,8 @@ and then visualize them with the GUI app :ref:`icp-log-viewer <app_icp-log-viewe
 Once you have a map, here are some next steps:
 
 - :ref:`This tutorial <tutorial-mola-lo-map-and-localize>` on how to save/load maps and re-localize using MOLA-LO ROS 2 nodes.
-- Maps with loop closures: :ref:`tutorial-ouster-mapping-lc`
+- Maps with loop closures: live, with :ref:`mola_mapper <mola_mapper>`, or offline, with
+  :ref:`tutorial-ouster-mapping-lc`
 - :ref:`geo-referencing`.
 - :ref:`Use for localization <localization-only>`.
 
