@@ -19,15 +19,10 @@ live. For the tasks these packages are combined to solve, see
 :doc:`API reference <doxygen-index>`.
 
 .. note::
-   Each package carries its own license (GPL-3.0 for core algorithms,
-   BSD-3-Clause for utilities, bridges and demos). Check the ``<license>``
-   tag of its ``package.xml``.
-
-.. contents::
-   :depth: 1
-   :local:
-   :backlinks: none
-
+   Each package carries its own license, GPL-3.0 or BSD-3-Clause: check the
+   ``<license>`` tag of its ``package.xml``. In the ``mola`` repository, ``mola_bridge_ros2``,
+   ``mola_yaml``, ``mola_traj_tools`` and ``mola_demos`` are BSD-3-Clause, and the rest
+   GPL-3.0. ``mp2p_icp`` is BSD-3-Clause.
 
 Core framework
 ----------------
@@ -149,13 +144,3 @@ Maps, tools and visualization
        :ref:`choosing a visualizer <mola_lo_gui_visualizer_selection>`.
    * - `mola_demos <https://github.com/MOLAorg/mola/tree/develop/mola_demos>`_
      - Example ``mola-cli`` launch files and ROS 2 launch files.
-
-
-Reference pages
------------------
-
-.. toctree::
-  :maxdepth: 2
-
-  module-mola-launcher
-  module-mola-yaml
