@@ -7,11 +7,6 @@ MOLA-LIO + Loop Closure: Globally Consistent Map
 This tutorial shows you how to build a **globally consistent, centimeter-accurate 3D map**
 from an Ouster LiDAR dataset using MOLA-LIO followed by offline loop closure (LC) post-processing.
 
-.. contents::
-   :depth: 1
-   :local:
-   :backlinks: none
-
 |
 
 This video summarizes the results of the complete pipeline:
@@ -37,10 +32,10 @@ Overview
 
 The pipeline consists of four steps:
 
-1. **LIO mapping** — Run MOLA-LIO on a rosbag to produce a raw ``*.simplemap`` keyframe map.
-2. **Loop closure** — Run ``mola-sm-lc-cli`` to detect and close loops, producing a corrected ``*.simplemap``.
-3. **Metric map generation** — Run ``sm2mm`` to convert the loop-closed simplemap into a dense ``*.mm`` metric map.
-4. **Georeferencing + visualization** — Optionally georeference the map (IMU gravity alignment) and inspect with ``mm-viewer``.
+1. **LIO mapping**: Run MOLA-LIO on a rosbag to produce a raw ``*.simplemap`` keyframe map.
+2. **Loop closure**: Run ``mola-sm-lc-cli`` to detect and close loops, producing a corrected ``*.simplemap``.
+3. **Metric map generation**: Run ``sm2mm`` to convert the loop-closed simplemap into a dense ``*.mm`` metric map.
+4. **Georeferencing + visualization**: Optionally georeference the map (IMU gravity alignment) and inspect with ``mm-viewer``.
 
 |
 
@@ -49,20 +44,23 @@ Prerequisites
 
 You must have the following MOLA packages installed:
 
-- ``mola_lidar_odometry`` (provides ``mola-lo-gui-rosbag2``, ``mm-viewer``)
+- ``mola_lidar_odometry`` (provides ``mola-lo-cli-rosbag2`` and ``mola-lo-gui-rosbag2``)
 - ``mola_sm_loop_closure`` (provides ``mola-sm-lc-cli``)
 - ``mola_state_estimation`` (provides ``mola-sm-georeferencing``)
-- ``mp2p_icp`` (provides ``sm2mm``)
+- ``mp2p_icp`` (provides ``sm2mm`` and ``mm-viewer``)
 
 Following the default :ref:`installation instructions <installing>` is enough for most of these.
-For ``mola_sm_loop_closure``, as of today (April 2026), it must be installed from source code
-(``apt install`` to be available in the short term).
-
-Also make sure you have the ``mola_sm_loop_closure`` pipeline files available in your workspace:
+``mola_sm_loop_closure`` is installed with:
 
 .. code-block:: bash
 
-    ls ~/ros2_ws/src/mola_sm_loop_closure/pipelines/
+    sudo apt install ros-$ROS_DISTRO-mola-sm-loop-closure
+
+Its pipeline files are installed with the package:
+
+.. code-block:: bash
+
+    ls $(ros2 pkg prefix mola_sm_loop_closure)/share/mola_sm_loop_closure/pipelines/
 
 You should see files like ``loop-closure-f2f-lidar3d-gicp.yaml`` listed there.
 
@@ -71,8 +69,10 @@ You should see files like ``loop-closure-f2f-lidar3d-gicp.yaml`` listed there.
 Step 1: Run MOLA-LIO to generate the raw simplemap
 ----------------------------------------------------
 
-Use ``mola-lo-gui-rosbag2`` to run the LIO pipeline on your rosbag.
-The environment variables below configure the pipeline specifically for Ouster sensors.
+Use ``mola-lo-cli-rosbag2`` to run the LIO pipeline on your rosbag. It processes every
+scan, as fast as the computer allows: unlike the GUI, it never drops a scan when the
+processing falls behind real time (see :ref:`gui_vs_cli`), which matters for an accurate
+map. The environment variables below configure the pipeline specifically for Ouster sensors.
 
 .. code-block:: bash
 
@@ -81,17 +81,19 @@ The environment variables below configure the pipeline specifically for Ouster s
     MOLA_GENERATE_SIMPLEMAP=true \
     MOLA_SIMPLEMAP_ALSO_NON_KEYFRAMES=true \
     MOLA_SIMPLEMAP_MIN_XYZ=0.15 \
+    MOLA_INCREMENTAL_MAP_MAX_SIZE=30.0 \
     MOLA_LOCAL_MAP_MAX_SIZE=30.0 \
     MOLA_DESKEW_METHOD=MotionCompensationMethod::IMU \
     MOLA_TF_BASE_LINK=os_sensor \
     MOLA_LIDAR_TOPIC=/ouster/points \
     MOLA_IMU_TOPIC=/ouster/imu \
-    mola-lo-gui-rosbag2   YOUR_DATASET.mcap
+    mola-lo-cli-rosbag2   YOUR_DATASET.mcap
 
 .. note::
 
     Replace ``YOUR_DATASET`` with the actual path to your ``.db3``
-    or ``.mcap`` rosbag file.
+    or ``.mcap`` rosbag file. To watch the data first, ``mola-lo-gui-rosbag2`` takes the
+    same variables.
 
 **Key environment variables explained:**
 
@@ -111,8 +113,10 @@ The environment variables below configure the pipeline specifically for Ouster s
   is useful only if one wants to export the full trajectory from the simplemap.
 - ``MOLA_SIMPLEMAP_MIN_XYZ=0.15``: Minimum distance (in meters) between consecutive
   keyframes. Lower values produce denser maps.
-- ``MOLA_LOCAL_MAP_MAX_SIZE=30.0``: Maximum radius of the local map kept in memory
-  during odometry.
+- ``MOLA_INCREMENTAL_MAP_MAX_SIZE=30.0``: Maximum distance (in meters) from the vehicle of the
+  points kept in the local map during odometry (default local map class,
+  ``mola::IncrementalPointCloud``).
+- ``MOLA_LOCAL_MAP_MAX_SIZE=30.0``: The same limit, for the keyframes that the local map keeps track of.
 - ``MOLA_DESKEW_METHOD=MotionCompensationMethod::IMU``: Use IMU data for per-point
   motion compensation (deskewing), greatly improving accuracy for fast movements.
 - ``MOLA_TF_BASE_LINK=os_sensor``: The TF frame name for the sensor base. Use
@@ -123,7 +127,7 @@ The environment variables below configure the pipeline specifically for Ouster s
 .. dropdown:: What output files does this step produce?
    :icon: file-directory
 
-   After the GUI process completes (or when you close the window):
+   When the run ends:
 
    - ``final_map.simplemap``: The keyframe map with all poses and sensor observations.
    - ``final_map_Images/``: Directory containing the externally stored observation files
@@ -152,7 +156,6 @@ to correct the accumulated drift.
     MIN_ICP_QUALITY=0.75 \
     LC_ICP_INITIAL_SIGMA=1.0 \
     LC_ICP_FINAL_SIGMA=0.10 \
-    LC_SELECTION_VERBOSE=1 \
     MIN_LC_DISTANCE=0.25 \
     MAX_LC_DISTANCE=2.5 \
     INPUT_ODOMETRY_NOISE_XYZ_PER_M=0.04 \
@@ -161,7 +164,7 @@ to correct the accumulated drift.
     MOLA_DESKEW_METHOD=MotionCompensationMethod::IMU \
     mola-sm-lc-cli \
         -a mola::FrameToFrameLoopClosure \
-        -p ~/ros2_ws/src/mola_sm_loop_closure/pipelines/loop-closure-f2f-lidar3d-gicp.yaml \
+        -p $(ros2 pkg prefix mola_sm_loop_closure)/share/mola_sm_loop_closure/pipelines/loop-closure-f2f-lidar3d-gicp.yaml \
         -i final_map.simplemap \
         -o final_map_lc.simplemap \
         --externals-dir final_map_Images/
@@ -212,18 +215,21 @@ See the :ref:`sm2mm pipelines documentation <sm2mm_pipelines>` for full details 
 
 .. code-block:: bash
 
+    # The example pipelines are not installed with the packages; download it:
+    wget https://github.com/MOLAorg/mp2p_icp/raw/develop/mp2p_icp_core/demos/sm2mm_no_decim_imu_mls.yaml
+
     sm2mm \
         -i final_map_lc.simplemap \
         -o final_map_lc.mm \
-        -p ~/ros2_ws/src/mp2p_icp/demos/sm2mm_no_decim_imu_mls.yaml \
+        -p sm2mm_no_decim_imu_mls.yaml \
         --externals-dir final_map_Images/
 
 .. note::
 
     The pipeline file ``sm2mm_no_decim_imu_mls.yaml`` produces a **dense, MLS-filtered**
     point cloud with IMU-based motion compensation. It is available in the
-    `mp2p_icp GitHub repository <https://github.com/MOLAorg/mp2p_icp/tree/develop/demos>`_
-    under the ``demos/`` directory.
+    `mp2p_icp GitHub repository <https://github.com/MOLAorg/mp2p_icp/tree/develop/mp2p_icp_core/demos>`_
+    under the ``mp2p_icp_core/demos/`` directory.
 
     See the :ref:`sm2mm pipelines page <sm2mm_pipelines>` for a full description of this
     pipeline and its alternatives (e.g. voxelized maps, static/dynamic separation).
@@ -288,12 +294,13 @@ edge 3D scenes generated in step 2 to visually verify which loop closures were a
 
     # With loop closure edges and trajectory overlay:
     mm-viewer final_map_lc.mm \
-        -s final_map_lc_lc_edges.3Dscene \
-        -s final_map_lc_path_edges.3Dscene
+        -s f2f_lc_lc_edges.3Dscene \
+        -s f2f_lc_path_edges.3Dscene
 
-The ``-s`` flag loads additional ``.3Dscene`` files as overlays. The ``_lc_edges`` scene
-shows the accepted loop closure constraints (edges between matched keyframe pairs), and
-``_path_edges`` shows the optimized trajectory.
+The ``-s`` flag loads additional ``.3Dscene`` files as overlays. Step 2 writes them in the
+current directory, with the prefix ``f2f_lc_`` (parameter ``debug_files_prefix`` of the
+loop closure pipeline). The ``lc_edges`` scene shows the accepted loop closure constraints
+(edges between matched keyframe pairs), and ``path_edges`` shows the optimized trajectory.
 
 |
 
@@ -324,7 +331,7 @@ After building your globally consistent map, you can:
 
 - **Use it for localization**: Load ``final_map_lc.mm`` in MOLA-LIO localization-only mode.
   See :ref:`tutorial-mola-lo-map-and-localize` for step-by-step instructions.
-- **Export to LAS/PLY**: Use ``mm2txt`` or ``mm2ply`` for GIS workflows or external processing.
+- **Export to LAS/PLY**: Use ``mm2las`` or ``mm2ply`` for GIS workflows or external processing.
 - **Add geodetic coordinates**: Use ``mola-mm-add-geodetic`` to enrich the point cloud with
   latitude/longitude/altitude fields. See :ref:`geo-referencing`.
 
