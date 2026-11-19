@@ -10,11 +10,6 @@ and SLAM. All solutions are fully configurable via YAML - no recompilation neede
 See :ref:`Plans and pricing <pricing>` for the comparison between Community (open-source)
 and Pro (commercial) editions.
 
-.. contents:: On this page
-   :depth: 1
-   :local:
-   :backlinks: none
-
 |
 
 .. _sol-lo-lio:
@@ -31,7 +26,7 @@ LiDAR odometry modules available. It supports:
 Both modes work in **mapping** (build a map from scratch) and **localization**
 (localize within a prebuilt map) configurations.
 
-**Key strengths:** Sub-centimeter accuracy when tuned for survey-grade applications,
+**Key strengths:** Centimeter-level accuracy when tuned for survey-grade applications,
 or lightweight real-time performance for navigation. Configurable pipeline via YAML.
 
 **Get started:** :ref:`Build your first map <building-maps>` |
@@ -71,21 +66,25 @@ GPS-available and GPS-denied areas, mixed indoor-outdoor scenarios.
 ========================================
 
 Based on the :ref:`smoother state estimator <mola_sta_est_index>`, this solution
-provides **RTK-quality georeferenced pose estimation without a prebuilt map**.
+provides **geo-referenced pose estimation without a prebuilt map**.
 
-By fusing **low-cost GNSS + LiDAR + IMU + kinematics**, the smoother estimates
-the vehicle pose in geodetic (latitude/longitude) or UTM coordinates in real time.
-No RTK base station is required - a standard consumer-grade GNSS receiver is sufficient.
+By fusing **GNSS + LiDAR + IMU + kinematics**, the smoother estimates the vehicle
+pose in geodetic (latitude/longitude) or UTM coordinates in real time. The trajectory
+keeps the **centimeter-level local accuracy** of LiDAR-inertial odometry, while its
+absolute accuracy is that of the GNSS: centimeter-level with an RTK receiver, and
+meter-level with a consumer-grade receiver, refined by fusing many fixes along the
+trajectory. GNSS outages (trees, buildings) are bridged by the LiDAR and wheel odometry.
 
 This enables:
 
-- Outdoor robot navigation with absolute positioning from the first second
+- Outdoor robot navigation with absolute positioning, as soon as the geo-reference
+  converges (about a second with RTK and an attitude IMU, or a few meters of driving)
 - Georeferenced trajectory logging for fleet management
 - Autonomous driving in open environments without prior mapping
 
 **Best for:** Agricultural robots, autonomous tractors, outdoor inspection platforms,
-delivery robots, and any application requiring absolute outdoor positioning without
-the cost and complexity of RTK infrastructure.
+delivery robots, and any application requiring absolute outdoor positioning, with
+the GNSS receiver chosen for the absolute accuracy it needs.
 
 |
 
@@ -98,6 +97,10 @@ Build **globally consistent, georeferenced 3D maps**, even in large-scale enviro
 mixing indoor and outdoor areas. This is the most complete SLAM solution in MOLA,
 combining:
 
+- **Live SLAM with online loop closure**: :ref:`mola_mapper <mola_mapper>` runs next to
+  LiDAR-inertial odometry, keeps a global keyframe map, detects loop closures and
+  optimizes a global pose graph (GNSS, gravity, gyroscope, wheel odometry) while the
+  robot moves
 - **Georeferencing** metric maps with consumer-grade GNSS sensors
   (see :ref:`geo-referencing`)
 - **Offline loop closure** for globally consistent maps - corrects accumulated
@@ -105,15 +108,16 @@ combining:
 - **Simple-map → metric-map pipelines** for flexible post-processing
   (see :ref:`sm2mm_pipelines`)
 
+.. image:: https://mrpt.github.io/videos/mola_mapper_vbr_colosseo.webp
+   :alt: mola_mapper GUI building the map of the Colosseum live (VBR dataset), with loop closures
+
 .. image:: https://mrpt.github.io/imgs/kaist01_georef_sample.png
 
 **Best for:** Large-scale surveying, building 3D maps of campuses/cities,
 creating reference maps for localization.
 
-**Coming soon:**
-
-- ``mola_3d_mapper``: Full live/offline 3D SLAM with online loop closure *(in development)*
-- ``mola_2d_mapper``: 2D SLAM via pose graph optimization for 2D LiDARs *(in development)*
+**Available now:** ``mola_mapper``, the global back end for live SLAM with online loop
+closure and geo-referencing, live on ROS 2 topics or on recorded data (see :ref:`mola_mapper`).
 
 |
 
@@ -124,42 +128,6 @@ Industry applications
 
 .. raw:: html
 
-   <style>
-   .mola-ind-grid {
-     display: grid;
-     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-     gap: 14px;
-     margin: 1.5rem 0 2rem;
-   }
-   .mola-ind-card {
-     border: 1px solid #d0d7de;
-     border-radius: 8px;
-     padding: 18px 20px 16px;
-     background: #fff;
-   }
-   .mola-ind-icon {
-     width: 32px; height: 32px;
-     border-radius: 6px;
-     background: #eef5fc;
-     display: flex; align-items: center; justify-content: center;
-     margin-bottom: 12px;
-   }
-   .mola-ind-icon svg { width: 18px; height: 18px; stroke: #185FA5; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-   .mola-ind-title {
-     font-size: 14px; font-weight: 600;
-     color: #1f2328; margin: 0 0 6px;
-   }
-   .mola-ind-body {
-     font-size: 13px; color: #57606a;
-     line-height: 1.55; margin: 0 0 12px;
-   }
-   .mola-ind-links {
-     font-size: 12px; color: #0550ae;
-     border-top: 1px solid #eaeef2;
-     padding-top: 10px; margin-top: auto;
-   }
-   .mola-ind-links span { color: #57606a; font-weight: 500; }
-   </style>
 
    <div class="mola-ind-grid">
 
@@ -195,7 +163,7 @@ Industry applications
          <svg viewBox="0 0 24 24"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
        </div>
        <p class="mola-ind-title">Surveying &amp; 3D Scanning</p>
-       <p class="mola-ind-body">Backpack mapping, drone-based surveying, forest inventory. Export to LAS/PLY for GIS workflows. Sub-centimeter accuracy with survey-grade pipeline tuning.</p>
+       <p class="mola-ind-body">Backpack mapping, drone-based surveying, forest inventory. Export to LAS/PLY for GIS workflows. Centimeter-level accuracy with survey-grade pipeline tuning.</p>
        <div class="mola-ind-links"><span>Solutions:</span> Full SLAM &middot; LO/LIO</div>
      </div>
 
@@ -226,39 +194,6 @@ Demos and videos
 
 .. raw:: html
 
-   <style>
-   .mola-videos-grid {
-     display: grid;
-     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-     gap: 16px;
-     margin: 1.5rem 0 2rem;
-   }
-   .mola-video-card {
-     border: 1px solid #d0d7de;
-     border-radius: 8px;
-     overflow: hidden;
-     background: #fff;
-   }
-   .mola-video-card iframe {
-     display: block;
-     width: 100%;
-     aspect-ratio: 16 / 9;
-     border: none;
-   }
-   .mola-video-label {
-     padding: 10px 14px;
-     font-size: 13px;
-     font-weight: 500;
-     color: #1f2328;
-     border-top: 1px solid #eaeef2;
-   }
-   .mola-videos-more {
-     font-size: 13px;
-     color: #57606a;
-     margin-top: 0.5rem;
-   }
-   .mola-videos-more a { color: #0550ae; }
-   </style>
 
    <div class="mola-videos-grid">
 
