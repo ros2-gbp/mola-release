@@ -19,156 +19,6 @@ Community vs. Pro
 
 .. raw:: html
 
-   <style>
-   .mola-pricing-wrap { margin: 2rem 0; font-size: 14px; font-family: inherit; }
-
-   .mola-pricing-table {
-     width: 100%;
-     border-collapse: collapse;
-     border: 1px solid #d0d7de;
-     border-radius: 8px;
-     overflow: hidden;
-   }
-
-   /* Column widths */
-   .mola-pricing-table col.col-feat   { width: 52%; }
-   .mola-pricing-table col.col-comm   { width: 24%; }
-   .mola-pricing-table col.col-pro    { width: 24%; }
-
-   /* Pro column tint */
-   .mola-pricing-table td.pro-col,
-   .mola-pricing-table th.pro-col { background: #eef5fc; }
-
-   /* Header row */
-   .mola-pricing-table thead tr th {
-     padding: 12px 16px;
-     text-align: center;
-     font-size: 15px;
-     font-weight: 600;
-     border-bottom: 1px solid #d0d7de;
-     color: #1f2328;
-   }
-   .mola-pricing-table thead tr th.col-feat-h {
-     text-align: left;
-     font-weight: 400;
-     font-size: 13px;
-     color: #57606a;
-   }
-   .mola-pricing-table thead tr th.pro-col {
-     color: #0550ae;
-     background: #dbeafe;
-     border-bottom-color: #bfdbfe;
-   }
-
-   /* Section header rows */
-   .mola-pricing-table tr.section-row td {
-     padding: 8px 16px 5px;
-     font-size: 11px;
-     font-weight: 600;
-     letter-spacing: 0.07em;
-     text-transform: uppercase;
-     color: #57606a;
-     background: #f6f8fa;
-     border-top: 1px solid #d0d7de;
-     border-bottom: 1px solid #d0d7de;
-   }
-   .mola-pricing-table tr.section-row td.pro-col {
-     background: #dbeafe;
-   }
-
-   /* Data rows */
-   .mola-pricing-table tr.data-row td {
-     padding: 9px 16px;
-     border-bottom: 1px solid #eaeef2;
-     vertical-align: middle;
-     color: #1f2328;
-     line-height: 1.45;
-   }
-   .mola-pricing-table tr.data-row:last-child td { border-bottom: none; }
-
-   .mola-pricing-table tr.data-row td.comm-col,
-   .mola-pricing-table tr.data-row td.pro-col {
-     text-align: center;
-     font-size: 13px;
-     color: #0550ae;
-     font-weight: 500;
-   }
-   .mola-pricing-table tr.data-row td.comm-col {
-     color: #57606a;
-   }
-
-   /* Price row */
-   .mola-pricing-table tr.price-row td {
-     padding: 16px 16px;
-     border-top: 2px solid #d0d7de;
-     vertical-align: middle;
-   }
-   .mola-pricing-table tr.price-row td.comm-col { text-align: center; }
-   .mola-pricing-table tr.price-row td.pro-col  { text-align: center; background: #dbeafe; }
-
-   .price-label    { font-size: 22px; font-weight: 700; color: #1f2328; }
-   .price-sub      { font-size: 12px; color: #57606a; margin-top: 3px; }
-   .price-pro      { font-size: 14px; font-weight: 600; color: #0550ae; }
-   .price-pro-sub  { font-size: 12px; color: #3b82b8; margin-top: 3px; }
-
-   /* Icons */
-   .check-icon { color: #1a7f37; font-size: 15px; }
-   .dash-icon  { color: #bbb; font-size: 18px; line-height: 1; }
-
-   /* Info tooltip */
-   .info-wrap { display: inline-block; position: relative; margin-left: 5px; vertical-align: middle; }
-   .info-btn {
-     display: inline-flex; align-items: center; justify-content: center;
-     width: 15px; height: 15px; border-radius: 50%;
-     background: #d0d7de; color: #57606a;
-     font-size: 10px; font-weight: 700; font-style: normal;
-     cursor: pointer; border: none; padding: 0;
-     font-family: inherit; line-height: 1;
-     transition: background 0.15s;
-   }
-   .info-btn:hover { background: #0550ae; color: #fff; }
-   .info-tooltip {
-     display: none;
-     position: absolute;
-     left: 50%; bottom: calc(100% + 6px);
-     transform: translateX(-50%);
-     width: 230px;
-     background: #1f2328; color: #fff;
-     font-size: 12px; line-height: 1.5;
-     padding: 8px 10px; border-radius: 6px;
-     z-index: 99; font-weight: 400; text-align: left;
-     pointer-events: none;
-   }
-   .info-tooltip::after {
-     content: '';
-     position: absolute; top: 100%; left: 50%;
-     transform: translateX(-50%);
-     border: 5px solid transparent;
-     border-top-color: #1f2328;
-   }
-   .info-wrap:hover .info-tooltip,
-   .info-btn:focus + .info-tooltip { display: block; }
-
-   /* Badges */
-   .badge-wip {
-     display: inline-block; font-size: 10px; padding: 1px 6px;
-     background: #fff8c5; color: #7d4e00;
-     border: 1px solid #e8c84a; border-radius: 4px;
-     margin-left: 6px; vertical-align: middle; font-weight: 500;
-     white-space: nowrap;
-   }
-   .badge-road {
-     display: inline-block; font-size: 10px; padding: 1px 6px;
-     background: #ddf4ff; color: #0550ae;
-     border: 1px solid #80caff; border-radius: 4px;
-     margin-left: 6px; vertical-align: middle; font-weight: 500;
-     white-space: nowrap;
-   }
-   .feat-note {
-     display: block; font-size: 11px; color: #57606a;
-     margin-top: 2px; font-weight: 400;
-   }
-   </style>
 
    <div class="mola-pricing-wrap">
    <table class="mola-pricing-table">
@@ -218,7 +68,7 @@ Community vs. Pro
            Loop closure / global SLAM
            <span class="info-wrap">
              <button class="info-btn" aria-label="About loop closure">i</button>
-             <span class="info-tooltip">Online or offline versions, configurable level of global accuracy.</span>
+             <span class="info-tooltip">Online (mola_mapper, live SLAM) or offline (mola_sm_loop_closure), configurable level of global accuracy.</span>
            </span>
          </td>
          <td class="comm-col"><span class="check-icon">&#10004;</span></td>
@@ -292,11 +142,6 @@ Community vs. Pro
          <td class="pro-col"><span class="check-icon">&#10004;</span></td>
        </tr>
        <tr class="data-row">
-         <td>mola_mapper <span class="badge-wip">in development</span></td>
-         <td class="comm-col"><span class="dash-icon">&mdash;</span></td>
-         <td class="pro-col">Early access</td>
-       </tr>
-       <tr class="data-row">
          <td>Visual odometry <span class="badge-wip">in development</span></td>
          <td class="comm-col"><span class="dash-icon">&mdash;</span></td>
          <td class="pro-col">Early access</td>
@@ -334,7 +179,7 @@ Community vs. Pro
 
        <!-- ── Price ── -->
        <tr class="price-row">
-         <td style="color:#57606a; font-size:13px;">Price</td>
+         <td class="price-head">Price</td>
          <td class="comm-col">
            <div class="price-label">Free</div>
            <div class="price-sub">Open-source, forever</div>
@@ -407,8 +252,8 @@ The MOLA framework is composed of several repositories with different open-sourc
      - ROS 2 nodes: map server, localization, point cloud pipeline
 
    * - `MOLA <https://github.com/MOLAorg/mola>`_
-     - GPL-3
-     - MOLA kernel, visualization, relocalization
+     - GPL-3 (BSD-3: ``mola_bridge_ros2``, ``mola_yaml``, ``mola_traj_tools``, ``mola_demos``)
+     - MOLA kernel, launcher, dataset inputs, metric maps, visualization, relocalization
 
    * - `mola_lidar_odometry <https://github.com/MOLAorg/mola_lidar_odometry/>`_
      - GPL-3
@@ -416,16 +261,21 @@ The MOLA framework is composed of several repositories with different open-sourc
 
    * - `mola_state_estimation <https://github.com/MOLAorg/mola_state_estimation/>`_
      - GPL-3
-     - State estimators: smoother, IMU/GNSS/kinematics fusion
+     - State estimators: smoother, IMU/GNSS/kinematics fusion; map and trajectory georeferencing tools
+
+   * - `mola_mapper <https://github.com/MOLAorg/mola_mapper/>`_
+     - GPL-3
+     - Live SLAM: global keyframe map, online loop closure, global pose graph, georeferencing
 
    * - `mola_sm_loop_closure <https://github.com/MOLAorg/mola_sm_loop_closure/>`_
      - GPL-3
-     - Map georeferencing, loop closure for consistent large maps
+     - Offline loop closure of simple-maps, for consistent large maps
 
-**BSD-3 modules** (MRPT, mp2p_icp, mrpt_navigation) can be freely used in any project,
-including closed-source commercial products.
+**BSD-3 modules** (MRPT, mp2p_icp, mrpt_navigation, and the BSD-3 packages of the MOLA
+repository listed above) can be freely used in any project, including closed-source
+commercial products.
 
-**GPL-3 modules** (MOLA core, lidar odometry, state estimation, loop closure) require
+**GPL-3 modules** (MOLA core, lidar odometry, state estimation, mapper, loop closure) require
 that derivative works also be released under GPL-3. If your product is closed-source,
 you need a **MOLA Pro commercial license**.
 
