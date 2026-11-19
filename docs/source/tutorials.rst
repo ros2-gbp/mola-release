@@ -11,15 +11,20 @@ Tutorials
 
   tutorial-ouster-lio
   tutorial-ouster-mapping-lc
-  building-maps
   tutorial-mola-lo-map-and-localize
+  tutorial-pf-localization
 
 
 .. toctree::
   :maxdepth: 2
-  :caption: Core MOLA functionalities
+  :caption: State estimation and sensor fusion
 
-  tutorial-mola-main-cli-tools
-  tutorial-mola-cmake-commands
+  tutorial-wheels-imu-gnss-fusion
+
+
+.. toctree::
+  :maxdepth: 2
+  :caption: Datasets and ROS 2
+
   tutorial-mulran-replay-to-ros2
 

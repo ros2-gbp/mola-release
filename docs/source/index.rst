@@ -9,37 +9,34 @@
   :caption: Get started
 
   Home <index.html#http://>
+  how-to-install
   quickstart
-  why-mola
   your-own-rosbag
   gui-vs-cli
-  building-maps
-  localization
-  geo-referencing
-  ros2api
-  mola_ros2_configurations
-  map-tools
   troubleshooting
 
 .. toctree::
-  :maxdepth: 1
+  :maxdepth: 2
   :hidden:
-  :caption: Datasets
+  :caption: Guides
 
+  building-maps
+  localization
+  geo-referencing
+  mola_ros2_configurations
   datasets/index
 
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: Solutions & pricing
+  :caption: Tutorials
 
-  solutions
-  pricing
+  tutorials
 
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: 3D LiDAR
+  :caption: LiDAR odometry
 
   mola_lidar_odometry
   mola_lo_apps
@@ -50,44 +47,48 @@
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: Full 3D SLAM
+  :caption: SLAM and state estimation
 
   mola_mapper
-  mola_mapper_ros2_node
-
-.. toctree::
-  :maxdepth: 2
-  :hidden:
-  :caption: State estimation
-
   mola_state_estimators
 
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: mp2p_icp
+  :caption: Maps and mp2p_icp
 
+  map-tools
   module-mp2p-icp
   mp2p_icp_basics
   mp2p_icp_filters
   mp2p_icp_optimal-transformations
-  mp2p_icp_applications
   sm2mm_pipelines
-
 
 .. toctree::
   :maxdepth: 2
   :hidden:
-  :caption: Learn more
+  :caption: Reference
 
-  tutorials
-  mola_architecture
-  dataset-conversions
+  ros2api
   supported-sensors
+  dataset-conversions
+  concept-slam-configuration-file
+  module-mola-launcher
+  mola_architecture
+  tutorial-mola-cmake-commands
   modules
   changelog
   doxygen-index
   bibliography
+
+.. toctree::
+  :maxdepth: 2
+  :hidden:
+  :caption: Product
+
+  why-mola
+  solutions
+  pricing
 
 
 =====================================================
@@ -96,92 +97,44 @@ MOLA: LiDAR Odometry, SLAM and Localization
 
 .. raw:: html
 
-   <div style="text-align: center; margin: 1.5em 0 1em 0;">
-     <p style="font-size: 1.3em; color: #333; margin-bottom: 0.5em;">
-       <strong>Production-grade LiDAR SLAM for robotics and surveying</strong>
-     </p>
-     <p style="font-size: 1.05em; color: #555;">
-       Open Core - free for research, commercially licensable for products
-     </p>
-   </div>
+   <section class="mola-hero" aria-label="MOLA">
+     <video class="mola-hero-video" autoplay muted loop playsinline preload="auto"
+            poster="https://mrpt.github.io/videos/mola_hero_v1_poster.jpg">
+       <source src="https://mrpt.github.io/videos/mola_hero_v1_720p.mp4" type="video/mp4" media="(max-width: 900px)">
+       <source src="https://mrpt.github.io/videos/mola_hero_v1.mp4" type="video/mp4">
+     </video>
+     <div class="mola-hero-shade"></div>
+     <nav class="mola-hero-nav">
+       <a class="mola-hero-brand" href="index.html">MOLA</a>
+       <span class="mola-hero-links">
+         <a href="quickstart.html">Quickstart</a>
+         <a href="tutorials.html">Tutorials</a>
+         <a href="modules.html">Modules</a>
+         <a href="solutions.html">Solutions</a>
+         <a href="pricing.html">Pricing</a>
+         <a href="https://github.com/MOLAorg/mola">GitHub</a>
+       </span>
+     </nav>
+     <div class="mola-hero-content">
+       <p class="mola-hero-eyebrow">Open-source LiDAR SLAM &middot; C++ &middot; ROS 2</p>
+       <p class="mola-hero-title">Production-grade LiDAR SLAM<br/>for robots and surveying</p>
+       <p class="mola-hero-sub">LiDAR and LiDAR-inertial odometry, live SLAM with loop closure,
+         localization and geo-referencing, from handheld scanners to legged robots and cars.</p>
+       <div class="mola-hero-cta">
+         <a class="mola-btn mola-btn-primary" href="quickstart.html">Get started</a>
+         <a class="mola-btn mola-btn-secondary" href="why-mola.html">Why MOLA</a>
+         <a class="mola-btn mola-btn-ghost" href="pricing.html">Plans &amp; pricing</a>
+       </div>
+     </div>
+     <p class="mola-hero-caption">Real data: GrandTour (ANYmal), Husky robot at the University of Almer&iacute;a,
+       TorWIC warehouse, Oxford Spires, VBR Rome.</p>
+   </section>
 
 :octicon:`mark-github` `MOLA`_ is a Modular system for Localization and Mapping,
 providing LiDAR Odometry (LO), LiDAR-inertial Odometry (LIO), SLAM, localization-only modes,
 and geo-referencing.
 
 .. raw:: html
-
-   <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
-     <div style="flex: 1; min-width: 280px;">
-       <video controls autoplay loop muted style="width: 100%;">
-         <source src="https://mrpt.github.io/videos/mola-lo-mulran-dcc02-demo-decaying-clouds.mp4" type="video/mp4">
-       </video>
-     </div>
-     <div style="flex: 1; min-width: 280px;">
-       <img src="https://mrpt.github.io/imgs/MOLA_LIO_Oxford_Spires_stairs.gif" style="width: 100%;" alt="MOLA LIO Oxford Spires stairs demo">
-     </div>
-   </div>
-
-|
-
-.. raw:: html
-
-   <style>
-   .mola-cards {
-     display: grid;
-     grid-template-columns: repeat(3, 1fr);
-     gap: 14px;
-     margin: 1.5rem 0 2rem;
-   }
-   @media (max-width: 600px) {
-     .mola-cards { grid-template-columns: 1fr; }
-   }
-   .mola-card {
-     display: block;
-     border: 1px solid #d0d7de;
-     border-radius: 8px;
-     padding: 20px 22px 18px;
-     background: #fff;
-     text-decoration: none !important;
-     color: inherit !important;
-     transition: border-color 0.15s, box-shadow 0.15s;
-   }
-   .mola-card:hover {
-     border-color: #0550ae;
-     box-shadow: 0 0 0 3px #e6f1fb;
-     text-decoration: none !important;
-   }
-   .mola-card-icon {
-     width: 34px; height: 34px;
-     border-radius: 7px;
-     background: #eef5fc;
-     display: flex; align-items: center; justify-content: center;
-     margin-bottom: 13px;
-   }
-   .mola-card-icon svg {
-     width: 18px; height: 18px;
-     stroke: #185FA5; fill: none;
-     stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
-   }
-   .mola-card-title {
-     font-size: 15px; font-weight: 600;
-     color: #1f2328; margin: 0 0 6px;
-   }
-   .mola-card-body {
-     font-size: 13px; color: #57606a;
-     line-height: 1.55; margin: 0 0 14px;
-   }
-   .mola-card-cta {
-     font-size: 12px; font-weight: 600;
-     color: #0550ae;
-     display: flex; align-items: center; gap: 4px;
-   }
-   .mola-card-cta svg {
-     width: 12px; height: 12px;
-     stroke: #0550ae; fill: none;
-     stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;
-   }
-   </style>
 
    <div class="mola-cards">
 
@@ -227,6 +180,7 @@ and geo-referencing.
 
 Quick links
 =============
+- :ref:`Install MOLA <installing>`
 - :ref:`Video tutorial: Ouster LIO mapping <tutorial-ouster-lio>`
 - :ref:`Building your first map <building-maps>`
 - :ref:`Mapping and localization <tutorial-mola-lo-map-and-localize>`
@@ -237,210 +191,6 @@ Quick links
 
 .. _MOLA: https://github.com/MOLAorg/mola
 .. _videos: https://www.youtube.com/playlist?list=PLOJ3GF0x2_eVaujK78PoVOvxJGrl_Z7fV
-
-|
-
-.. humble badges ------
-
-.. |badgeHrel| image:: https://img.shields.io/ros/v/humble/mola
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola
-
-.. |badgeHrel_LO| image:: https://img.shields.io/ros/v/humble/mola_lidar_odometry
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
-
-.. |badgeHrel_MP| image:: https://img.shields.io/ros/v/humble/mp2p_icp
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
-
-.. |badgeHrel_SE| image:: https://img.shields.io/ros/v/humble/mola_state_estimation
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
-
-.. jazzy badges ------
-
-.. |badgeJrel| image:: https://img.shields.io/ros/v/jazzy/mola
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola
-
-.. |badgeJrel_LO| image:: https://img.shields.io/ros/v/jazzy/mola_lidar_odometry
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
-
-.. |badgeJrel_MP| image:: https://img.shields.io/ros/v/jazzy/mp2p_icp
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
-
-.. |badgeJrel_SE| image:: https://img.shields.io/ros/v/jazzy/mola_state_estimation
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
-
-.. lyrical badges ------
-
-.. |badgeLrel| image:: https://img.shields.io/ros/v/lyrical/mola
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola
-
-.. |badgeLrel_LO| image:: https://img.shields.io/ros/v/lyrical/mola_lidar_odometry
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
-
-.. |badgeLrel_MP| image:: https://img.shields.io/ros/v/lyrical/mp2p_icp
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
-
-.. |badgeLrel_SE| image:: https://img.shields.io/ros/v/lyrical/mola_state_estimation
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
-
-.. rolling badges ------
-
-.. |badgeRrel| image:: https://img.shields.io/ros/v/rolling/mola
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola
-
-.. |badgeRrel_LO| image:: https://img.shields.io/ros/v/rolling/mola_lidar_odometry
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_lidar_odometry
-
-.. |badgeRrel_MP| image:: https://img.shields.io/ros/v/rolling/mp2p_icp
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mp2p_icp
-
-.. |badgeRrel_SE| image:: https://img.shields.io/ros/v/rolling/mola_state_estimation
-   :align: middle
-   :target: https://index.ros.org/?search_packages=true&pkgs=mola_state_estimation
-
-
-.. _installing:
-
-Installing
-======================
-
-How to install all MOLA modules:
-
-.. dropdown:: From ROS 2 repositories
-    :open:
-    :icon: download
-
-    **Recommended**: This is the easiest way to install MOLA.
-
-    In Debian/Ubuntu systems, activate your ROS environment (``setup.bash``) if not done automatically
-    in your ``~./bashrc`` file, then just run:
-
-    .. code-block:: bash
-
-        # Install core MOLA modules and 3D LiDAR odometry:
-        sudo apt install \
-         ros-$ROS_DISTRO-mola \
-         ros-$ROS_DISTRO-mola-state-estimation \
-         ros-$ROS_DISTRO-mola-lidar-odometry
-
-         # If you want parsers for KITTI, MULRAN, EuROC, etc.
-         ros-$ROS_DISTRO-mola-academic-datasets
-
-         # If you want to parse ROS1 bags from your ROS2 system:
-         ros-$ROS_DISTRO-mola-input-rosbag1
-
-    .. code-block:: bash
-
-        # (OPTIONAL) Install example small datasets to run demos/unit tests:
-        sudo apt install ros-$ROS_DISTRO-mola-test-datasets
-
-    Check if all new nodes and apps are visible:
-
-    .. code-block:: bash
-
-        # For example, let's launch the mm map viewer.
-        # If a GUI app is opened, it means installation was successful.
-        mm-viewer
-
-    .. code-block:: bash
-
-        # You can also test the mola LO cli interface:
-        mola-lidar-odometry-cli --help
-
-
-    These are the **versions available** from ROS build farms for each main MOLA component:
-
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | Repository           | ROS 2 Humble       | ROS 2 Jazzy    | ROS 2 Lyrical  | ROS 2 Rolling  |
-    |                      | (u22.04)           | (u24.04)       | (u26.04)       | (u24.04)       |
-    +======================+====================+================+================+================+
-    | MOLA                 | |badgeHrel|        | |badgeJrel|    | |badgeLrel|    | |badgeRrel|    |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mola_lidar_odometry  | |badgeHrel_LO|     | |badgeJrel_LO| | |badgeLrel_LO| | |badgeRrel_LO| |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mola_state_estimation| |badgeHrel_SE|     | |badgeJrel_SE| | |badgeLrel_SE| | |badgeRrel_SE| |
-    +----------------------+--------------------+----------------+----------------+----------------+
-    | mp2p_icp             | |badgeHrel_MP|     | |badgeJrel_MP| | |badgeLrel_MP| | |badgeRrel_MP| |
-    +----------------------+--------------------+----------------+----------------+----------------+
-
-
-.. dropdown:: Build from sources
-    :icon: code-square
-
-    Building tools
-    ~~~~~~~~~~~~~~~~~
-    MOLA uses ``colcon`` so you need to `install it first <https://colcon.readthedocs.io/en/released/user/installation.html>`_.
-
-    Note that despite ROS 2 integration, a full ROS 2 installation is actually not **required** for MOLA, only ``colcon`` and ``ament``.
-
-
-    Get the sources
-    ~~~~~~~~~~~~~~~~~
-
-    Clone the git repositories, including the submodules:
-
-    .. code-block:: bash
-
-        mkdir -p ~/ros2_mola_ws/src/
-        cd ~/ros2_mola_ws/src/
-
-        # Main MOLA modules:
-        git clone https://github.com/MOLAorg/mola_common.git
-        git clone https://github.com/MOLAorg/mp2p_icp.git --recursive
-        git clone https://github.com/MOLAorg/mola.git --recursive
-        git clone https://github.com/MOLAorg/mola_state_estimation.git
-        git clone https://github.com/MOLAorg/mola_test_datasets.git
-        git clone https://github.com/MOLAorg/mola_imu_preintegration.git
-        git clone https://github.com/MOLAorg/mola_sm_loop_closure.git
-
-        # MOLA lidar odometry package:
-        git clone https://github.com/MOLAorg/mola_lidar_odometry.git --recursive
-
-    Dependencies
-    ~~~~~~~~~~~~~~~~~
-
-    Make sure you have all dependencies installed (make sure of having `rosdep already installed <https://wiki.ros.org/rosdep>`_):
-
-    .. code-block:: bash
-
-        cd ~/ros2_mola_ws/
-        rosdep install --from-paths src --ignore-src -r -y
-
-
-    Build and test
-    ~~~~~~~~~~~~~~~~~
-
-    Now, compile as usual with colcon:
-
-    .. code-block:: bash
-
-        cd ~/ros2_mola_ws/
-        colcon  build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
-
-
-    Next, activate the new environment and check if all new modules are visible:
-
-    .. code-block:: bash
-
-        cd ~/ros2_mola_ws/
-        . install/setup.bash
-
-        # For example, let's launch the mm map viewer:
-        mm-viewer
 
 |
 
