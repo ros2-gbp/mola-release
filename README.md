@@ -33,21 +33,14 @@
 
 ---
 
-
-
-
-| Distro | Build dev | Release |
-| --- | --- | --- |
-| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/) | [![Version](https://img.shields.io/ros/v/humble/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-| ROS 2 Jazzy (u24.04) | [![Build Status](https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/badge/icon)](https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/) | [![Version](https://img.shields.io/ros/v/jazzy/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-| ROS 2 Kilted (u24.04) | [![Build Status](https://build.ros2.org/job/Kdev__mola__ubuntu_noble_amd64/badge/icon)](https://build.ros2.org/job/Kdev__mola__ubuntu_noble_amd64/) | [![Version](https://img.shields.io/ros/v/kilted/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-| ROS 2 Lyrical (u26.04) | [![Build Status](https://build.ros2.org/job/Ldev__mola__ubuntu_resolute_amd64/badge/icon)](https://build.ros2.org/job/Ldev__mola__ubuntu_resolute_amd64/) | [![Version](https://img.shields.io/ros/v/lyrical/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-| ROS 2 Rolling (u26.04) | [![Build Status](https://build.ros2.org/job/Rdev__mola__ubuntu_resolute_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mola__ubuntu_resolute_amd64/) | [![Version](https://img.shields.io/ros/v/rolling/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-
-| EOL Distro | Last Release |
-| --- | ---
-| ROS 2 Iron (u22.04) | [![Version](https://img.shields.io/ros/v/iron/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
-
+<p align="center">
+  <img src="https://mrpt.github.io/videos/mola_demo_montage.webp" width="100%"
+       alt="MOLA on real data: ANYmal legged robot (GrandTour), Husky robot (University of Almeria), TorWIC warehouse, Oxford Spires handheld, KITTI car, and live loop closure at the Colosseum (VBR)"/>
+  <br/>
+  <sub>Live MOLA GUI on real data: GrandTour (ANYmal legged robot), Husky robot at the University of Almer&iacute;a,
+  TorWIC warehouse, Oxford Spires (handheld), KITTI (car) and VBR Rome (loop closure at the Colosseum).
+  More videos and tutorials in the <a href="https://docs.mola-slam.org/latest/">documentation</a>.</sub>
+</p>
 
 ## 🤖 What is MOLA?
 MOLA (Modular Optimization framework for Localization and mApping) is a 
@@ -60,25 +53,12 @@ Refer to the [official documentation](https://docs.mola-slam.org/latest/) for bu
 
 ## 🗺️ Features
 - 📍 LiDAR Odometry (LO), LiDAR-Inertial Odometry (LIO), geo-referenced maps, sensor fusion
+- 🔁 Live SLAM with online loop closure and a global pose graph ([mola_mapper](https://github.com/MOLAorg/mola_mapper))
 - 🧩 Fully configurable YAML pipelines - no recompilation needed to change sensors, filters, or map layers
 - 🎯 Flexible accuracy: fast real-time navigation or survey-grade (<1 cm) mapping
 - 🌍 Map-less RTK-quality outdoor georeferencing with low-cost GNSS + LiDAR + IMU
 - 🛠️ Rich `.mm` metric map ecosystem: viewer, LAS/PLY/TXT export, filtering, georeferencing tools
 - 🤖 ROS 2 ready (Humble, Jazzy, Kilted, Rolling) but also usable from standalone pure C++
-
-## 🚀 Demo videos
-
-Lidar-Inertial-Odometry (LIO) demo with Oxford Spires:
-
-![Peek 2025-10-10 10-29](https://github.com/user-attachments/assets/f3a83a42-a9d7-4007-b0a0-a87c13893c0e)
-
-Lidar-Odometry (LO) demo with GrandTour legged dataset:
-
-<img width="550" height="292" alt="mola-lio-legged-cons" src="https://github.com/user-attachments/assets/9899217b-760a-431d-8b03-2e2e5e681e4b" />
-
-Lidar-Odometry (LO) demo with KITTI:
-
-![kitti_demo_06](https://github.com/MOLAorg/mola/assets/5497818/76cf07e2-ab20-41a3-abc6-df5c5ba74b97)
 
 ## ROSCon Talk introducing MOLA
 Video ([Slides](https://docs.google.com/presentation/d/1Zg1saZCxlE49jZ4SxPBLaRh7WUYGmfC0fiKUunJg-dA/edit?usp=drivesdk)):
@@ -86,7 +66,18 @@ Video ([Slides](https://docs.google.com/presentation/d/1Zg1saZCxlE49jZ4SxPBLaRh7
 [![MOLA ROSCon talk](https://img.youtube.com/vi/FkDnbfVyN2M/0.jpg)](https://www.youtube.com/watch?v=FkDnbfVyN2M)
 
 
-## Individual package build status
+## 🏗️ Build status
+
+<details>
+<summary>ROS 2 build farm status (click to expand)</summary>
+
+| Distro | Build dev | Release |
+| --- | --- | --- |
+| ROS 2 Humble (u22.04) | [![Build Status](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/badge/icon)](https://build.ros2.org/job/Hdev__mola__ubuntu_jammy_amd64/) | [![Version](https://img.shields.io/ros/v/humble/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
+| ROS 2 Jazzy (u24.04) | [![Build Status](https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/badge/icon)](https://build.ros2.org/job/Jdev__mola__ubuntu_noble_amd64/) | [![Version](https://img.shields.io/ros/v/jazzy/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
+| ROS 2 Kilted (u24.04) | [![Build Status](https://build.ros2.org/job/Kdev__mola__ubuntu_noble_amd64/badge/icon)](https://build.ros2.org/job/Kdev__mola__ubuntu_noble_amd64/) | [![Version](https://img.shields.io/ros/v/kilted/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
+| ROS 2 Lyrical (u26.04) | [![Build Status](https://build.ros2.org/job/Ldev__mola__ubuntu_resolute_amd64/badge/icon)](https://build.ros2.org/job/Ldev__mola__ubuntu_resolute_amd64/) | [![Version](https://img.shields.io/ros/v/lyrical/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
+| ROS 2 Rolling (u26.04) | [![Build Status](https://build.ros2.org/job/Rdev__mola__ubuntu_resolute_amd64/badge/icon)](https://build.ros2.org/job/Rdev__mola__ubuntu_resolute_amd64/) | [![Version](https://img.shields.io/ros/v/rolling/mola)](https://index.ros.org/?search_packages=true&pkgs=mola) |
 
 Binary package build status per package and ROS 2 distro:
 
@@ -116,8 +107,7 @@ Each cell stacks the badges for that ROS 2 distro, in this order (when available
 - RHEL (`x86_64`) -- not available for Humble, since `mrpt3` cannot be built there.
 - Fedora (`x86_64`) -- only available since ROS 2 Lyrical.
 
-
-
+</details>
 
 ## Citations
 
