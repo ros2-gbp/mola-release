@@ -1,11 +1,12 @@
 .. _mola-launcher:
+.. _mola_main_cli_tools:
 
-======================
-Module: mola-launcher
-======================
+======================================
+mola-cli and command-line tools
+======================================
 
-.. toctree::
-  :maxdepth: 2
+The ``mola_launcher`` package provides ``mola-cli``, the program that runs MOLA
+systems, and ``mola-yaml-parser``, to test the YAML pre-processor.
 
 ----
 
@@ -67,9 +68,6 @@ SYNOPSIS
          paths in which the program looks for module dynamic libraries, then
          exits.
 
-       --list-module-shared-dirs
-         Finds all MOLA module source/shared directories, then list them. Paths
-         can be added with the environment variable MOLA_MODULES_SHARED_PATH.
 
 
 Notes:
@@ -97,16 +95,16 @@ are defined in separate, reusable files:
   mola-cli sensors.yaml pipeline.yaml visualization.yaml
 
 
-Example: To list all known ICP algorithms:
+Example: To list all known ICP solvers:
 
 .. code-block:: none
 
-  mola-cli --rtti-children-of mp2p_icp::ICP_Base
+  mola-cli --rtti-children-of mp2p_icp::Solver
 
-  Listing children of class: mp2p_icp::ICP_Base
-  mp2p_icp::ICP_GaussNewton
-  mp2p_icp::ICP_Horn_MultiCloud
-  mp2p_icp::ICP_OLAE
+  Listing children of class: mp2p_icp::Solver
+  mp2p_icp::Solver_GaussNewton
+  mp2p_icp::Solver_Horn
+  mp2p_icp::Solver_OLAE
 
 
 Number of threads
@@ -124,37 +122,6 @@ cores, with the same results (parallel sums are deterministic). The scans took
 every core awake. Set the environment variable ``MOLA_MAX_THREADS`` to another
 positive number to change it. ``mola-lidar-odometry-cli`` does the same.
 
-
-----
-
-.. index::
-   single: mola-dir
-
-.. _mola_dir:
-
-Application: ``mola-dir``
-##########################
-
-``mola-dir`` is a CLI program that finds the shared directory
-(see :ref:`concepts_module_shared_dir`) of a module.
-It is most-commonly useful inside evaluation expression of MOLA definition files (:ref:`yaml_slam_cfg_file`).
-
--------------
-SYNOPSIS
--------------
-
-.. code-block:: none
-
-    USAGE:
-
-       mola-dir  <module_name>
-
-
-Note: To list all known shared directories of modules, use:
-
-.. code-block:: none
-
-    mola-cli --list-module-shared-dirs
 
 ----
 
@@ -211,7 +178,7 @@ Example:
 ----
 
 .. index::
-   module: mola-launcher
+   pair: module; mola-launcher
 
 C++ library: `mola-launcher`
 #############################
