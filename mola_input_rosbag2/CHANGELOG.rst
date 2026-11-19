@@ -3,6 +3,9 @@ Changelog for package mola_input_rosbag2
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+3.6.0 (2026-11-20)
+------------------
+
 3.5.0 (2026-11-15)
 ------------------
 * RGB-D cameras (color + depth + camera_info) as CObservation3DRangeScan.
