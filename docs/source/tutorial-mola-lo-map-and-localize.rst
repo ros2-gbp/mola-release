@@ -7,11 +7,6 @@ MOLA-LO: Build a map and then localize
 This tutorial will show you how to build a map using MOLA-LO, then save the map to disk, 
 and how to load that map to use the LO localization mode.
 
-.. contents::
-   :depth: 1
-   :local:
-   :backlinks: none
-
 |
 
 This video shows the steps in the tutorial:
@@ -97,10 +92,11 @@ Open **three terminals**, and run these commands in each one:
 The map saved in the former step comprises two files:
 
 - A **key-frame (view-based) map** (``*.simplemap``): a set of SE(3) poses annotated with metadata and raw sensor observations.
-- The metric **local map** used by the specific LO/LIO pipeline; For the for the ``lidar3d-gicp`` :ref:`pipeline <mola_3d_gicp_pipeline>` (default),
-  it is a key-frame based point cloud based on :ref:`mola_metric_maps/KeyframePointCloudMap <doxid-classmola_1_1_keyframe_point_cloud_map>`.
-  For the ``lidar3d-icp`` :ref:`pipeline <mola_3d_icp_pipeline>`,  it is a voxel-based point cloud of the current area, which may include an area of
-  more than 100 meters around the latest robot pose, but if you mapped a larger area, it would be an incomplete representation of the whole map.
+- The metric **local map** used by the specific LO/LIO pipeline. For the ``lidar3d-gicp`` :ref:`pipeline <mola_3d_gicp_pipeline>` (default),
+  it is a ``mola::IncrementalPointCloud`` (or a ``mola::KeyframePointCloudMap``, if :ref:`selected <gicp_localmap_class>`).
+  For the ``lidar3d-icp`` :ref:`pipeline <mola_3d_icp_pipeline>`, it is a voxel-based point cloud.
+  Either way, it only keeps the area around the latest robot pose (by default, at least 100 meters; see ``MOLA_INCREMENTAL_MAP_MAX_SIZE``
+  and ``MOLA_LOCAL_MAP_MAX_SIZE``), so if you mapped a larger area, it would be an incomplete representation of the whole map.
 
 
 The key-frame map is the more versatile one since it allows for running further map filtering,
@@ -117,10 +113,10 @@ the local map would contain the whole scenario and you are good to go with it as
 
   .. code-block:: bash
 
-    mm-viewer -l libmola_metric_maps.so  /path/to/your/map.mm
+    mm-viewer /path/to/your/map.mm
 
-  Where the ``-l`` flag is used to load the additional metric map classes defined in ``mola_metric_maps``, and
-  used in the ``lidar3d-default`` :ref:`pipeline <mola_lo_pipelines>`.
+  ``mm-viewer`` loads the metric map classes of ``mola_metric_maps`` used by the
+  ``lidar3d-default`` :ref:`pipeline <mola_lo_pipelines>` by itself when needed.
 
 
 However, if the map is much larger, you need to **generate a new local metric map** that includes the whole area where
@@ -134,10 +130,20 @@ the robot needs to operate so it can localize correctly.
   First, if your map is so large that it needs to close loops (e.g. several building blocks, a large part of a campus, etc.)
   the :ref:`loop closure module <solutions>` would be needed to post-process the ``*.simplemap`` file.
 
-  Next, either if you already have closed loops or you do not need them, follow :ref:`these instructions <building-maps_step_mm>`,
-  taking into account that there must exist an output metric map **layer** named as expected by the LO pipeline (e.g. :ref:`lidar3d-default <mola_lo_pipelines>`).
+  Next, either if you already have closed loops or you do not need them, build a metric map from the
+  key-frame map with ``sm2mm`` (see :ref:`these instructions <building-maps_step_mm>`). The new map must have a
+  **layer** named ``localmap``, the one the LO pipeline matches scans against. The example pipeline
+  ``sm2mm_pointcloud_voxelize_keyframe_map.yaml`` builds it, with all the key-frames, for the default
+  ``lidar3d-gicp`` :ref:`pipeline <mola_lo_pipelines>`:
 
-  TO-DO: Write complete example files and commands!
+  .. code-block:: bash
+
+    wget https://github.com/MOLAorg/mp2p_icp/raw/develop/mp2p_icp_core/demos/sm2mm_pointcloud_voxelize_keyframe_map.yaml
+
+    sm2mm -i /tmp/my_map.simplemap -o /tmp/my_full_map.mm -p sm2mm_pointcloud_voxelize_keyframe_map.yaml
+
+  Then, load ``/tmp/my_full_map`` in the next section. Since there is no ``/tmp/my_full_map.simplemap``,
+  the map can be used for localization, but not extended.
 
 
 
@@ -219,7 +225,7 @@ Again, we will use **three terminals**:
           mola_initial_map_sm_file:=/tmp/my_map.simplemap
 
     Of course, the ROS 2 service offers a greater flexibility to switch
-    between maps at run-time. You can drop ``MOLA_LOAD_SM`` if you do not need
+    between maps at run-time. You can drop ``mola_initial_map_sm_file`` if you do not need
     to extend the map (multi-session mapping).
 
 
